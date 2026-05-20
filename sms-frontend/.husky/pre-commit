@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+
+echo "Lint-staged: ESLint + Prettier on staged files"
+npx lint-staged
+
+echo "Typecheck: full project (tsc)"
+npm run typecheck
