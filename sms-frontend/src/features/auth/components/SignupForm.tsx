@@ -1,5 +1,5 @@
 import { FormLabel, InputField, CheckboxField, Button } from '@/components/ui'
-import FormWrapper from './FormWrapper'
+import { FormWrapper } from '@/features/auth/components'
 import AppLogo from '@/components/shared/AppLogo'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -12,7 +12,7 @@ const SignupForm = () => {
       <div className="flex justify-center items-center gap-8 flex-col text-center mb-6">
         <AppLogo />
         <div className="">
-          <h2 className="font-semibold text-3xl mb-3">Admin sign up</h2>
+          <h2 className="font-semibold text-2xl mb-3">Admin sign up</h2>
           <p className="text-lg text-slate-400">Register your school and create an admin account</p>
         </div>
       </div>
