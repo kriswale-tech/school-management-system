@@ -16,7 +16,7 @@ class AdminSignUpSerializerTests(TestCase):
         self.assertEqual(user.phone_number, PHONE)
         self.assertEqual(user.school.name, 'Test Academy')
         self.assertEqual(user.school.phone_number, PHONE)
-        self.assertEqual(user.role.name, 'admin')
+        self.assertEqual(user.role, User.RoleChoices.ADMIN)
 
     def test_normalizes_local_phone_number(self):
         serializer = AdminSignUpSerializer(data=signup_payload())

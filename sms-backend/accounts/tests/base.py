@@ -5,7 +5,14 @@ from django.core.cache import cache
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
-from accounts.views import AdminSignUpView, AdminVerifyOtpView
+from accounts.views import (
+    AdminSignUpView,
+    AdminVerifyOtpView,
+    LoginVerifyOtpView,
+    LoginView,
+    ResendLoginOtpView,
+    ResendOtpView,
+)
 
 TEST_REST_FRAMEWORK = {
     **settings.REST_FRAMEWORK,
@@ -21,6 +28,10 @@ class AccountsAPITestCase(APITestCase):
         cls._throttle_patches = [
             patch.object(AdminSignUpView, 'throttle_classes', []),
             patch.object(AdminVerifyOtpView, 'throttle_classes', []),
+            patch.object(ResendOtpView, 'throttle_classes', []),
+            patch.object(LoginView, 'throttle_classes', []),
+            patch.object(LoginVerifyOtpView, 'throttle_classes', []),
+            patch.object(ResendLoginOtpView, 'throttle_classes', []),
         ]
         for throttle_patch in cls._throttle_patches:
             throttle_patch.start()

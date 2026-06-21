@@ -1,8 +1,9 @@
 from django.db import transaction
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from shared.helpers import format_phone_number
-from accounts.models import User, Role, Profile
+from accounts.models import User, Profile
 from schools.models import School
 
 
@@ -20,7 +21,7 @@ class AdminSignUpSerializer(serializers.Serializer):
             raise serializers.ValidationError(str(e))
 
         if User.objects.filter(phone_number=phone, is_active=True).exists():
-            raise serializers.ValidationError('Phone number already exists')
+            raise serializers.ValidationError('Account with this phone number already exists')
 
         return phone
 
@@ -44,11 +45,6 @@ class AdminSignUpSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
-        admin_role, _ = Role.objects.get_or_create(
-            name=Role.RoleChoices.ADMIN,
-            defaults={'description': 'School administrator'},
-        )
-
         with transaction.atomic():
             existing_user = User.objects.filter(
                 phone_number=validated_data['phone_number'],
@@ -64,7 +60,7 @@ class AdminSignUpSerializer(serializers.Serializer):
                 existing_user.email = validated_data['email']
                 existing_user.first_name = validated_data['first_name']
                 existing_user.last_name = validated_data['last_name']
-                existing_user.role = admin_role
+                existing_user.role = User.RoleChoices.ADMIN
                 existing_user.save()
                 return existing_user
 
@@ -79,7 +75,7 @@ class AdminSignUpSerializer(serializers.Serializer):
                 first_name=validated_data['first_name'],
                 last_name=validated_data['last_name'],
                 school=school,
-                role=admin_role,
+                role=User.RoleChoices.ADMIN,
                 is_active=False,
             )
 
@@ -87,6 +83,16 @@ class AdminSignUpSerializer(serializers.Serializer):
 class AdminVerifyOtpSerializer(serializers.Serializer):
     phone_number = serializers.CharField(max_length=15)
     otp = serializers.CharField(max_length=6)
+
+    def validate_phone_number(self, value):
+        try:
+            return format_phone_number(value)
+        except ValueError as e:
+            raise serializers.ValidationError(str(e))
+
+
+class ResendOtpSerializer(serializers.Serializer):
+    phone_number = serializers.CharField(max_length=15)
 
     def validate_phone_number(self, value):
         try:
@@ -112,12 +118,13 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'full_name', 'first_name', 'last_name',
-            'phone_number', 'email', 'is_active', 'profile',
+            'phone_number', 'email', 'role', 'is_active', 'profile',
         ]
 
     def get_full_name(self, obj):
         return obj.get_full_name()
 
+    @extend_schema_field(ProfileSerializer(allow_null=True))
     def get_profile(self, obj):
         try:
             return ProfileSerializer(obj.profile).data
@@ -127,9 +134,5 @@ class UserSerializer(serializers.ModelSerializer):
 
 class MessageResponseSerializer(serializers.Serializer):
     message = serializers.CharField(read_only=True)
+    retry_after_seconds = serializers.IntegerField(read_only=True, required=False)
 
-
-class TokenResponseSerializer(serializers.Serializer):
-    message = serializers.CharField(read_only=True)
-    access = serializers.CharField(read_only=True)
-    refresh = serializers.CharField(read_only=True)

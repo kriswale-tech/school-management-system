@@ -4,6 +4,12 @@ import AppLogo from '@/components/shared/AppLogo'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { signup } from '@/features/auth/services'
+import { useAuthStore } from '@/features/auth/store'
+import { useMutation } from '@tanstack/react-query'
+import { useNavigate, Link } from 'react-router-dom'
+import toast from 'react-hot-toast'
+import { getApiErrorMessage } from '@/utils'
 
 const SignupForm = () => {
   return (
@@ -27,7 +33,8 @@ export default SignupForm
 
 const schema = z.object({
   school_name: z.string().min(1, { message: 'School name is required' }),
-  name: z.string().min(1, { message: 'Name is required' }),
+  first_name: z.string().min(1, { message: 'First name is required' }),
+  last_name: z.string().min(1, { message: 'Last name is required' }),
   phone_number: z
     .string()
     .min(1, { message: 'Phone number is required' })
@@ -38,6 +45,8 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 const Form = () => {
+  const navigate = useNavigate()
+  const setVerificationPhone = useAuthStore((state) => state.setVerificationPhone)
   const {
     register,
     handleSubmit,
@@ -46,8 +55,21 @@ const Form = () => {
     resolver: zodResolver(schema),
   })
 
+  const { mutate: signupMutation } = useMutation({
+    mutationFn: signup,
+  })
+
   const onSubmit = (data: FormData) => {
-    console.log(data)
+    signupMutation(data, {
+      onSuccess: () => {
+        setVerificationPhone(data.phone_number)
+        toast.success('Account created. Please verify your phone number.')
+        navigate('/auth/signup/verify-otp')
+      },
+      onError: (mutationError) => {
+        toast.error(getApiErrorMessage(mutationError, 'Unable to create account. Please try again.'))
+      },
+    })
   }
 
   return (
@@ -61,13 +83,22 @@ const Form = () => {
           {...register('school_name')}
         />
       </div>
-      {/* Name */}
+      {/* First Name */}
       <div className="space-y-2">
-        <FormLabel label="Name" required />
+        <FormLabel label="First Name" required />
         <InputField
-          placeholder="Enter your name"
-          error={errors.name?.message}
-          {...register('name')}
+          placeholder="Enter your first name"
+          error={errors.first_name?.message}
+          {...register('first_name')}
+        />
+      </div>
+      {/* Last Name */}
+      <div className="space-y-2">
+        <FormLabel label="Last Name" required />
+        <InputField
+          placeholder="Enter your last name"
+          error={errors.last_name?.message}
+          {...register('last_name')}
         />
       </div>
       {/* Phone Number */}
@@ -98,6 +129,13 @@ const Form = () => {
       <Button type="submit" variant="outline">
         Sign up
       </Button>
+
+      <p className="text-sm text-slate-500 text-center">
+        Already have an account?{' '}
+        <Link to="/auth/login" className="text-blue-500 hover:text-blue-600">
+          Log in
+        </Link>
+      </p>
     </form>
   )
 }
