@@ -84,7 +84,7 @@ const Form = () => {
         />
       </div>
 
-      <Button type="submit" variant="outline" disabled={isPending}>
+      <Button type="submit" disabled={isPending}>
         {isPending ? 'Sending code...' : 'Continue'}
       </Button>
     </form>

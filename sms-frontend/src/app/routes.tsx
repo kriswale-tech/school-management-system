@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { authRoutes } from '@/features/auth/routes'
 import AppLayout from '@/components/layout/AppLayout'
 import { lazy } from 'react'
+import { setupRoutes } from '@/features/setup/routes'
 
 const DashboardPage = lazy(() => import('@/features/dashboard/Dashboard'))
 
@@ -13,6 +14,7 @@ const AppRoutes = () => {
           <Route index element={<DashboardPage />} />
         </Route>
         {authRoutes}
+        {setupRoutes}
       </Routes>
     </BrowserRouter>
   )

@@ -1,9 +1,9 @@
-import { Outlet } from 'react-router-dom'
+import { Navigate, Outlet } from 'react-router-dom'
 import { AppToaster, AuthLoading } from '@/components/shared'
 import { useAuth } from '@/features/auth/hooks'
 
 const AppLayout = () => {
-  const { isReady, isAuthenticated } = useAuth({ requireAuth: true })
+  const { isReady, isAuthenticated, user } = useAuth({ requireAuth: true })
 
   if (!isReady || !isAuthenticated) {
     return (
@@ -12,6 +12,10 @@ const AppLayout = () => {
         <AuthLoading />
       </>
     )
+  }
+
+  if (user && !user.school_setup_completed) {
+    return <Navigate to="/setup" replace />
   }
 
   return (

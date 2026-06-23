@@ -4,7 +4,7 @@ import { AppToaster, AuthLoading } from '@/components/shared'
 import { useAuth } from '@/features/auth/hooks'
 
 const AuthLayout = () => {
-  const { isReady, isAuthenticated } = useAuth()
+  const { isReady, isAuthenticated, user } = useAuth()
 
   if (!isReady) {
     return (
@@ -15,7 +15,9 @@ const AuthLayout = () => {
     )
   }
 
-  if (isAuthenticated) return <Navigate to="/" replace />
+  if (isAuthenticated && user) {
+    return <Navigate to={user.school_setup_completed ? '/' : '/setup'} replace />
+  }
 
   return (
     <>

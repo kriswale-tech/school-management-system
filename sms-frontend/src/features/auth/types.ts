@@ -33,4 +33,5 @@ export interface User {
   role: string
   is_active: boolean
   profile: Profile
+  school_setup_completed: boolean
 }

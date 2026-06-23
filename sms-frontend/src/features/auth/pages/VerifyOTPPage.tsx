@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useMutation } from '@tanstack/react-query'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { OTPForm } from '../components'
 import { verifyOTP, verifyLoginOTP, getUser, resendOTP, resendLoginOTP } from '../services'
 import { useAuthStore } from '../store'
@@ -10,7 +10,6 @@ import { getApiErrorMessage } from '@/utils'
 const RESEND_COOLDOWN_SECONDS = 60
 
 const VerifyOTPPage = () => {
-  const navigate = useNavigate()
   const location = useLocation()
   const isLoginFlow = location.pathname.includes('/login/')
   const redirectTo = isLoginFlow ? '/auth/login' : '/auth/signup'
@@ -75,7 +74,6 @@ const VerifyOTPPage = () => {
         setUser(user)
         clearVerificationPhone()
         toast.success(successMessage)
-        navigate('/')
       },
       onError: (mutationError) => {
         toast.error(getApiErrorMessage(mutationError, 'Unable to verify code. Please try again.'))
