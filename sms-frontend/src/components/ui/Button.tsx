@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import LoadingSpinner from './LoadingSpinner'
 import { mergeClasses } from '@/utils'
 
 type ButtonVariant = 'outline' | 'solid' | 'solidReverse' | 'ghost'
@@ -8,6 +9,8 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode
   variant?: ButtonVariant
   color?: ButtonColor
+  loading?: boolean
+  loadingText?: string
 }
 
 const colorVariantClasses: Record<ButtonColor, Record<ButtonVariant, string>> = {
@@ -37,20 +40,32 @@ const Button = ({
   color = 'slate',
   className,
   type = 'button',
+  loading = false,
+  loadingText = 'Loading',
+  disabled,
   ...props
 }: ButtonProps) => {
   return (
     <button
       type={type}
+      disabled={disabled || loading}
+      aria-busy={loading}
       className={mergeClasses(
         'w-full rounded-lg bg-transparent px-4 py-3 text-center text-sm font-medium transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-60',
-        'inline-flex items-center justify-center cursor-pointer',
+        'inline-flex items-center justify-center gap-2 cursor-pointer',
         colorVariantClasses[color][variant],
         className,
       )}
       {...props}
     >
-      {children}
+      {loading ? (
+        <>
+          <LoadingSpinner size={16} className="text-current" />
+          {loadingText}
+        </>
+      ) : (
+        children
+      )}
     </button>
   )
 }

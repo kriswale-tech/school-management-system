@@ -69,7 +69,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_spectacular',
     'rest_framework_simplejwt.token_blacklist',
-
+    'cloudinary',
+    'cloudinary_storage',
 
     # Local apps
     'schools',
@@ -148,12 +149,13 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.AnonRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'otp_verify': '10/hour',
-        'admin_signup': '4/hour',
-        'otp_send': '3/hour',
-        'anon': '100/day',
+        'otp_verify': '10/hour' if not DEBUG else '100/hour',
+        'admin_signup': '4/hour' if not DEBUG else '100/hour',
+        'otp_send': '3/hour' if not DEBUG else '100/hour',
+        'anon': '100/day' if not DEBUG else '1000/day',
     },
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'EXCEPTION_HANDLER': 'core.exceptions.custom_exception_handler',
 }
 
 # drf spectacular settings
@@ -229,3 +231,45 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 AUTH_USER_MODEL = 'accounts.User'
+
+# Arkesel settings
+ARKESEL_API_KEY = os.getenv('ARKESEL_API_KEY')
+ARKESEL_SMS_SENDER = os.getenv('ARKESEL_SMS_SENDER')
+
+# cloudinary settings
+PARENT_CLOUDINARY_FOLDER = 'school-management-system'
+CLOUDINARY_UPLOAD_PRESET = os.getenv('CLOUDINARY_UPLOAD_PRESET')
+
+_cloudinary_upload_options = {
+    'folder': f'{PARENT_CLOUDINARY_FOLDER}/school-logos',
+}
+if CLOUDINARY_UPLOAD_PRESET:
+    _cloudinary_upload_options['upload_preset'] = CLOUDINARY_UPLOAD_PRESET
+    _cloudinary_upload_options['unsigned'] = True
+
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME'),
+    'API_KEY': os.getenv('CLOUDINARY_API_KEY'),
+    'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
+    'SECURE': True,
+    'MEDIA_TAG': 'school-management-system',
+    'UPLOAD_OPTIONS': _cloudinary_upload_options,
+}
+
+import cloudinary
+
+cloudinary.config(
+    cloud_name=CLOUDINARY_STORAGE['CLOUD_NAME'],
+    api_key=CLOUDINARY_STORAGE['API_KEY'],
+    api_secret=CLOUDINARY_STORAGE['API_SECRET'],
+    secure=True,
+)
+
+STORAGES = {
+    'default': {
+        'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+    },
+}

@@ -3,6 +3,7 @@ from datetime import timedelta
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
+from django.conf import settings
 
 from shared.models import BaseModel
 
@@ -26,7 +27,7 @@ class User(BaseModel, AbstractUser):
 
 class Profile(BaseModel):
     user = models.OneToOneField('accounts.User', on_delete=models.CASCADE)
-    profile_picture = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)
+    profile_picture = models.ImageField(upload_to=f'{settings.PARENT_CLOUDINARY_FOLDER}/profile-pictures/', null=True, blank=True)
     bio = models.TextField(null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
     gender = models.CharField(

@@ -34,4 +34,5 @@ export interface User {
   is_active: boolean
   profile: Profile
   school_setup_completed: boolean
+  school_id: string
 }

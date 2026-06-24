@@ -4,5 +4,6 @@ import InputField from './InputField'
 import OTPInput from './OTPInput'
 import Button from './Button'
 import AvatarComponent from './AvatarComponent'
+import LoadingSpinner from './LoadingSpinner'
 
-export { FormLabel, InputField, OTPInput, CheckboxField, Button, AvatarComponent }
+export { FormLabel, InputField, OTPInput, CheckboxField, Button, AvatarComponent, LoadingSpinner }

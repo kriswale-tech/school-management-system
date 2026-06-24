@@ -14,4 +14,5 @@ urlpatterns = [
 
     # api urls
     path(f'{v1_path}accounts/', include('accounts.urls')),
+    path(f'{v1_path}schools/', include('schools.urls')),
 ]

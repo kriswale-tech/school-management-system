@@ -1,14 +1,13 @@
 import { lazy } from 'react'
-import { Navigate, Route } from 'react-router-dom'
+import { Route } from 'react-router-dom'
 import SetupLayout from '@/components/layout/SetupLayout'
 
-const SchoolProfile = lazy(() => import('./pages/SchoolProfile'))
+const SetupStepPage = lazy(() => import('./pages/SetupStepPage'))
 
 export const setupRoutes = (
   <>
     <Route path="/setup" element={<SetupLayout />}>
-      <Route index element={<Navigate to="school-profile" />} />
-      <Route path="school-profile" element={<SchoolProfile />} />
+      <Route path=":step" element={<SetupStepPage />} />
     </Route>
   </>
 )

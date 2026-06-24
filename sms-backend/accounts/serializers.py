@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from shared.helpers import format_phone_number
 from accounts.models import User, Profile
-from schools.models import School
+from schools.models import School, SchoolSetup
 
 
 class AdminSignUpSerializer(serializers.Serializer):
@@ -62,12 +62,14 @@ class AdminSignUpSerializer(serializers.Serializer):
                 existing_user.last_name = validated_data['last_name']
                 existing_user.role = User.RoleChoices.ADMIN
                 existing_user.save()
+                SchoolSetup.objects.get_or_create(school=school)
                 return existing_user
 
             school = School.objects.create(
                 name=validated_data['school_name'],
                 phone_number=validated_data['phone_number'],
             )
+            SchoolSetup.objects.create(school=school)
 
             return User.objects.create(
                 phone_number=validated_data['phone_number'],
@@ -113,16 +115,23 @@ class ProfileSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     profile = serializers.SerializerMethodField()
     full_name = serializers.SerializerMethodField()
+    school_setup_completed = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'full_name', 'first_name', 'last_name',
             'phone_number', 'email', 'role', 'is_active', 'profile',
+            'school_setup_completed',
+            'school_id',
         ]
 
     def get_full_name(self, obj):
         return obj.get_full_name()
+    
+    @extend_schema_field(serializers.BooleanField())
+    def get_school_setup_completed(self, obj):
+        return obj.school.setup_completed
 
     @extend_schema_field(ProfileSerializer(allow_null=True))
     def get_profile(self, obj):
