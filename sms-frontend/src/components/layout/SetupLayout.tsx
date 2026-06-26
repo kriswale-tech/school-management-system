@@ -72,7 +72,7 @@ const SetupLayout = () => {
           </div>
 
           <div className="my-10!">
-            <Outlet />
+            <Outlet context={setup} />
           </div>
         </main>
       </div>

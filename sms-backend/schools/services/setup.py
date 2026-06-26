@@ -1,4 +1,5 @@
 from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 
 from schools.models import SchoolSetup
 
@@ -13,10 +14,29 @@ SETUP_STEP_ORDER = [
 ]
 
 
+def _step_value(step) -> str:
+    return step.value if hasattr(step, 'value') else step
+
+
+def require_prior_setup_steps(school_setup: SchoolSetup, step) -> None:
+    try:
+        step_index = SETUP_STEP_ORDER.index(step)
+    except ValueError:
+        return
+
+    completed = set(school_setup.completed_steps or [])
+    for prior_step in SETUP_STEP_ORDER[:step_index]:
+        if _step_value(prior_step) not in completed:
+            raise ValidationError({
+                'detail': f'Complete the "{prior_step.label}" step before continuing.',
+            })
+
+
 def advance_setup_step(school_setup: SchoolSetup, step: str) -> dict:
+    step_value = _step_value(step)
     completed = list(school_setup.completed_steps or [])
-    if step not in completed:
-        completed.append(step)
+    if step_value not in completed:
+        completed.append(step_value)
 
     actionable_steps = [choice.value for choice in SETUP_STEP_ORDER]
     completed_count = len([item for item in completed if item in actionable_steps])

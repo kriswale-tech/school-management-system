@@ -1,29 +1,37 @@
-import { useParams } from 'react-router-dom'
-import AcademicYear from './AcademicYear'
-import Classes from './Classes'
+import type { ComponentType } from 'react'
+import { useOutletContext, useParams } from 'react-router-dom'
+import type { Setup } from '../types'
+import AcademicYearAndTerm from './AcademicYearAndTerm'
+import Assessment from './Assessment'
+import ClassesAndSubjects from './ClassesAndSubjects'
 import Fees from './Fees'
-import Review from './Review'
 import SchoolProfile from './SchoolProfile'
 import Staff from './Staff'
+import Teachers from './Teachers'
 
-const stepPages = {
+/** Maps a backend step slug to its page component when one exists. */
+const stepComponents: Record<string, ComponentType> = {
   school_profile: SchoolProfile,
-  academic_year: AcademicYear,
-  classes: Classes,
-  staff: Staff,
+  academic_year_term: AcademicYearAndTerm,
+  classes_and_subjects: ClassesAndSubjects,
+  assessment: Assessment,
   fees: Fees,
-  review: Review,
-} as const
+  teachers: Teachers,
+  staff: Staff,
+}
 
 const SetupStepPage = () => {
+  const setup = useOutletContext<Setup>()
   const { step } = useParams<{ step: string }>()
-  const Page = step && step in stepPages ? stepPages[step as keyof typeof stepPages] : null
 
-  if (Page) {
+  const stepMeta = setup.steps.find((item) => item.step === step)
+  const Page = step ? stepComponents[step] : undefined
+
+  if (Page && stepMeta) {
     return <Page />
   }
 
-  return <div>{step?.replace(/_/g, ' ') ?? 'Setup'}</div>
+  return <div>{stepMeta?.name ?? step?.replace(/_/g, ' ') ?? 'Setup'}</div>
 }
 
 export default SetupStepPage

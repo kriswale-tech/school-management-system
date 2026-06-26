@@ -1,9 +1,19 @@
 import FormLabel from './FormLabel'
 import CheckboxField from './CheckboxField'
 import InputField from './InputField'
+import SelectField from './SelectField'
 import OTPInput from './OTPInput'
 import Button from './Button'
 import AvatarComponent from './AvatarComponent'
 import LoadingSpinner from './LoadingSpinner'
 
-export { FormLabel, InputField, OTPInput, CheckboxField, Button, AvatarComponent, LoadingSpinner }
+export {
+  FormLabel,
+  InputField,
+  SelectField,
+  OTPInput,
+  CheckboxField,
+  Button,
+  AvatarComponent,
+  LoadingSpinner,
+}

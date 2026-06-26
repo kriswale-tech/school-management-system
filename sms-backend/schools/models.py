@@ -47,14 +47,78 @@ class SchoolSetup(models.Model):
 
 
 class AcademicYear(BaseModel):
-    pass
+    school = models.ForeignKey(
+        'School',
+        on_delete=models.CASCADE,
+        related_name='academic_years',
+    )
+    academic_year = models.CharField(max_length=9)  # e.g. 2026/2027
+    start_date = models.DateField()
+    end_date = models.DateField()
+    is_active = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['school'],
+                condition=models.Q(is_active=True),
+                name='unique_active_academic_year_per_school',
+            ),
+            models.UniqueConstraint(
+                fields=['school', 'academic_year'],
+                name='unique_academic_year_label_per_school',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.academic_year} ({self.school.name})'
 
 
 class Term(BaseModel):
-    pass
+    class TermChoices(models.TextChoices):
+        FIRST_TERM = 'first_term', 'First Term'
+        SECOND_TERM = 'second_term', 'Second Term'
+        THIRD_TERM = 'third_term', 'Third Term'
+
+    school = models.ForeignKey(
+        'School',
+        on_delete=models.CASCADE,
+        related_name='terms',
+    )
+    academic_year = models.ForeignKey(
+        'AcademicYear',
+        on_delete=models.CASCADE,
+        related_name='terms',
+    )
+    term = models.CharField(
+        max_length=15,
+        choices=TermChoices.choices,
+    )
+    start_date = models.DateField()
+    end_date = models.DateField()
+    is_active = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['start_date']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['school'],
+                condition=models.Q(is_active=True),
+                name='unique_active_term_per_school',
+            ),
+            models.UniqueConstraint(
+                fields=['academic_year', 'term'],
+                name='unique_term_per_academic_year',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.get_term_display()} ({self.academic_year.academic_year})'
+
 
 class Level(BaseModel):
     pass
+
 
 class Class(BaseModel):
     pass
