@@ -77,7 +77,7 @@ INSTALLED_APPS = [
     'shared',
     'accounts',
     'students',
-    'staff',
+    'teachers',
     'academics',
     'assessments',
     'fees',

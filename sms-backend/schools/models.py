@@ -1,6 +1,7 @@
-from django.db import models
-from shared.models import BaseModel
 from django.conf import settings
+from django.db import models
+
+from shared.models import BaseModel
 
 # Create your models here.
 class School(BaseModel):
@@ -114,11 +115,3 @@ class Term(BaseModel):
 
     def __str__(self):
         return f'{self.get_term_display()} ({self.academic_year.academic_year})'
-
-
-class Level(BaseModel):
-    pass
-
-
-class Class(BaseModel):
-    pass

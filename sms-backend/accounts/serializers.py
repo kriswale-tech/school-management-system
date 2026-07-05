@@ -4,6 +4,7 @@ from rest_framework import serializers
 
 from shared.helpers import format_phone_number
 from accounts.models import User, Profile
+from shared.services.curriculum import provision_school_curriculum
 from schools.models import School, SchoolSetup
 
 
@@ -70,6 +71,7 @@ class AdminSignUpSerializer(serializers.Serializer):
                 phone_number=validated_data['phone_number'],
             )
             SchoolSetup.objects.create(school=school)
+            provision_school_curriculum(school)
 
             return User.objects.create(
                 phone_number=validated_data['phone_number'],
