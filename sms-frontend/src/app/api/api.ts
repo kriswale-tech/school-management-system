@@ -45,7 +45,12 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config
 
-    if (!original || error.response?.status !== 401 || original._retry || original._skipAuthRefresh) {
+    if (!original || error.response?.status !== 401 || original._skipAuthRefresh) {
+      return Promise.reject(error)
+    }
+
+    if (original._retry) {
+      await useAuthStore.getState().logout()
       return Promise.reject(error)
     }
 
