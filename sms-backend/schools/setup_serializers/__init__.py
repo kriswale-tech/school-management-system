@@ -6,7 +6,6 @@ from schools.setup_serializers.academic_year_term import (
     TermScheduleResponseItemSerializer,
 )
 from schools.setup_serializers.classes_and_subjects import (
-    ClassesAndSubjectsDataSerializer,
     SetupClassLevelSerializer,
     SetupClassStreamSerializer,
     SetupLevelSerializer,
@@ -18,7 +17,6 @@ from schools.setup_serializers.school_profile import SetupSchoolProfileSerialize
 
 __all__ = [
     'AcademicYearTermDataSerializer',
-    'ClassesAndSubjectsDataSerializer',
     'SetupAcademicYearTermPostResponseSerializer',
     'SetupAcademicYearTermSerializer',
     'SetupClassLevelSerializer',

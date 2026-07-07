@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from shared.helpers import format_phone_number
 from accounts.models import User, Profile
-from shared.services.curriculum import provision_school_curriculum
+from academics.services.curriculum import provision_school_curriculum
 from schools.models import School, SchoolSetup
 
 

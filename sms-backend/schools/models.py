@@ -17,6 +17,13 @@ class School(BaseModel):
 
     setup_completed = models.BooleanField(default=False)
     setup_completed_at = models.DateTimeField(null=True, blank=True)
+    provisioned_curriculum = models.ForeignKey(
+        'academics.Curriculum',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='schools',
+    )
 
 
 class SchoolSetup(models.Model):

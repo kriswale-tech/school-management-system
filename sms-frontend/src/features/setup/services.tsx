@@ -5,6 +5,7 @@ import type {
   SetupProgressResponse,
   AcademicYearAndTerm,
   AcademicYearAndTermPayload,
+  LevelWithRelatedClassesAndSubjects,
 } from './types'
 
 // get setup endpoint
@@ -36,6 +37,14 @@ export const updateAcademicYearAndTerm = async (payload: AcademicYearAndTermPayl
   const response = await api.post<SetupProgressResponse>(
     '/schools/setup/academic-year-term/',
     payload,
+  )
+  return response.data
+}
+
+// get levels with related classes and subjects endpoint
+export const getClassAndSubjects = async () => {
+  const response = await api.get<LevelWithRelatedClassesAndSubjects>(
+    '/schools/setup/classes-and-subjects/',
   )
   return response.data
 }

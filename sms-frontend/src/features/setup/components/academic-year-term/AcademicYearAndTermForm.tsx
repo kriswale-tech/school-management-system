@@ -173,12 +173,7 @@ const AcademicYearAndTermForm = ({
       </div>
 
       <div className="space-y-2">
-        <FormLabel
-          label="Current Term"
-          className="font-normal text-base"
-          required
-          helperText="Derived from term schedule and today's date"
-        />
+        <FormLabel label="Current Term" className="font-normal text-base" required />
         <Controller
           name="current_term"
           control={control}

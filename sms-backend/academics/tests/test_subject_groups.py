@@ -5,7 +5,7 @@ from django.test import TestCase
 from academics.models import StudentSubjectGroup, SubjectGroup
 from accounts.tests.factories import create_school
 from schools.models import AcademicYear
-from shared.services.curriculum import provision_school_curriculum, seed_ghana_curriculum
+from academics.services.curriculum import provision_school_curriculum, seed_ghana_curriculum
 from students.models import Student
 
 

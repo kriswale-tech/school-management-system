@@ -13,6 +13,29 @@ def _serialize_stream(stream):
     }
 
 
+def _serialize_subject_groups(class_subject):
+    return [
+        {
+            'id': group.id,
+            'name': group.name,
+            'is_active': group.is_active,
+        }
+        for group in sorted(class_subject.groups.all(), key=lambda item: item.name)
+    ]
+
+
+def _serialize_class_subject(class_subject):
+    return {
+        'id': class_subject.subject.id,
+        'class_subject_id': class_subject.id,
+        'name': class_subject.subject.name,
+        'is_active': class_subject.subject.is_active,
+        'is_system_generated': class_subject.is_system_generated,
+        'is_editable': not class_subject.is_system_generated,
+        'groups': _serialize_subject_groups(class_subject),
+    }
+
+
 def _serialize_class_level(class_level):
     streams = sorted(
         class_level.streams.all(),
@@ -24,7 +47,16 @@ def _serialize_class_level(class_level):
         'description': class_level.description,
         'order': class_level.order,
         'is_active': class_level.is_active,
+        'is_system_generated': class_level.is_system_generated,
+        'is_editable': not class_level.is_system_generated,
         'streams': [_serialize_stream(stream) for stream in streams],
+        'subjects': [
+            _serialize_class_subject(class_subject)
+            for class_subject in sorted(
+                class_level.class_subjects.all(),
+                key=lambda item: item.subject.name,
+            )
+        ],
     }
 
 
@@ -40,6 +72,8 @@ def _build_level_subjects(class_levels):
                     'id': subject.id,
                     'name': subject.name,
                     'is_active': subject.is_active,
+                    'is_system_generated': subject.is_system_generated,
+                    'is_editable': not subject.is_system_generated,
                 }
                 groups_by_subject[subject.id] = {}
 
@@ -76,23 +110,27 @@ def get_classes_and_subjects_setup(school):
         .order_by('order', 'name')
     )
 
-    return {
-        'levels': [
-            {
-                'id': level.id,
-                'name': level.name,
-                'description': level.description,
-                'order': level.order,
-                'is_active': level.is_active,
-                'classes': [
-                    _serialize_class_level(class_level)
-                    for class_level in sorted(
-                        level.class_levels.all(),
-                        key=lambda item: (item.order, item.name),
-                    )
-                ],
-                'subjects': _build_level_subjects(level.class_levels.all()),
-            }
-            for level in levels
-        ],
-    }
+    serialized_levels = []
+    for level in levels:
+        class_levels = sorted(
+            level.class_levels.all(),
+            key=lambda item: (item.order, item.name),
+        )
+
+        serialized_levels.append({
+            'id': level.id,
+            'name': level.name,
+            'description': level.description,
+            'order': level.order,
+            'is_active': level.is_active,
+            'is_system_generated': level.is_system_generated,
+            'subject_scope': level.subject_scope,
+            'allows_custom_classes': level.allows_custom_classes,
+            'classes': [
+                _serialize_class_level(class_level)
+                for class_level in class_levels
+            ],
+            'subjects': _build_level_subjects(class_levels),
+        })
+
+    return serialized_levels

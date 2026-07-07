@@ -1,18 +1,37 @@
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from academics.mixins import SystemGeneratedRecordMixin
 from shared.models import BaseModel
 
 
-class Level(BaseModel):
+class Level(SystemGeneratedRecordMixin, BaseModel):
+    class SubjectScope(models.TextChoices):
+        LEVEL = 'level', 'Shared across classes'
+        CLASS = 'class', 'Configured per class'
+
     school = models.ForeignKey(
         'schools.School',
         on_delete=models.CASCADE,
         related_name='levels',
     )
+    curriculum_level = models.ForeignKey(
+        'academics.CurriculumLevel',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='school_levels',
+    )
     name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    is_system_generated = models.BooleanField(default=False)
+    subject_scope = models.CharField(
+        max_length=10,
+        choices=SubjectScope.choices,
+        default=SubjectScope.LEVEL,
+    )
+    allows_custom_classes = models.BooleanField(default=False)
     order = models.PositiveSmallIntegerField(
         default=1,
         help_text='Display order within the school.',
@@ -27,11 +46,25 @@ class Level(BaseModel):
             ),
         ]
 
+    def clean(self):
+        super().clean()
+        if self.is_system_generated and not self.curriculum_level_id:
+            raise ValidationError({
+                'curriculum_level': 'Required for system-generated levels.',
+            })
+        if not self.is_system_generated and self.curriculum_level_id:
+            raise ValidationError({
+                'curriculum_level': 'Custom levels cannot reference the master curriculum.',
+            })
+
+    def uses_per_class_subjects(self):
+        return self.subject_scope == self.SubjectScope.CLASS
+
     def __str__(self):
         return self.name
 
 
-class ClassLevel(BaseModel):
+class ClassLevel(SystemGeneratedRecordMixin, BaseModel):
     level = models.ForeignKey(
         'Level',
         on_delete=models.CASCADE,
@@ -42,9 +75,17 @@ class ClassLevel(BaseModel):
         on_delete=models.CASCADE,
         related_name='class_levels',
     )
+    curriculum_class_level = models.ForeignKey(
+        'academics.CurriculumClassLevel',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='school_class_levels',
+    )
     name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    is_system_generated = models.BooleanField(default=False)
     order = models.PositiveSmallIntegerField(
         default=1,
         help_text='Display order within the level.',
@@ -60,8 +101,17 @@ class ClassLevel(BaseModel):
         ]
 
     def clean(self):
+        super().clean()
         if self.level_id and self.school_id and self.level.school_id != self.school_id:
             raise ValidationError({'school': 'Must match the selected level school.'})
+        if self.is_system_generated and not self.curriculum_class_level_id:
+            raise ValidationError({
+                'curriculum_class_level': 'Required for system-generated classes.',
+            })
+        if not self.is_system_generated and self.curriculum_class_level_id:
+            raise ValidationError({
+                'curriculum_class_level': 'Custom classes cannot reference the master curriculum.',
+            })
 
     def save(self, *args, **kwargs):
         if self.level_id:
@@ -128,7 +178,7 @@ class ClassStream(BaseModel):
         return self.full_name
 
 
-class Subject(BaseModel):
+class Subject(SystemGeneratedRecordMixin, BaseModel):
     school = models.ForeignKey(
         'schools.School',
         on_delete=models.CASCADE,
@@ -136,6 +186,7 @@ class Subject(BaseModel):
     )
     name = models.CharField(max_length=255)
     is_active = models.BooleanField(default=True)
+    is_system_generated = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['name']
@@ -150,7 +201,7 @@ class Subject(BaseModel):
         return self.name
 
 
-class ClassSubject(BaseModel):
+class ClassSubject(SystemGeneratedRecordMixin, BaseModel):
     school = models.ForeignKey(
         'schools.School',
         on_delete=models.CASCADE,
@@ -166,7 +217,15 @@ class ClassSubject(BaseModel):
         on_delete=models.CASCADE,
         related_name='class_subjects',
     )
+    curriculum_subject = models.ForeignKey(
+        'academics.CurriculumSubject',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='school_class_subjects',
+    )
     is_active = models.BooleanField(default=True)
+    is_system_generated = models.BooleanField(default=False)
 
     class Meta:
         constraints = [
@@ -175,6 +234,17 @@ class ClassSubject(BaseModel):
                 name='unique_subject_per_class_level',
             ),
         ]
+
+    def clean(self):
+        super().clean()
+        if self.is_system_generated and not self.curriculum_subject_id:
+            raise ValidationError({
+                'curriculum_subject': 'Required for system-generated class subjects.',
+            })
+        if not self.is_system_generated and self.curriculum_subject_id:
+            raise ValidationError({
+                'curriculum_subject': 'Custom class subjects cannot reference the master curriculum.',
+            })
 
     def __str__(self):
         return f'{self.class_level.name} - {self.subject.name}'
