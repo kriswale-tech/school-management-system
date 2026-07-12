@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button, FormLabel, InputField, SelectField } from '@/components/ui'
@@ -100,7 +100,6 @@ const AcademicYearAndTermForm = ({
     register,
     handleSubmit,
     reset,
-    watch,
     setValue,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<AcademicYearAndTermFormData>({
@@ -108,7 +107,7 @@ const AcademicYearAndTermForm = ({
     defaultValues: mapApiToFormData(academicYearAndTerm),
   })
 
-  const watchedTerms = watch('terms')
+  const watchedTerms = useWatch({ control, name: 'terms' })
 
   useEffect(() => {
     reset(mapApiToFormData(academicYearAndTerm))

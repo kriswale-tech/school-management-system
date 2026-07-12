@@ -5,7 +5,7 @@ const DEFAULT_LENGTH = 6
 
 export type OTPInputProps = {
   value: string
-  onChange: (value: string) => void
+  onChange: (_value: string) => void
   error?: string
   length?: number
   className?: string

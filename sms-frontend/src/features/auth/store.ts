@@ -6,9 +6,9 @@ interface AuthState {
   user: User | null
   isAuthenticated: boolean
   verificationPhone: string | null
-  setVerificationPhone: (phoneNumber: string) => void
+  setVerificationPhone: (_phoneNumber: string) => void
   clearVerificationPhone: () => void
-  setUser: (user: User) => void
+  setUser: (_user: User) => void
   logout: () => Promise<void>
 }
 

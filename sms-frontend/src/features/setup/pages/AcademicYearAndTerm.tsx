@@ -45,10 +45,7 @@ const AcademicYearAndTerm = () => {
   if (isLoading) return <LoadingSpinner className="mx-auto" />
 
   return (
-    <AcademicYearAndTermForm
-      onSubmit={handleSubmit}
-      academicYearAndTerm={academicYearAndTerm}
-    />
+    <AcademicYearAndTermForm onSubmit={handleSubmit} academicYearAndTerm={academicYearAndTerm} />
   )
 }
 

@@ -1,11 +1,20 @@
 import { useState } from 'react'
 import { Icon } from '@iconify/react'
 import ClassSubjectCard from './ClassSubjectCard'
+import CustomClassModal from './CustomClassModal'
+import CustomSubjectModal from './CustomSubjectModal'
 import Button from '@/components/ui/Button'
 import type { LevelForSetup } from '../../types'
 import { mergeClasses } from '@/utils'
 
-type AccordionOpenChangeHandler = (open: boolean) => void
+type AccordionOpenChangeHandler = (_open: boolean) => void
+
+type ClassModalState = { mode: 'add' | 'edit'; initialName?: string } | null
+type SubjectModalState = {
+  mode: 'add' | 'edit'
+  initialName?: string
+  initialClassIds?: string[]
+} | null
 
 interface LevelClassSubjectAccordionProps {
   level: LevelForSetup
@@ -22,6 +31,8 @@ const LevelClassSubjectAccordion = ({
 }: LevelClassSubjectAccordionProps) => {
   const [internalOpen, setInternalOpen] = useState(defaultOpen)
   const [isActive, setIsActive] = useState(level.is_active ?? true)
+  const [classModal, setClassModal] = useState<ClassModalState>(null)
+  const [subjectModal, setSubjectModal] = useState<SubjectModalState>(null)
   const isOpen = openProp ?? internalOpen
 
   const setOpen = (next: boolean) => {
@@ -82,11 +93,12 @@ const LevelClassSubjectAccordion = ({
                   key={classItem.id ?? classItem.name}
                   data={classItem}
                   type="class"
+                  subject_scope={level.subject_scope}
                 />
               ))}
             </div>
-            {level.subject_scope === 'class' && (
-              <Button className="w-fit gap-2">
+            {level.allows_custom_classes && (
+              <Button className="w-fit gap-2" onClick={() => setClassModal({ mode: 'add' })}>
                 <Icon
                   icon="hugeicons:plus-sign"
                   className="size-4 bg-white text-black rounded-full p-0.5"
@@ -101,10 +113,16 @@ const LevelClassSubjectAccordion = ({
             <p>Subjects (GES Standard)</p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {level.subjects.map((subject) => (
-                <ClassSubjectCard key={subject.id ?? subject.name} data={subject} type="subject" />
+                <ClassSubjectCard
+                  key={subject.id ?? subject.name}
+                  data={subject}
+                  type="subject"
+                  subject_scope={level.subject_scope}
+                  levelClasses={level.classes}
+                />
               ))}
             </div>
-            <Button className="w-fit gap-2">
+            <Button className="w-fit gap-2" onClick={() => setSubjectModal({ mode: 'add' })}>
               <Icon
                 icon="hugeicons:plus-sign"
                 className="size-4 bg-white text-black rounded-full p-0.5"
@@ -114,6 +132,25 @@ const LevelClassSubjectAccordion = ({
           </div>
         </div>
       )}
+
+      <CustomClassModal
+        open={classModal !== null}
+        mode={classModal?.mode ?? 'add'}
+        initialName={classModal?.initialName}
+        onClose={() => setClassModal(null)}
+        onSubmit={() => setClassModal(null)}
+      />
+
+      <CustomSubjectModal
+        open={subjectModal !== null}
+        mode={subjectModal?.mode ?? 'add'}
+        subjectScope={level.subject_scope}
+        classes={level.classes}
+        initialName={subjectModal?.initialName}
+        initialClassIds={subjectModal?.initialClassIds}
+        onClose={() => setSubjectModal(null)}
+        onSubmit={() => setSubjectModal(null)}
+      />
     </div>
   )
 }
@@ -133,7 +170,7 @@ const ToggleButton = ({
   onChange,
 }: {
   checked: boolean
-  onChange: (checked: boolean) => void
+  onChange: (_checked: boolean) => void
 }) => {
   return (
     <button

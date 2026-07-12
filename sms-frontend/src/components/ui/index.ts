@@ -6,6 +6,7 @@ import OTPInput from './OTPInput'
 import Button from './Button'
 import AvatarComponent from './AvatarComponent'
 import LoadingSpinner from './LoadingSpinner'
+import Modal from './Modal'
 
 export {
   FormLabel,
@@ -16,4 +17,5 @@ export {
   Button,
   AvatarComponent,
   LoadingSpinner,
+  Modal,
 }

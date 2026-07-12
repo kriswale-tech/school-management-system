@@ -5,8 +5,7 @@ import type { SetupProgressResponse } from '../types'
 type HandleSetupProgressOptions = {
   navigate: NavigateFunction
   user: User | null
-  // eslint-disable-next-line no-unused-vars
-  setUser: (user: User) => void
+  setUser: (_user: User) => void
 }
 
 export function handleSetupProgressResponse(

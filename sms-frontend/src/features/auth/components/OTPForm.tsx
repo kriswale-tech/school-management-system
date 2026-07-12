@@ -8,8 +8,8 @@ export interface OTPFormProps {
   phoneNumber: string
   title?: string
   error?: string
-  onOtpChange?: (value: string) => void
-  onSubmit: (otp: string) => void
+  onOtpChange?: (_value: string) => void
+  onSubmit: (_otp: string) => void
   isSubmitting?: boolean
   submitLabel?: string
   submittingLabel?: string
