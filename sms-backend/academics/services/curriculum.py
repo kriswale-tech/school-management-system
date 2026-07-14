@@ -89,7 +89,7 @@ def get_active_curriculum(curriculum_code=GHANA_CURRICULUM_CODE):
 
 
 def _provision_level_content(school, school_level, level_template, subject_cache):
-    from academics.models import ClassLevel, ClassStream, ClassSubject, Subject
+    from academics.models import ClassLevel, ClassStream, ClassSubject, LevelSubject, Subject
 
     class_level_map = {}
     for class_template in level_template.class_levels.all():
@@ -113,6 +113,16 @@ def _provision_level_content(school, school_level, level_template, subject_cache
                 defaults={'is_system_generated': True},
             )
             subject_cache[subject_template.name] = subject
+
+        LevelSubject.objects.get_or_create(
+            level=school_level,
+            subject=subject,
+            defaults={
+                'school': school,
+                'curriculum_subject': subject_template,
+                'is_system_generated': True,
+            },
+        )
 
         if subject_template.curriculum_class_level_id:
             target_class_levels = [

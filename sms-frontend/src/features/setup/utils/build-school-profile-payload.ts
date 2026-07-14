@@ -1,4 +1,4 @@
-import type { SchoolProfileFormData } from '../types'
+import type { SchoolProfileFormData } from '../types/types'
 
 /** Maps form fields to API field names (without the logo file). */
 export function toSchoolProfileApiFields(data: SchoolProfileFormData) {

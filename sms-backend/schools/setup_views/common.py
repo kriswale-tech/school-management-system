@@ -4,19 +4,13 @@ from rest_framework.views import APIView
 
 from schools.models import SchoolSetup
 from schools.serializers import SchoolSetupSerializer
-from schools.services.setup import advance_setup_step
+from schools.services.setup import advance_setup_if_needed, advance_setup_step
 
-
-def advance_setup_if_needed(school_setup, step):
-    if step not in (school_setup.completed_steps or []):
-        return advance_setup_step(school_setup, step)
-
-    return {
-        'next_step': school_setup.current_step,
-        'completed_steps': school_setup.completed_steps,
-        'is_complete': school_setup.current_step == SchoolSetup.SetupStep.COMPLETED,
-        'progress_percentage': school_setup.progress_percentage,
-    }
+__all__ = [
+    'SchoolSetupView',
+    'advance_setup_if_needed',
+    'advance_setup_step',
+]
 
 
 @extend_schema(

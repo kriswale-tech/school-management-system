@@ -7,6 +7,7 @@ from academics.services.custom_curriculum import (
     assign_subject_to_class,
     create_custom_class_level,
     create_custom_subject,
+    ensure_level_subject,
 )
 from accounts.tests.factories import create_school
 
@@ -67,6 +68,8 @@ class FlexiblePreschoolLevelTests(TestCase):
         )
         play = create_custom_subject(self.school, name='Play-based Learning')
         motor_skills = create_custom_subject(self.school, name='Motor Skills')
+        ensure_level_subject(self.school, level=pre_school, subject=play)
+        ensure_level_subject(self.school, level=pre_school, subject=motor_skills)
 
         assign_subject_to_class(self.school, class_level=toddler_room, subject=play)
         assign_subject_to_class(self.school, class_level=toddler_room, subject=motor_skills)

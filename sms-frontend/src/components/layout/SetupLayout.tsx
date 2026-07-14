@@ -5,7 +5,7 @@ import { AppToaster, AuthLoading } from '@/components/shared'
 import { useAuth } from '@/features/auth/hooks'
 import NavBar from '@/components/shared/NavBar'
 import SetupStepper from '@/features/setup/components/SetupStepper'
-import { getSetup } from '@/features/setup/services'
+import { getSetup } from '@/features/setup/services/services'
 
 const SetupLayout = () => {
   const location = useLocation()

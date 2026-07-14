@@ -45,6 +45,10 @@ class CurriculumGovernanceTests(TestCase):
         self.assertTrue(class_subject.is_system_generated)
         self.assertIsNotNone(class_subject.curriculum_subject_id)
 
+        level_subject = level.level_subjects.get(subject=subject)
+        self.assertTrue(level_subject.is_system_generated)
+        self.assertIsNotNone(level_subject.curriculum_subject_id)
+
     def test_master_curriculum_is_immutable_outside_seed_context(self):
         template = CurriculumLevel.objects.get(name='Kindergarten')
         template.name = 'Changed'

@@ -58,3 +58,4 @@ class SetupAcademicYearTermView(APIView):
                 **setup_result,
             }).data,
         )
+

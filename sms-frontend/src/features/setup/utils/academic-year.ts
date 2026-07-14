@@ -4,7 +4,7 @@ import type {
   AcademicYearAndTermPayload,
   TermApiKey,
   TermName,
-} from '../types'
+} from '../types/types'
 
 export const TERMS = ['First term', 'Second term', 'Third term'] as const
 

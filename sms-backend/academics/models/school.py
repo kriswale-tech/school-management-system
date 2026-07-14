@@ -201,6 +201,68 @@ class Subject(SystemGeneratedRecordMixin, BaseModel):
         return self.name
 
 
+class LevelSubject(SystemGeneratedRecordMixin, BaseModel):
+    """Subject membership on a level (catalog), independent of class assignment."""
+
+    school = models.ForeignKey(
+        'schools.School',
+        on_delete=models.CASCADE,
+        related_name='level_subjects',
+    )
+    level = models.ForeignKey(
+        'Level',
+        on_delete=models.CASCADE,
+        related_name='level_subjects',
+    )
+    subject = models.ForeignKey(
+        Subject,
+        on_delete=models.CASCADE,
+        related_name='level_subjects',
+    )
+    curriculum_subject = models.ForeignKey(
+        'academics.CurriculumSubject',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='school_level_subjects',
+    )
+    is_active = models.BooleanField(default=True)
+    is_system_generated = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['subject__name']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['level', 'subject'],
+                name='unique_subject_per_level',
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.level_id and self.school_id and self.level.school_id != self.school_id:
+            raise ValidationError({'school': 'Must match the selected level school.'})
+        if self.subject_id and self.school_id and self.subject.school_id != self.school_id:
+            raise ValidationError({'school': 'Must match the selected subject school.'})
+        if self.is_system_generated and not self.curriculum_subject_id:
+            raise ValidationError({
+                'curriculum_subject': 'Required for system-generated level subjects.',
+            })
+        if not self.is_system_generated and self.curriculum_subject_id:
+            raise ValidationError({
+                'curriculum_subject': 'Custom level subjects cannot reference the master curriculum.',
+            })
+
+    def save(self, *args, **kwargs):
+        if self.level_id:
+            self.school_id = self.level.school_id
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.level.name} - {self.subject.name}'
+
+
 class ClassSubject(SystemGeneratedRecordMixin, BaseModel):
     school = models.ForeignKey(
         'schools.School',
@@ -237,6 +299,14 @@ class ClassSubject(SystemGeneratedRecordMixin, BaseModel):
 
     def clean(self):
         super().clean()
+        if self.class_level_id and self.subject_id:
+            if not LevelSubject.objects.filter(
+                level_id=self.class_level.level_id,
+                subject_id=self.subject_id,
+            ).exists():
+                raise ValidationError({
+                    'subject': 'Subject must belong to the class level first.',
+                })
         if self.is_system_generated and not self.curriculum_subject_id:
             raise ValidationError({
                 'curriculum_subject': 'Required for system-generated class subjects.',
@@ -245,6 +315,10 @@ class ClassSubject(SystemGeneratedRecordMixin, BaseModel):
             raise ValidationError({
                 'curriculum_subject': 'Custom class subjects cannot reference the master curriculum.',
             })
+
+    def delete(self, *args, **kwargs):
+        # Class-subject links are removable even when provisioned; the Subject remains.
+        return models.Model.delete(self, *args, **kwargs)
 
     def __str__(self):
         return f'{self.class_level.name} - {self.subject.name}'

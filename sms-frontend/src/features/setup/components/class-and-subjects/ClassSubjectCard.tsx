@@ -1,97 +1,241 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useState } from 'react'
 import CheckboxField from '@/components/ui/CheckboxField'
 import { Icon } from '@iconify/react'
 import Button from '@/components/ui/Button'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import CustomClassModal from './CustomClassModal'
 import CustomSubjectModal from './CustomSubjectModal'
-import type { ClassForSetup, SubjectForSetup, SubjectScope } from '../../types'
+import StreamModal from './StreamModal'
+import SubjectGroupModal from './SubjectGroupModal'
+import {
+  CardActionButtons,
+  GroupsDropdown,
+  StreamAndSubjectMiniButtons,
+  StreamsDropdown,
+  type ConfirmState,
+} from './class-subject-card-components'
+import type { ClassForSetup, SubjectForSetup, SubjectScope } from '../../types/types'
+import type { ClassSubjectSetupHandlers } from '../../types/class-subject-setup-handlers'
+import type { AddStreamPayload } from '../../types/class-subject-setup-types'
 
 type ClassSubjectCardProps = {
+  levelId: string
+  handlers: ClassSubjectSetupHandlers
   subject_scope: SubjectScope
   levelClasses?: ClassForSetup[]
-} & (
-  | { data: ClassForSetup; type: 'class' }
-  | { data: SubjectForSetup; type: 'subject' }
-)
+  levelSubjects?: SubjectForSetup[]
+} & ({ data: ClassForSetup; type: 'class' } | { data: SubjectForSetup; type: 'subject' })
 
-const getAssociatedClassIds = (subject: SubjectForSetup, classes: ClassForSetup[]) =>
-  classes
-    .filter((classItem) =>
-      classItem.subjects?.some(
-        (classSubject) =>
-          (subject.id && classSubject.id === subject.id) || classSubject.name === subject.name,
-      ),
-    )
-    .map((classItem) => classItem.id ?? classItem.name)
+type StreamModalState =
+  | { mode: 'add' }
+  | { mode: 'edit'; streamId: string; initialValues: AddStreamPayload }
+
+type GroupModalState = { mode: 'add' } | { mode: 'edit'; groupId: string; initialName: string }
 
 const ClassSubjectCard = ({
   data,
   type,
+  levelId,
+  handlers,
   subject_scope = 'level',
   levelClasses = [],
+  levelSubjects = [],
 }: ClassSubjectCardProps) => {
-  const items = type === 'class' ? (data.streams ?? []) : data.groups
-  const showDropdown = type === 'class' ? items.length > 1 : items.length > 0
+  const streams = type === 'class' ? (data.streams ?? []) : []
+  const groups = type === 'subject' ? data.groups : []
+  const showGroupsDropdown = type === 'subject' ? groups.length > 0 : streams.length > 0
   const showStreamAndSubjectMiniButtons = subject_scope === 'class' && type === 'class'
-  const [isFormOpen, setIsFormOpen] = useState(false)
+  const entityId = data.id
+
+  const [streamModal, setStreamModal] = useState<StreamModalState | null>(null)
+  const [groupModal, setGroupModal] = useState<GroupModalState | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [confirmState, setConfirmState] = useState<ConfirmState>(null)
+
+  const handleActiveChange = (checked: boolean) => {
+    if (!entityId) return
+    if (type === 'class') handlers.onClassActiveChange(entityId, checked)
+    else handlers.onSubjectActiveChange(entityId, checked)
+  }
+
+  const handleConfirm = () => {
+    if (!confirmState) return
+
+    switch (confirmState.type) {
+      case 'deleteClass':
+        handlers.onDeleteClass(confirmState.classId)
+        break
+      case 'deleteSubject':
+        handlers.onDeleteSubject(confirmState.subjectId)
+        break
+      case 'deleteStream':
+        handlers.onDeleteStream(confirmState.streamId)
+        break
+      case 'deleteGroup':
+        handlers.onDeleteSubjectGroup(confirmState.groupId)
+        break
+      case 'removeSubjectFromClass':
+        handlers.onRemoveSubjectFromClass(confirmState.classId, confirmState.subjectId)
+        break
+    }
+
+    setConfirmState(null)
+  }
+
+  const getConfirmCopy = () => {
+    switch (confirmState?.type) {
+      case 'deleteClass':
+        return {
+          title: 'Delete class',
+          message: `Are you sure you want to delete "${confirmState.name}"?`,
+        }
+      case 'deleteSubject':
+        return {
+          title: 'Delete subject',
+          message: `Are you sure you want to delete "${confirmState.name}"?`,
+        }
+      case 'deleteStream':
+        return {
+          title: 'Remove stream',
+          message: `Are you sure you want to remove "${confirmState.name}"?`,
+        }
+      case 'deleteGroup':
+        return {
+          title: 'Remove group',
+          message: `Are you sure you want to remove "${confirmState.name}"?`,
+        }
+      case 'removeSubjectFromClass':
+        return {
+          title: 'Remove subject',
+          message: `Are you sure you want to remove "${confirmState.subjectName}" from "${confirmState.className}"?`,
+        }
+      default:
+        return { title: '', message: '' }
+    }
+  }
+
+  const confirmCopy = getConfirmCopy()
 
   return (
     <div className=" bg-white border border-slate-400 px-4 py-3 space-y-4">
-      {/* Checkbox and Name plus options */}
       <div className="flex items-start justify-between gap-2">
-        {/* Checkbox */}
         <div className="flex items-baseline gap-2">
-          <CheckboxField checked={data.is_active ?? false} />{' '}
+          <CheckboxField
+            checked={data.is_active ?? false}
+            onChange={(e) => handleActiveChange(e.target.checked)}
+          />
           <span className="text-slate-600 text-[15px]">{data.name}</span>
         </div>
-        {/*  options */}
-        {showStreamAndSubjectMiniButtons ? (
-          <StreamAndSubjectMiniButtons data={data} />
-        ) : (
-          showDropdown && (
-            <DropdownButton
-              items={items}
-              label={type === 'class' ? 'View Streams' : 'View Groups'}
-            />
-          )
-        )}
-      </div>
-      {/* Button */}
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1 overflow-visible">
-          <Button className="w-full" variant="ghost" onClick={() => setIsFormOpen((open) => !open)}>
-            <Icon
-              icon="hugeicons:plus-sign"
-              className="size-4 bg-white text-black rounded-full p-0.5"
-            />
-            <span>{type === 'class' ? 'Add Stream' : 'Add Group'}</span>
-          </Button>
-          {isFormOpen && (
-            <ButtonForm type={type} items={items} onClose={() => setIsFormOpen(false)} />
-          )}
-        </div>
 
-        {data.is_editable && (
-          <button
-            type="button"
-            title={type === 'class' ? 'Edit class' : 'Edit subject'}
-            aria-label={type === 'class' ? 'Edit class' : 'Edit subject'}
-            onClick={() => setIsEditModalOpen(true)}
-            className="flex size-10 shrink-0 items-center justify-center rounded-full border border-slate-400 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-          >
-            <Icon icon="hugeicons:edit-02" className="size-4" />
-          </button>
+        {showStreamAndSubjectMiniButtons && type === 'class' ? (
+          <StreamAndSubjectMiniButtons
+            data={data}
+            levelSubjects={levelSubjects}
+            handlers={handlers}
+            onConfirm={setConfirmState}
+            onEditStream={(streamId, initialValues) =>
+              setStreamModal({ mode: 'edit', streamId, initialValues })
+            }
+          />
+        ) : (
+          showGroupsDropdown &&
+          (type === 'subject' ? (
+            <GroupsDropdown
+              groups={groups}
+              onEdit={(groupId, initialName) =>
+                setGroupModal({ mode: 'edit', groupId, initialName })
+              }
+              onDelete={(groupId, name) => setConfirmState({ type: 'deleteGroup', groupId, name })}
+            />
+          ) : (
+            <StreamsDropdown
+              streams={streams}
+              onEdit={(streamId, initialValues) =>
+                setStreamModal({ mode: 'edit', streamId, initialValues })
+              }
+              onDelete={(streamId, name) =>
+                setConfirmState({ type: 'deleteStream', streamId, name })
+              }
+            />
+          ))
         )}
       </div>
+
+      <div className="flex items-center gap-2">
+        <Button
+          className="flex-1"
+          variant="ghost"
+          onClick={() =>
+            type === 'class' ? setStreamModal({ mode: 'add' }) : setGroupModal({ mode: 'add' })
+          }
+        >
+          <Icon
+            icon="hugeicons:plus-sign"
+            className="size-4 bg-white text-black rounded-full p-0.5"
+          />
+          <span>{type === 'class' ? 'Add Stream' : 'Add Group'}</span>
+        </Button>
+
+        {data.is_editable && entityId && (
+          <CardActionButtons
+            editLabel={type === 'class' ? 'Edit class' : 'Edit subject'}
+            deleteLabel={type === 'class' ? 'Delete class' : 'Delete subject'}
+            onEdit={() => setIsEditModalOpen(true)}
+            onDelete={() =>
+              setConfirmState(
+                type === 'class'
+                  ? { type: 'deleteClass', classId: entityId, name: data.name }
+                  : { type: 'deleteSubject', subjectId: entityId, name: data.name },
+              )
+            }
+          />
+        )}
+      </div>
+
+      {type === 'class' && entityId && (
+        <StreamModal
+          open={streamModal !== null}
+          mode={streamModal?.mode ?? 'add'}
+          initialValues={streamModal?.mode === 'edit' ? streamModal.initialValues : undefined}
+          onClose={() => setStreamModal(null)}
+          onSubmit={(payload) => {
+            if (streamModal?.mode === 'add') handlers.onAddStream(entityId, payload)
+            else if (streamModal?.mode === 'edit')
+              handlers.onEditStream(streamModal.streamId, payload)
+            setStreamModal(null)
+          }}
+        />
+      )}
+
+      {type === 'subject' && entityId && (
+        <SubjectGroupModal
+          open={groupModal !== null}
+          mode={groupModal?.mode ?? 'add'}
+          initialName={groupModal?.mode === 'edit' ? groupModal.initialName : undefined}
+          onClose={() => setGroupModal(null)}
+          onSubmit={(payload) => {
+            if (groupModal?.mode === 'add') handlers.onAddSubjectGroup(levelId, entityId, payload)
+            else if (groupModal?.mode === 'edit')
+              handlers.onEditSubjectGroup(groupModal.groupId, payload)
+            setGroupModal(null)
+          }}
+        />
+      )}
 
       {type === 'class' ? (
         <CustomClassModal
           open={isEditModalOpen}
           mode="edit"
-          initialName={data.name}
+          initialValues={{
+            name: data.name,
+            description: data.description ?? undefined,
+            order: data.order,
+          }}
           onClose={() => setIsEditModalOpen(false)}
-          onSubmit={() => setIsEditModalOpen(false)}
+          onSubmit={(payload) => {
+            if (entityId) handlers.onEditClass(entityId, payload)
+            setIsEditModalOpen(false)
+          }}
         />
       ) : (
         <CustomSubjectModal
@@ -99,232 +243,32 @@ const ClassSubjectCard = ({
           mode="edit"
           subjectScope={subject_scope}
           classes={levelClasses}
-          initialName={data.name}
-          initialClassIds={getAssociatedClassIds(data, levelClasses)}
+          initialValues={{
+            name: data.name,
+            classIds: data.class_ids ?? [],
+          }}
           onClose={() => setIsEditModalOpen(false)}
-          onSubmit={() => setIsEditModalOpen(false)}
+          onSubmit={(values) => {
+            if (entityId) {
+              handlers.onEditSubject(entityId, {
+                name: values.name,
+                class_ids: values.classIds.length > 0 ? values.classIds : undefined,
+              })
+            }
+            setIsEditModalOpen(false)
+          }}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmState !== null}
+        title={confirmCopy.title}
+        message={confirmCopy.message}
+        onClose={() => setConfirmState(null)}
+        onConfirm={handleConfirm}
+      />
     </div>
   )
 }
 
 export default ClassSubjectCard
-
-const DropdownButton = ({
-  items,
-  label,
-}: {
-  items: { id?: string; name: string }[]
-  label: string
-}) => {
-  return (
-    <button className="flex items-center gap-1 border border-slate-300 px-2 py-1 text-slate-600 hover:text-slate-900 text-xs shrink-0">
-      <span>
-        {label}
-        {items.length > 0 ? ` (${items.length})` : ''}
-      </span>{' '}
-      <Icon icon="hugeicons:arrow-down-01" className="size-4" />
-    </button>
-  )
-}
-
-const ButtonForm = ({
-  type,
-  items,
-  onClose,
-}: {
-  type: 'class' | 'subject'
-  items: { id?: string; name: string }[]
-  onClose: () => void
-}) => {
-  const [name, setName] = useState('')
-  const isClass = type === 'class'
-  const addLabel = isClass ? 'Add Stream' : 'Add Group'
-  const placeholder = isClass ? 'Enter stream name here' : 'Enter group name here'
-
-  const showList = isClass ? items.length > 1 : items.length > 0
-
-  const handleAdd = () => {
-    if (!name.trim()) return
-    setName('')
-  }
-
-  return (
-    <div className="absolute left-0 right-0 top-full z-20 mt-2 bg-white p-4 space-y-4 shadow-lg">
-      {showList && (
-        <ul className="list-disc list-inside space-y-1 text-sm text-slate-600">
-          {items.map((item) => (
-            <li key={item.id ?? item.name}>{item.name}</li>
-          ))}
-        </ul>
-      )}
-
-      <input
-        type="text"
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded-md border border-slate-400 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-600"
-      />
-
-      <div className="grid grid-cols-2 gap-2">
-        <Button type="button" variant="ghost" onClick={handleAdd}>
-          {addLabel}
-        </Button>
-        <Button type="button" variant="solid" onClick={onClose}>
-          Done
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-const StreamAndSubjectMiniButtons = ({ data }: { data: ClassForSetup }) => {
-  const showStreamButton = data.streams && data.streams.length > 1
-  const showSubjectButton = data.subjects && data.subjects.length > 0
-
-  return (
-    <div className="flex items-center gap-2">
-      {showStreamButton && <StreamCountDropdown streams={data.streams ?? []} />}
-      {showSubjectButton && <SubjectCountDropdown subjects={data.subjects ?? []} />}
-    </div>
-  )
-}
-
-const StreamCountDropdown = ({ streams }: { streams: NonNullable<ClassForSetup['streams']> }) => {
-  const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement | null>(null)
-
-  useClickOutside(containerRef, isOpen, () => setIsOpen(false))
-
-  return (
-    <div ref={containerRef} className="relative">
-      <Button
-        type="button"
-        variant="ghost"
-        title="Class streams"
-        className="w-fit rounded-full p-0.5 px-1.5 gap-0.5 text-xs"
-        onClick={() => setIsOpen((open) => !open)}
-      >
-        <Icon icon="ph:tree-structure-light" className="size-4" />
-        <span>{streams.length}</span>
-      </Button>
-
-      {isOpen && (
-        <div className="absolute right-0 top-full z-20 mt-1 min-w-44 bg-white p-2 shadow-lg">
-          <ul className="space-y-1">
-            {streams.map((stream) => (
-              <li
-                key={stream.id}
-                className="flex items-center justify-between gap-2 px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
-              >
-                <span className="truncate">{stream.name || stream.full_name}</span>
-                <div className="flex shrink-0 items-center gap-0.5">
-                  <IconActionButton icon="hugeicons:edit-02" label="Edit stream" />
-                  <IconActionButton
-                    variant="danger"
-                    icon="ic:outline-remove-circle-outline"
-                    label="Remove stream from this class"
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  )
-}
-
-const SubjectCountDropdown = ({
-  subjects,
-}: {
-  subjects: NonNullable<ClassForSetup['subjects']>
-}) => {
-  const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement | null>(null)
-
-  useClickOutside(containerRef, isOpen, () => setIsOpen(false))
-
-  return (
-    <div ref={containerRef} className="relative">
-      <Button
-        type="button"
-        variant="ghost"
-        title="Class subjects"
-        className="w-fit rounded-full p-0.5 px-1.5 gap-0.5 text-xs"
-        onClick={() => setIsOpen((open) => !open)}
-      >
-        <Icon icon="ph:books" className="size-4" />
-        <span>{subjects.length}</span>
-      </Button>
-
-      {isOpen && (
-        <div className="absolute right-0 top-full z-20 mt-1 min-w-44 bg-white p-2 shadow-lg">
-          <ul className="space-y-1">
-            {subjects.map((subject) => (
-              <li
-                key={subject.id}
-                className="flex items-center justify-between gap-2 px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
-              >
-                <span className="truncate">{subject.name}</span>
-                <IconActionButton
-                  variant="danger"
-                  icon="ic:outline-remove-circle-outline"
-                  label="Remove subject from this class"
-                />
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  )
-}
-
-const useClickOutside = (
-  containerRef: RefObject<HTMLDivElement | null>,
-  isOpen: boolean,
-  onClose: () => void,
-) => {
-  useEffect(() => {
-    if (!isOpen) return
-
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null
-      if (!target) return
-      if (containerRef.current && !containerRef.current.contains(target)) {
-        onClose()
-      }
-    }
-
-    window.addEventListener('pointerdown', onPointerDown)
-    return () => window.removeEventListener('pointerdown', onPointerDown)
-  }, [containerRef, isOpen, onClose])
-}
-
-const IconActionButton = ({
-  icon,
-  label,
-  variant = 'default',
-}: {
-  icon: string
-  label: string
-  variant?: 'default' | 'danger'
-}) => {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      className={
-        variant === 'danger'
-          ? 'rounded p-1 text-red-600 hover:bg-red-50 hover:text-red-700'
-          : 'rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900'
-      }
-    >
-      <Icon icon={icon} className="size-3.5" />
-    </button>
-  )
-}

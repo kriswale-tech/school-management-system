@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react'
 import { useOutletContext, useParams } from 'react-router-dom'
-import type { Setup } from '../types'
+import type { Setup } from '../types/types'
 import AcademicYearAndTerm from './AcademicYearAndTerm'
 import Assessment from './Assessment'
 import ClassesAndSubjects from './ClassesAndSubjects'

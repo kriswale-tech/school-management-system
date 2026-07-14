@@ -7,8 +7,8 @@ import SchoolProfileForm from '@/features/setup/components/school-profile/School
 import type {
   SchoolProfileFormData,
   SchoolProfile as SchoolProfileType,
-} from '@/features/setup/types'
-import { getSchoolProfile, setupSchoolProfile } from '@/features/setup/services'
+} from '@/features/setup/types/types'
+import { getSchoolProfile, setupSchoolProfile } from '@/features/setup/services/services'
 import { buildSchoolProfilePayload } from '@/features/setup/utils/build-school-profile-payload'
 import { handleSetupProgressResponse } from '@/features/setup/utils/handle-setup-progress-response'
 import { useAuthStore } from '@/features/auth/store'

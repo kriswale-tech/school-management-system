@@ -6,7 +6,7 @@ import type {
   AcademicYearAndTerm,
   AcademicYearAndTermPayload,
   LevelWithRelatedClassesAndSubjects,
-} from './types'
+} from '../types/types'
 
 // get setup endpoint
 export const getSetup = async () => {
@@ -46,5 +46,12 @@ export const getClassAndSubjects = async () => {
   const response = await api.get<LevelWithRelatedClassesAndSubjects>(
     '/schools/setup/classes-and-subjects/',
   )
+  return response.data
+}
+
+
+// complete levels with related classes and subjects setup endpoint
+export const updateClassAndSubjectsSetup = async () => {
+  const response = await api.post<SetupProgressResponse>('/schools/setup/classes-and-subjects/complete/')
   return response.data
 }

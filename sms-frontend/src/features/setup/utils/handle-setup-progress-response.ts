@@ -1,6 +1,6 @@
 import type { NavigateFunction } from 'react-router-dom'
 import type { User } from '@/features/auth/types'
-import type { SetupProgressResponse } from '../types'
+import type { SetupProgressResponse } from '../types/types'
 
 type HandleSetupProgressOptions = {
   navigate: NavigateFunction

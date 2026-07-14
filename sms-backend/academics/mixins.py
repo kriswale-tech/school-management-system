@@ -2,6 +2,7 @@ from django.core.exceptions import ValidationError
 
 SYSTEM_GENERATED_MUTABLE_FIELDS = frozenset({
     'is_active',
+    'order',
     'updated_at',
 })
 

@@ -32,6 +32,19 @@ def require_prior_setup_steps(school_setup: SchoolSetup, step) -> None:
             })
 
 
+def advance_setup_if_needed(school_setup: SchoolSetup, step) -> dict:
+    step_value = _step_value(step)
+    if step_value not in (school_setup.completed_steps or []):
+        return advance_setup_step(school_setup, step)
+
+    return {
+        'next_step': school_setup.current_step,
+        'completed_steps': school_setup.completed_steps,
+        'is_complete': school_setup.current_step == SchoolSetup.SetupStep.COMPLETED,
+        'progress_percentage': school_setup.progress_percentage,
+    }
+
+
 def advance_setup_step(school_setup: SchoolSetup, step: str) -> dict:
     step_value = _step_value(step)
     completed = list(school_setup.completed_steps or [])

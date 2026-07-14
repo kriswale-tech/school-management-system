@@ -1,10 +1,23 @@
 from django.urls import path
 
 from schools.setup_views import (
+    CompleteClassesAndSubjectsSetupView,
     SchoolSetupView,
     SetupAcademicYearTermView,
+    SetupClassStatusView,
+    SetupClassStreamCreateView,
+    SetupClassStreamDetailView,
+    SetupClassSubjectAssignmentView,
     SetupClassesAndSubjectsView,
+    SetupCustomClassCreateView,
+    SetupCustomClassDetailView,
+    SetupLevelStatusView,
     SetupSchoolProfileView,
+    SetupSubjectCreateView,
+    SetupSubjectDetailView,
+    SetupSubjectGroupCreateView,
+    SetupSubjectGroupDetailView,
+    SetupSubjectStatusView,
 )
 from schools.views import SchoolView
 
@@ -24,6 +37,71 @@ urlpatterns = [
         'setup/classes-and-subjects/',
         SetupClassesAndSubjectsView.as_view(),
         name='school-setup-classes-and-subjects',
+    ),
+    path(
+        'setup/classes-and-subjects/complete/',
+        CompleteClassesAndSubjectsSetupView.as_view(),
+        name='school-setup-classes-and-subjects-complete',
+    ),
+    path(
+        'setup/classes-and-subjects/classes/<uuid:class_id>/streams/',
+        SetupClassStreamCreateView.as_view(),
+        name='school-setup-class-streams',
+    ),
+    path(
+        'setup/classes-and-subjects/streams/<uuid:stream_id>/',
+        SetupClassStreamDetailView.as_view(),
+        name='school-setup-stream-detail',
+    ),
+    path(
+        'setup/classes-and-subjects/levels/<uuid:level_id>/subjects/<uuid:subject_id>/groups/',
+        SetupSubjectGroupCreateView.as_view(),
+        name='school-setup-subject-groups',
+    ),
+    path(
+        'setup/classes-and-subjects/groups/<uuid:group_id>/',
+        SetupSubjectGroupDetailView.as_view(),
+        name='school-setup-group-detail',
+    ),
+    path(
+        'setup/classes-and-subjects/levels/<uuid:level_id>/classes/',
+        SetupCustomClassCreateView.as_view(),
+        name='school-setup-custom-classes',
+    ),
+    path(
+        'setup/classes-and-subjects/classes/<uuid:class_id>/',
+        SetupCustomClassDetailView.as_view(),
+        name='school-setup-class-detail',
+    ),
+    path(
+        'setup/classes-and-subjects/classes/<uuid:class_id>/status/',
+        SetupClassStatusView.as_view(),
+        name='school-setup-class-status',
+    ),
+    path(
+        'setup/classes-and-subjects/classes/<uuid:class_id>/subjects/<uuid:subject_id>/',
+        SetupClassSubjectAssignmentView.as_view(),
+        name='school-setup-class-subject-assignment',
+    ),
+    path(
+        'setup/classes-and-subjects/subjects/',
+        SetupSubjectCreateView.as_view(),
+        name='school-setup-subjects',
+    ),
+    path(
+        'setup/classes-and-subjects/subjects/<uuid:subject_id>/',
+        SetupSubjectDetailView.as_view(),
+        name='school-setup-subject-detail',
+    ),
+    path(
+        'setup/classes-and-subjects/subjects/<uuid:subject_id>/status/',
+        SetupSubjectStatusView.as_view(),
+        name='school-setup-subject-status',
+    ),
+    path(
+        'setup/classes-and-subjects/levels/<uuid:level_id>/status/',
+        SetupLevelStatusView.as_view(),
+        name='school-setup-level-status',
     ),
     path('school/', SchoolView.as_view(), name='school'),
 ]

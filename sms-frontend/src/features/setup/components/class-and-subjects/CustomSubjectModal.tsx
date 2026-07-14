@@ -1,26 +1,29 @@
 import { useState, type FormEvent } from 'react'
 import { Button, CheckboxField, FormLabel, InputField, Modal } from '@/components/ui'
-import type { ClassForSetup, SubjectScope } from '../../types'
+import type { ClassForSetup, SubjectScope } from '../../types/types'
+
+export interface SubjectFormValues {
+  name: string
+  classIds: string[]
+}
 
 interface CustomSubjectModalProps {
   open: boolean
   mode: 'add' | 'edit'
   subjectScope: SubjectScope
   classes: ClassForSetup[]
-  initialName?: string
-  initialClassIds?: string[]
+  initialValues?: Partial<SubjectFormValues>
   onClose: () => void
-  onSubmit: (_data: { name: string; classIds: string[] }) => void
+  onSubmit: (data: SubjectFormValues) => void
 }
 
 interface SubjectModalFormProps {
   mode: 'add' | 'edit'
   subjectScope: SubjectScope
   classes: ClassForSetup[]
-  initialName: string
-  initialClassIds: string[]
+  initialValues: SubjectFormValues
   onClose: () => void
-  onSubmit: (_data: { name: string; classIds: string[] }) => void
+  onSubmit: (data: SubjectFormValues) => void
 }
 
 const getClassKey = (classItem: ClassForSetup) => classItem.id ?? classItem.name
@@ -30,11 +33,15 @@ const CustomSubjectModal = ({
   mode,
   subjectScope,
   classes,
-  initialName = '',
-  initialClassIds = [],
+  initialValues = {},
   onClose,
   onSubmit,
 }: CustomSubjectModalProps) => {
+  const defaults: SubjectFormValues = {
+    name: initialValues.name ?? '',
+    classIds: initialValues.classIds ?? [],
+  }
+
   return (
     <Modal
       open={open}
@@ -43,12 +50,11 @@ const CustomSubjectModal = ({
     >
       {open ? (
         <SubjectModalForm
-          key={`${mode}-${initialName}-${initialClassIds.join(',')}`}
+          key={`${mode}-${defaults.name}-${defaults.classIds.join(',')}`}
           mode={mode}
           subjectScope={subjectScope}
           classes={classes}
-          initialName={initialName}
-          initialClassIds={initialClassIds}
+          initialValues={defaults}
           onClose={onClose}
           onSubmit={onSubmit}
         />
@@ -61,13 +67,12 @@ const SubjectModalForm = ({
   mode,
   subjectScope,
   classes,
-  initialName,
-  initialClassIds,
+  initialValues,
   onClose,
   onSubmit,
 }: SubjectModalFormProps) => {
-  const [name, setName] = useState(initialName)
-  const [selectedClassIds, setSelectedClassIds] = useState<string[]>(initialClassIds)
+  const [name, setName] = useState(initialValues.name)
+  const [selectedClassIds, setSelectedClassIds] = useState<string[]>(initialValues.classIds)
   const [nameError, setNameError] = useState('')
   const [classesError, setClassesError] = useState('')
 

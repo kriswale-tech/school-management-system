@@ -6,17 +6,34 @@ from schools.setup_serializers.academic_year_term import (
     TermScheduleResponseItemSerializer,
 )
 from schools.setup_serializers.classes_and_subjects import (
+    ActivationResponseSerializer,
+    ActivationSerializer,
+    CreateCustomClassSerializer,
+    CreateStreamSerializer,
+    CreateSubjectGroupSerializer,
+    CreateSubjectSerializer,
     SetupClassLevelSerializer,
     SetupClassStreamSerializer,
     SetupLevelSerializer,
     SetupLevelSubjectSerializer,
     SetupSubjectGroupSerializer,
+    SubjectDetailSerializer,
+    UpdateCustomClassSerializer,
+    UpdateStreamSerializer,
+    UpdateSubjectGroupSerializer,
+    UpdateSubjectSerializer,
 )
 from schools.setup_serializers.common import SetupStepResponseSerializer, validate_image
 from schools.setup_serializers.school_profile import SetupSchoolProfileSerializer
 
 __all__ = [
     'AcademicYearTermDataSerializer',
+    'ActivationResponseSerializer',
+    'ActivationSerializer',
+    'CreateCustomClassSerializer',
+    'CreateStreamSerializer',
+    'CreateSubjectGroupSerializer',
+    'CreateSubjectSerializer',
     'SetupAcademicYearTermPostResponseSerializer',
     'SetupAcademicYearTermSerializer',
     'SetupClassLevelSerializer',
@@ -26,7 +43,12 @@ __all__ = [
     'SetupSchoolProfileSerializer',
     'SetupStepResponseSerializer',
     'SetupSubjectGroupSerializer',
+    'SubjectDetailSerializer',
     'TermScheduleItemSerializer',
     'TermScheduleResponseItemSerializer',
+    'UpdateCustomClassSerializer',
+    'UpdateStreamSerializer',
+    'UpdateSubjectGroupSerializer',
+    'UpdateSubjectSerializer',
     'validate_image',
 ]

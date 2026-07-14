@@ -1,23 +1,28 @@
 import { useState } from 'react'
 import { Icon } from '@iconify/react'
 import ClassSubjectCard from './ClassSubjectCard'
-import CustomClassModal from './CustomClassModal'
-import CustomSubjectModal from './CustomSubjectModal'
+import CustomClassModal, { type ClassFormValues } from './CustomClassModal'
+import CustomSubjectModal, { type SubjectFormValues } from './CustomSubjectModal'
 import Button from '@/components/ui/Button'
-import type { LevelForSetup } from '../../types'
+import type { LevelForSetup } from '../../types/types'
+import type { ClassSubjectSetupHandlers } from '../../types/class-subject-setup-handlers'
 import { mergeClasses } from '@/utils'
 
 type AccordionOpenChangeHandler = (_open: boolean) => void
 
-type ClassModalState = { mode: 'add' | 'edit'; initialName?: string } | null
-type SubjectModalState = {
-  mode: 'add' | 'edit'
-  initialName?: string
-  initialClassIds?: string[]
-} | null
+type ClassModalState =
+  | { mode: 'add' }
+  | { mode: 'edit'; classId: string; initialValues: ClassFormValues }
+  | null
+
+type SubjectModalState =
+  | { mode: 'add' }
+  | { mode: 'edit'; subjectId: string; initialValues: SubjectFormValues }
+  | null
 
 interface LevelClassSubjectAccordionProps {
   level: LevelForSetup
+  handlers: ClassSubjectSetupHandlers
   open?: boolean
   defaultOpen?: boolean
   onOpenChange?: AccordionOpenChangeHandler
@@ -25,6 +30,7 @@ interface LevelClassSubjectAccordionProps {
 
 const LevelClassSubjectAccordion = ({
   level,
+  handlers,
   open: openProp,
   defaultOpen = false,
   onOpenChange,
@@ -34,6 +40,7 @@ const LevelClassSubjectAccordion = ({
   const [classModal, setClassModal] = useState<ClassModalState>(null)
   const [subjectModal, setSubjectModal] = useState<SubjectModalState>(null)
   const isOpen = openProp ?? internalOpen
+  const levelId = level.id
 
   const setOpen = (next: boolean) => {
     if (openProp === undefined) setInternalOpen(next)
@@ -48,13 +55,43 @@ const LevelClassSubjectAccordion = ({
   const handleActiveChange = (active: boolean) => {
     setIsActive(active)
     if (!active) setOpen(false)
+    if (levelId) handlers.onLevelActiveChange(levelId, active)
+  }
+
+  const handleClassSubmit = (payload: ClassFormValues) => {
+    if (!classModal || !levelId) return
+
+    if (classModal.mode === 'add') {
+      handlers.onAddClass(levelId, payload)
+    } else {
+      handlers.onEditClass(classModal.classId, payload)
+    }
+
+    setClassModal(null)
+  }
+
+  const handleSubjectSubmit = (values: SubjectFormValues) => {
+    if (!subjectModal || !levelId) return
+
+    if (subjectModal.mode === 'add') {
+      handlers.onAddSubject({
+        level_id: levelId,
+        name: values.name,
+        class_ids: values.classIds.length > 0 ? values.classIds : undefined,
+      })
+    } else {
+      handlers.onEditSubject(subjectModal.subjectId, {
+        name: values.name,
+        class_ids: values.classIds.length > 0 ? values.classIds : undefined,
+      })
+    }
+
+    setSubjectModal(null)
   }
 
   return (
     <div className="form-field-wrapper space-y-6">
-      {/* Heading */}
       <div className="flex items-start justify-between">
-        {/* Level name and description */}
         <div className={mergeClasses(!isActive && 'opacity-50')}>
           <div className="flex items-center gap-2 mb-2">
             <ToggleButton checked={isActive} onChange={handleActiveChange} />
@@ -65,7 +102,6 @@ const LevelClassSubjectAccordion = ({
           <p className="text-sm text-slate-500">{`${level.name} classes and subjects`}</p>
         </div>
 
-        {/* Icon for toggling showing and hiding the level classes and subjects aka accordion */}
         <div className={mergeClasses(!isActive && 'opacity-50')}>
           <button
             type="button"
@@ -82,8 +118,7 @@ const LevelClassSubjectAccordion = ({
         </div>
       </div>
 
-      {/* Classes and subjects container */}
-      {isActive && isOpen && (
+      {isActive && isOpen && levelId && (
         <div className="space-y-6">
           <div className="space-y-4">
             <p>Classes Offered</p>
@@ -93,7 +128,10 @@ const LevelClassSubjectAccordion = ({
                   key={classItem.id ?? classItem.name}
                   data={classItem}
                   type="class"
+                  levelId={levelId}
                   subject_scope={level.subject_scope}
+                  levelSubjects={level.subjects}
+                  handlers={handlers}
                 />
               ))}
             </div>
@@ -108,7 +146,6 @@ const LevelClassSubjectAccordion = ({
             )}
           </div>
 
-          {/* Subjects container */}
           <div className="space-y-4">
             <p>Subjects (GES Standard)</p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -117,8 +154,10 @@ const LevelClassSubjectAccordion = ({
                   key={subject.id ?? subject.name}
                   data={subject}
                   type="subject"
+                  levelId={levelId}
                   subject_scope={level.subject_scope}
                   levelClasses={level.classes}
+                  handlers={handlers}
                 />
               ))}
             </div>
@@ -136,9 +175,9 @@ const LevelClassSubjectAccordion = ({
       <CustomClassModal
         open={classModal !== null}
         mode={classModal?.mode ?? 'add'}
-        initialName={classModal?.initialName}
+        initialValues={classModal?.mode === 'edit' ? classModal.initialValues : undefined}
         onClose={() => setClassModal(null)}
-        onSubmit={() => setClassModal(null)}
+        onSubmit={handleClassSubmit}
       />
 
       <CustomSubjectModal
@@ -146,10 +185,9 @@ const LevelClassSubjectAccordion = ({
         mode={subjectModal?.mode ?? 'add'}
         subjectScope={level.subject_scope}
         classes={level.classes}
-        initialName={subjectModal?.initialName}
-        initialClassIds={subjectModal?.initialClassIds}
+        initialValues={subjectModal?.mode === 'edit' ? subjectModal.initialValues : undefined}
         onClose={() => setSubjectModal(null)}
-        onSubmit={() => setSubjectModal(null)}
+        onSubmit={handleSubjectSubmit}
       />
     </div>
   )

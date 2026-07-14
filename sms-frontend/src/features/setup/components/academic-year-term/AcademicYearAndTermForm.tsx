@@ -3,7 +3,7 @@ import { Controller, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button, FormLabel, InputField, SelectField } from '@/components/ui'
-import type { AcademicYearAndTerm, AcademicYearAndTermFormData } from '@/features/setup/types'
+import type { AcademicYearAndTerm, AcademicYearAndTermFormData } from '@/features/setup/types/types'
 import {
   getAcademicYearOptions,
   guessCurrentTerm,

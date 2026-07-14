@@ -5,8 +5,11 @@ import AcademicYearAndTermForm from '@/features/setup/components/academic-year-t
 import type {
   AcademicYearAndTerm as AcademicYearAndTermType,
   AcademicYearAndTermFormData,
-} from '@/features/setup/types'
-import { getAcademicYearAndTerm, updateAcademicYearAndTerm } from '@/features/setup/services'
+} from '@/features/setup/types/types'
+import {
+  getAcademicYearAndTerm,
+  updateAcademicYearAndTerm,
+} from '@/features/setup/services/services'
 import { mapFormToApiPayload } from '@/features/setup/utils/academic-year'
 import { handleSetupProgressResponse } from '@/features/setup/utils/handle-setup-progress-response'
 import { useAuthStore } from '@/features/auth/store'

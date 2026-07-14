@@ -118,10 +118,11 @@ export interface SubjectForSetup {
   is_active?: boolean
   is_system_generated?: boolean
   is_editable: boolean
+  class_ids: string[]
   groups: SubjectGroupForSetup[]
 }
 
-export interface ClassSubjectForSetup extends SubjectForSetup {
+export interface ClassSubjectForSetup extends Omit<SubjectForSetup, 'class_ids'> {
   id: string
   class_subject_id: string
 }

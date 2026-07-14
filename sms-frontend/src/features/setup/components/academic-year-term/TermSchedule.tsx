@@ -1,6 +1,6 @@
 import type { UseFormRegister } from 'react-hook-form'
 import { FormLabel } from '@/components/ui'
-import type { AcademicYearAndTermFormData } from '@/features/setup/types'
+import type { AcademicYearAndTermFormData } from '@/features/setup/types/types'
 import { mergeClasses } from '@/utils'
 
 type TermScheduleProps = {
