@@ -1,9 +1,12 @@
 from django.urls import path
 
 from schools.setup_views import (
+    CompleteAssessmentSetupView,
     CompleteClassesAndSubjectsSetupView,
     SchoolSetupView,
     SetupAcademicYearTermView,
+    SetupAssessmentLevelConfigView,
+    SetupAssessmentView,
     SetupClassStatusView,
     SetupClassStreamCreateView,
     SetupClassStreamDetailView,
@@ -102,6 +105,21 @@ urlpatterns = [
         'setup/classes-and-subjects/levels/<uuid:level_id>/status/',
         SetupLevelStatusView.as_view(),
         name='school-setup-level-status',
+    ),
+    path(
+        'setup/assessment/',
+        SetupAssessmentView.as_view(),
+        name='school-setup-assessment',
+    ),
+    path(
+        'setup/assessment/levels/<uuid:level_id>/',
+        SetupAssessmentLevelConfigView.as_view(),
+        name='school-setup-assessment-level-config',
+    ),
+    path(
+        'setup/assessment/complete/',
+        CompleteAssessmentSetupView.as_view(),
+        name='school-setup-assessment-complete',
     ),
     path('school/', SchoolView.as_view(), name='school'),
 ]

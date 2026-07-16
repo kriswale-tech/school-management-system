@@ -5,6 +5,11 @@ from schools.setup_serializers.academic_year_term import (
     TermScheduleItemSerializer,
     TermScheduleResponseItemSerializer,
 )
+from schools.setup_serializers.assessment import (
+    SaveLevelAssessmentConfigSerializer,
+    SetupAssessmentDataSerializer,
+    SetupAssessmentLevelSerializer,
+)
 from schools.setup_serializers.classes_and_subjects import (
     ActivationResponseSerializer,
     ActivationSerializer,
@@ -36,6 +41,9 @@ __all__ = [
     'CreateSubjectSerializer',
     'SetupAcademicYearTermPostResponseSerializer',
     'SetupAcademicYearTermSerializer',
+    'SaveLevelAssessmentConfigSerializer',
+    'SetupAssessmentDataSerializer',
+    'SetupAssessmentLevelSerializer',
     'SetupClassLevelSerializer',
     'SetupClassStreamSerializer',
     'SetupLevelSerializer',
