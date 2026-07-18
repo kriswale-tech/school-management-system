@@ -4,13 +4,13 @@ ghana_education_curriculum = {
         "subject_scope": "class",
         "allows_custom_classes": True,
         "classes": [
-            "Crèche / Daycare (Ages 0-2)",
+            "Crèche / Daycare",
             "Nursery 1",
             "Nursery 2",
         ],
         "description": "Ages 0 - 5",
         "subjects": {
-            "Crèche / Daycare (Ages 0-2)": [
+            "Crèche / Daycare": [
                 "Sensory Stimulation (colors, sounds, textures)",
                 "Motor Skills Development (crawling, grasping)",
                 "Social & Communication Play (singing, rhyming)",

@@ -29,6 +29,12 @@ from schools.setup_serializers.classes_and_subjects import (
     UpdateSubjectSerializer,
 )
 from schools.setup_serializers.common import SetupStepResponseSerializer, validate_image
+from schools.setup_serializers.fees import (
+    CreateFeeItemSerializer,
+    SetupFeesDataSerializer,
+    SetupFeeItemSerializer,
+    UpdateFeeItemSerializer,
+)
 from schools.setup_serializers.school_profile import SetupSchoolProfileSerializer
 
 __all__ = [
@@ -36,6 +42,7 @@ __all__ = [
     'ActivationResponseSerializer',
     'ActivationSerializer',
     'CreateCustomClassSerializer',
+    'CreateFeeItemSerializer',
     'CreateStreamSerializer',
     'CreateSubjectGroupSerializer',
     'CreateSubjectSerializer',
@@ -44,6 +51,8 @@ __all__ = [
     'SaveLevelAssessmentConfigSerializer',
     'SetupAssessmentDataSerializer',
     'SetupAssessmentLevelSerializer',
+    'SetupFeesDataSerializer',
+    'SetupFeeItemSerializer',
     'SetupClassLevelSerializer',
     'SetupClassStreamSerializer',
     'SetupLevelSerializer',
@@ -55,6 +64,7 @@ __all__ = [
     'TermScheduleItemSerializer',
     'TermScheduleResponseItemSerializer',
     'UpdateCustomClassSerializer',
+    'UpdateFeeItemSerializer',
     'UpdateStreamSerializer',
     'UpdateSubjectGroupSerializer',
     'UpdateSubjectSerializer',

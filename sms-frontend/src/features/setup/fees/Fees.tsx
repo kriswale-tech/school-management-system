@@ -1,10 +1,44 @@
+import toast from 'react-hot-toast'
 import { Icon } from '@iconify/react'
-
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+import Button from '@/components/ui/Button'
+import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import { useAuthStore } from '@/features/auth/store'
+import { handleSetupProgressResponse } from '@/features/setup/utils/handle-setup-progress-response'
+import { getApiErrorMessage } from '@/utils'
 import FeesSetupForm from './components/FeesSetupForm'
 import FeesSetupTable from './components/FeesSetupTable'
-import Button from '@/components/ui/Button'
+import { completeFeeSetup, getFeeStructures } from './services'
 
 const Fees = () => {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const setUser = useAuthStore((state) => state.setUser)
+  const user = useAuthStore((state) => state.user)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['feeStructures'],
+    queryFn: getFeeStructures,
+  })
+
+  const { mutate: completeSetup, isPending: isCompleting } = useMutation({
+    mutationFn: completeFeeSetup,
+    onSuccess: (response) => {
+      toast.success('Fees setup saved')
+      void queryClient.invalidateQueries({ queryKey: ['setup'] })
+      void queryClient.invalidateQueries({ queryKey: ['feeStructures'] })
+      handleSetupProgressResponse(response, { navigate, user, setUser })
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Unable to complete fees setup'))
+    },
+  })
+
+  if (isLoading || !data) {
+    return <LoadingSpinner className="mx-auto" />
+  }
+
   return (
     <div className="space-y-6">
       <div className="mb-6">
@@ -21,12 +55,12 @@ const Fees = () => {
 
       <FeesSetupForm />
 
-      <div className="">
-        <h3 className="text-lg mb-2 text-slate-900">Fees Structure Summary</h3>
-        <FeesSetupTable />
+      <div>
+        <h3 className="text-lg mb-2 text-slate-900">{data.fee_structure.name}</h3>
+        <FeesSetupTable feeItems={data.fee_items} />
       </div>
 
-      <Button type="button" variant="outline">
+      <Button type="button" variant="outline" onClick={() => completeSetup()} loading={isCompleting}>
         Proceed to Next Step
       </Button>
     </div>

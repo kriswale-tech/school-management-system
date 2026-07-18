@@ -1,51 +1,81 @@
+import toast from 'react-hot-toast'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
+import { Icon } from '@iconify/react'
+import { ChoicePillGroup } from '@/components/shared'
+import Button from '@/components/ui/Button'
 import FormLabel from '@/components/ui/FormLabel'
 import InputField from '@/components/ui/InputField'
-import { useState } from 'react'
-import ChoicePillGroup from '@/components/shared/ChoicePillGroup'
-import Button from '@/components/ui/Button'
-import { Icon } from '@iconify/react'
-
-const APPLIES_TO_GROUPS_OPTIONS = [
-  { label: 'Entire School', value: 'entire_school' },
-  {
-    label: 'Level',
-    options: [
-      { label: 'Primary', value: 'primary' },
-      { label: 'Secondary', value: 'secondary' },
-      { label: 'Tertiary', value: 'tertiary' },
-    ],
-  },
-  {
-    label: 'Class',
-    options: [
-      { label: 'Class 1', value: 'class_1' },
-      { label: 'Class 2', value: 'class_2' },
-      { label: 'Class 3', value: 'class_3' },
-      { label: 'Class 4', value: 'class_4' },
-      { label: 'Class 5', value: 'class_5' },
-    ],
-  },
-]
-
-const APPLIES_TO_STUDENTS_OPTIONS = [
-  { label: 'All Students', value: 'all_students' },
-  { label: 'New Students Only', value: 'new_students' },
-  { label: 'Continuing Students Only', value: 'continuing_students' },
-]
+import { getApiErrorMessage } from '@/utils'
+import { createFeeItem, getClasses, getLevels } from '../services'
+import {
+  buildAppliesToGroupsOptions,
+  buildFeeItemPayload,
+  ENTIRE_SCHOOL_VALUE,
+  STUDENT_TYPE_OPTIONS,
+  validateFeeItemForm,
+} from '../utils'
 
 const FeesSetupForm = () => {
-  const [appliesToGroups, setAppliesToGroups] = useState<string>('entire_school')
-  const [appliesToStudents, setAppliesToStudents] = useState<string>('all_students')
+  const queryClient = useQueryClient()
+  const [name, setName] = useState('')
+  const [amount, setAmount] = useState('')
+  const [appliesToGroups, setAppliesToGroups] = useState(ENTIRE_SCHOOL_VALUE)
+  const [appliesToStudents, setAppliesToStudents] = useState('all_students')
+
+  const { data: levels = [] } = useQuery({
+    queryKey: ['feeLevels'],
+    queryFn: getLevels,
+  })
+
+  const { data: classes = [] } = useQuery({
+    queryKey: ['feeClasses'],
+    queryFn: getClasses,
+  })
+
+  const { mutate: addFeeItem, isPending } = useMutation({
+    mutationFn: createFeeItem,
+    onSuccess: () => {
+      toast.success('Fee item added')
+      void queryClient.invalidateQueries({ queryKey: ['feeStructures'] })
+      setName('')
+      setAmount('')
+      setAppliesToGroups(ENTIRE_SCHOOL_VALUE)
+      setAppliesToStudents('all_students')
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Unable to add fee item'))
+    },
+  })
+
+  const handleSubmit = () => {
+    const validationError = validateFeeItemForm({
+      name,
+      amount,
+      appliesToGroups,
+      appliesToStudents,
+    })
+
+    if (validationError) {
+      toast.error(validationError)
+      return
+    }
+
+    addFeeItem(buildFeeItemPayload({ name, amount, appliesToGroups, appliesToStudents }))
+  }
+
+  const appliesToOptions = buildAppliesToGroupsOptions(levels, classes)
 
   return (
     <div className="form-field-wrapper space-y-6">
-      {/* Forms */}
       <div className="flex gap-4 items-center justify-between">
         <div className="w-1/2 space-y-2">
           <FormLabel label="Fee Name" required />
           <InputField
             type="text"
             placeholder="Eg. Tuition Fee"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
             className="rounded-none bg-white py-3"
           />
         </div>
@@ -58,6 +88,8 @@ const FeesSetupForm = () => {
             <InputField
               type="number"
               placeholder="Eg. 5000"
+              value={amount}
+              onChange={(event) => setAmount(event.target.value)}
               wrapperClassName="min-w-0 flex-1"
               className="rounded-none bg-white py-3 border-none w-full"
             />
@@ -65,30 +97,28 @@ const FeesSetupForm = () => {
         </div>
       </div>
 
-      {/* Applies to (Groups) */}
       <div className="space-y-4">
         <FormLabel label="Applies to (Groups)" required />
         <ChoicePillGroup
           name="applies-to"
-          items={APPLIES_TO_GROUPS_OPTIONS}
+          items={appliesToOptions}
           value={appliesToGroups}
-          onChange={(value) => setAppliesToGroups(value)}
+          onChange={setAppliesToGroups}
         />
       </div>
 
-      {/* Applies to (Students) */}
       <div className="space-y-4">
         <FormLabel label="Applies to (Students)" required />
         <ChoicePillGroup
           name="applies-to-students"
-          items={APPLIES_TO_STUDENTS_OPTIONS}
+          items={STUDENT_TYPE_OPTIONS}
           value={appliesToStudents}
-          onChange={(value) => setAppliesToStudents(value)}
+          onChange={setAppliesToStudents}
         />
       </div>
 
       <div className="flex justify-end pt-2">
-        <Button type="button" className="w-fit">
+        <Button type="button" className="w-fit" onClick={handleSubmit} loading={isPending}>
           <Icon
             icon="hugeicons:plus-sign"
             className="size-4 bg-white text-black rounded-full p-0.5"

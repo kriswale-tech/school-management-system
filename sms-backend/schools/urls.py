@@ -3,6 +3,7 @@ from django.urls import path
 from schools.setup_views import (
     CompleteAssessmentSetupView,
     CompleteClassesAndSubjectsSetupView,
+    CompleteFeesSetupView,
     SchoolSetupView,
     SetupAcademicYearTermView,
     SetupAssessmentLevelConfigView,
@@ -14,6 +15,9 @@ from schools.setup_views import (
     SetupClassesAndSubjectsView,
     SetupCustomClassCreateView,
     SetupCustomClassDetailView,
+    SetupFeeItemCreateView,
+    SetupFeeItemDetailView,
+    SetupFeesView,
     SetupLevelStatusView,
     SetupSchoolProfileView,
     SetupSubjectCreateView,
@@ -120,6 +124,26 @@ urlpatterns = [
         'setup/assessment/complete/',
         CompleteAssessmentSetupView.as_view(),
         name='school-setup-assessment-complete',
+    ),
+    path(
+        'setup/fees/',
+        SetupFeesView.as_view(),
+        name='school-setup-fees',
+    ),
+    path(
+        'setup/fees/items/',
+        SetupFeeItemCreateView.as_view(),
+        name='school-setup-fee-items',
+    ),
+    path(
+        'setup/fees/items/<uuid:fee_item_id>/',
+        SetupFeeItemDetailView.as_view(),
+        name='school-setup-fee-item-detail',
+    ),
+    path(
+        'setup/fees/complete/',
+        CompleteFeesSetupView.as_view(),
+        name='school-setup-fees-complete',
     ),
     path('school/', SchoolView.as_view(), name='school'),
 ]

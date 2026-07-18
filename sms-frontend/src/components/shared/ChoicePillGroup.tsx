@@ -128,7 +128,7 @@ const ChoicePillGroup = ({ items, value, onChange, name, className }: ChoicePill
             {isOpen ? (
               <div
                 role="listbox"
-                className="absolute left-0 z-40 mt-2 min-w-full rounded-xl border border-slate-200 bg-white p-1 shadow-lg"
+                className="absolute left-0 z-40 mt-2 w-max min-w-56 max-w-80 rounded-xl border border-slate-200 bg-white p-1 shadow-lg"
               >
                 {item.options.map((option) => {
                   const optionSelected = value === option.value

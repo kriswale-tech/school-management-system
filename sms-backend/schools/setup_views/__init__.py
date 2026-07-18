@@ -4,6 +4,12 @@ from schools.setup_views.assessment import (
     SetupAssessmentLevelConfigView,
     SetupAssessmentView,
 )
+from schools.setup_views.fees import (
+    CompleteFeesSetupView,
+    SetupFeeItemCreateView,
+    SetupFeeItemDetailView,
+    SetupFeesView,
+)
 from schools.setup_views.classes_and_subjects import (
     CompleteClassesAndSubjectsSetupView,
     SetupClassStatusView,
@@ -26,6 +32,7 @@ from schools.setup_views.school_profile import SetupSchoolProfileView
 __all__ = [
     'CompleteAssessmentSetupView',
     'CompleteClassesAndSubjectsSetupView',
+    'CompleteFeesSetupView',
     'SchoolSetupView',
     'SetupAcademicYearTermView',
     'SetupAssessmentLevelConfigView',
@@ -37,6 +44,9 @@ __all__ = [
     'SetupClassesAndSubjectsView',
     'SetupCustomClassCreateView',
     'SetupCustomClassDetailView',
+    'SetupFeeItemCreateView',
+    'SetupFeeItemDetailView',
+    'SetupFeesView',
     'SetupLevelStatusView',
     'SetupSchoolProfileView',
     'SetupSubjectCreateView',
