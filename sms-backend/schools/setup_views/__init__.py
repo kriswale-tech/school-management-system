@@ -26,6 +26,14 @@ from schools.setup_views.classes_and_subjects import (
     SetupSubjectGroupDetailView,
     SetupSubjectStatusView,
 )
+from schools.setup_views.teachers import (
+    CompleteTeachersSetupView,
+    SetupClassTeacherAssignmentCreateView,
+    SetupClassTeacherAssignmentDetailView,
+    SetupTeachersView,
+    SetupTeachingAssignmentCreateView,
+    SetupTeachingAssignmentDetailView,
+)
 from schools.setup_views.common import SchoolSetupView, advance_setup_if_needed
 from schools.setup_views.school_profile import SetupSchoolProfileView
 
@@ -33,6 +41,7 @@ __all__ = [
     'CompleteAssessmentSetupView',
     'CompleteClassesAndSubjectsSetupView',
     'CompleteFeesSetupView',
+    'CompleteTeachersSetupView',
     'SchoolSetupView',
     'SetupAcademicYearTermView',
     'SetupAssessmentLevelConfigView',
@@ -54,5 +63,10 @@ __all__ = [
     'SetupSubjectGroupCreateView',
     'SetupSubjectGroupDetailView',
     'SetupSubjectStatusView',
+    'SetupClassTeacherAssignmentCreateView',
+    'SetupClassTeacherAssignmentDetailView',
+    'SetupTeachersView',
+    'SetupTeachingAssignmentCreateView',
+    'SetupTeachingAssignmentDetailView',
     'advance_setup_if_needed',
 ]

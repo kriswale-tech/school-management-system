@@ -4,6 +4,7 @@ from schools.setup_views import (
     CompleteAssessmentSetupView,
     CompleteClassesAndSubjectsSetupView,
     CompleteFeesSetupView,
+    CompleteTeachersSetupView,
     SchoolSetupView,
     SetupAcademicYearTermView,
     SetupAssessmentLevelConfigView,
@@ -25,6 +26,12 @@ from schools.setup_views import (
     SetupSubjectGroupCreateView,
     SetupSubjectGroupDetailView,
     SetupSubjectStatusView,
+    SetupClassTeacherAssignmentCreateView,
+    SetupClassTeacherAssignmentDetailView,
+    SetupTeachersView,
+    SetupTeachingAssignmentCreateView,
+    SetupTeachingAssignmentDetailView,
+    CompleteTeachersSetupView,
 )
 from schools.views import SchoolView
 
@@ -144,6 +151,36 @@ urlpatterns = [
         'setup/fees/complete/',
         CompleteFeesSetupView.as_view(),
         name='school-setup-fees-complete',
+    ),
+    path(
+        'setup/teachers/',
+        SetupTeachersView.as_view(),
+        name='school-setup-teachers',
+    ),
+    path(
+        'setup/teachers/class-teacher-assignments/',
+        SetupClassTeacherAssignmentCreateView.as_view(),
+        name='school-setup-class-teacher-assignments',
+    ),
+    path(
+        'setup/teachers/class-teacher-assignments/<uuid:assignment_id>/',
+        SetupClassTeacherAssignmentDetailView.as_view(),
+        name='school-setup-class-teacher-assignment-detail',
+    ),
+    path(
+        'setup/teachers/teaching-assignments/',
+        SetupTeachingAssignmentCreateView.as_view(),
+        name='school-setup-teaching-assignments',
+    ),
+    path(
+        'setup/teachers/teaching-assignments/<uuid:assignment_id>/',
+        SetupTeachingAssignmentDetailView.as_view(),
+        name='school-setup-teaching-assignment-detail',
+    ),
+    path(
+        'setup/teachers/complete/',
+        CompleteTeachersSetupView.as_view(),
+        name='school-setup-teachers-complete',
     ),
     path('school/', SchoolView.as_view(), name='school'),
 ]

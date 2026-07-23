@@ -10,6 +10,8 @@ from accounts.views import (
     RefreshTokenView,
     ResendLoginOtpView,
     ResendOtpView,
+    UserDetailView,
+    UserListCreateView,
 )
 
 urlpatterns = [
@@ -22,4 +24,6 @@ urlpatterns = [
     path('login/resend-otp/', ResendLoginOtpView.as_view(), name='login-resend-otp'),
     path('refresh/', RefreshTokenView.as_view(), name='refresh-token'),
     path('logout/', LogoutView.as_view(), name='logout'),
+    path('users/', UserListCreateView.as_view(), name='user-list'),
+    path('users/<uuid:pk>/', UserDetailView.as_view(), name='user-detail'),
 ]

@@ -8,9 +8,10 @@ interface ModalProps {
   onClose: () => void
   children: ReactNode
   className?: string
+  scrollable?: boolean
 }
 
-const Modal = ({ open, title, onClose, children, className }: ModalProps) => {
+const Modal = ({ open, title, onClose, children, className, scrollable = false }: ModalProps) => {
   const titleId = useId()
 
   useEffect(() => {
@@ -41,10 +42,11 @@ const Modal = ({ open, title, onClose, children, className }: ModalProps) => {
         aria-labelledby={titleId}
         className={mergeClasses(
           'relative w-full max-w-md rounded-lg bg-white p-6 shadow-xl',
+          scrollable && 'flex max-h-[95vh] flex-col overflow-hidden',
           className,
         )}
       >
-        <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="mb-4 flex shrink-0 items-start justify-between gap-4">
           <h2 id={titleId} className="text-lg font-medium text-slate-900">
             {title}
           </h2>
@@ -58,7 +60,11 @@ const Modal = ({ open, title, onClose, children, className }: ModalProps) => {
           </button>
         </div>
 
-        {children}
+        {scrollable ? (
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1">{children}</div>
+        ) : (
+          children
+        )}
       </div>
     </div>
   )

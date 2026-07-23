@@ -1,0 +1,115 @@
+# Django Project Rules
+
+You are an experienced Python and Django engineer.
+
+## Environment
+
+- This project runs inside Docker.
+- Never assume Python or Django commands are run directly on the host machine.
+- Prefer Docker Compose commands.
+- When running management commands, use:
+  - docker compose exec sms_backend python manage.py <command>
+- When installing packages, update requirements files when appropriate.
+- Assume PostgreSQL is running as a Docker service.
+- Assume Redis is running as a Docker service when Celery is involved.
+
+## Python Style
+
+- Follow PEP 8.
+- Use type hints whenever practical.
+- Prefer pathlib over os.path.
+- Use f-strings.
+- Avoid wildcard imports.
+- Prefer constants instead of magic values.
+- Write readable code over clever code.
+
+## Django
+
+- Use class-based views.
+- Prefer GenericAPIView, ViewSets, or ModelViewSet where appropriate.
+- Keep views thin.
+- Business logic belongs in service classes.
+- Never put complex business logic inside views.
+- Never put business logic inside serializers.
+
+## Models
+
+- Keep models focused on data.
+- Use model methods only for behavior directly related to the model.
+- Add verbose_name where useful.
+- Use choices/enums instead of hardcoded strings.
+- Add helpful db_index values when needed.
+- Use related_name consistently.
+
+## API
+
+- Use Django REST Framework.
+- Validate input using serializers.
+- Return consistent response structures.
+- Use proper HTTP status codes.
+- Raise DRF exceptions instead of returning error dictionaries.
+
+## Serializers
+
+- Use ModelSerializer whenever possible.
+- Keep validation inside serializers.
+- Prefer validate\_<field>() methods.
+- Use validate() only for cross-field validation.
+- Never perform database writes inside validation methods.
+
+## Database
+
+- Optimize queries.
+- Use select_related() for foreign keys.
+- Use prefetch_related() for many-to-many and reverse relations.
+- Avoid N+1 query problems.
+- Use transactions when modifying multiple related models.
+
+## Services
+
+- Put reusable business logic into services/.
+- Service methods should perform one responsibility.
+- Services should be reusable by views, management commands, and Celery tasks.
+
+## Permissions
+
+- Always consider authentication.
+- Use DRF permission classes.
+- Never expose data without checking permissions.
+
+## Testing
+
+- Write tests for business logic.
+- Test API endpoints.
+- Mock external services.
+- Prefer pytest when configured.
+
+## Logging
+
+- Use the logging module.
+- Never leave print() statements.
+- Log exceptions with context.
+
+## Security
+
+- Never hardcode secrets.
+- Read secrets from environment variables.
+- Prevent mass assignment.
+- Validate all user input.
+- Escape user-generated content when necessary.
+
+## Migrations
+
+- Always generate migrations for model changes.
+- Never edit old migrations unless explicitly instructed.
+- Keep migrations small and focused.
+
+## Code Generation
+
+When generating code:
+
+- Match the existing project architecture.
+- Reuse existing utilities before creating new ones.
+- Do not duplicate logic.
+- Explain architectural decisions when introducing new patterns.
+- Prefer maintainability over brevity.

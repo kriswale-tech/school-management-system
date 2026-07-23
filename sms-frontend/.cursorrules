@@ -1,0 +1,106 @@
+# SMS Frontend — Cursor rules
+
+## Imports
+
+- Use the `@/` path alias for anything under `src/`. Do **not** use deep relative paths like `../../../`.
+- Examples:
+  - `import api from '@/app/api/api'`
+  - `import { Button } from '@/components/ui'`
+  - `import { Table, TableWrapper } from '@/components/shared'`
+  - `import { useAuthStore } from '@/features/auth/store'`
+  - `import { getApiErrorMessage } from '@/utils'`
+  - `import type { PaginatedResponse } from '@/types/generalTypes'`
+- Relative imports are fine **within the same feature/step folder** (e.g. `./types`, `./components/AddTeacherForm`, `../types/types` from a setup sub-step).
+- Prefer barrel exports when they exist: `@/components/ui`, `@/components/shared`, `@/features/auth/components`.
+
+## API & services
+
+- There is **one** HTTP client: `@/app/api/api` (axios with auth refresh + CSRF). Never create another axios instance in features.
+- Feature API calls live in `services.ts` (or `*-services.ts` when large) inside the feature folder.
+- Services are thin wrappers: call `api.get/post/patch/put/delete`, type the response, return `response.data`.
+- Do not put UI logic, react-query hooks, or toast handling in service files — keep that in page/components.
+
+```ts
+import api from '@/app/api/api'
+import type { MyType } from './types'
+
+export const getThings = async () => {
+  const response = await api.get<MyType[]>('/path/')
+  return response.data
+}
+```
+
+## Project layout
+
+```
+src/
+├── app/                    # App shell: routes, api client
+│   ├── api/api.ts          # Single axios instance
+│   └── routes.tsx          # Composes feature routes
+├── components/
+│   ├── ui/                 # Primitives (Button, InputField, Modal, …)
+│   ├── shared/             # Reusable app components (EmptyState, data-table, …)
+│   └── layout/             # AppLayout, AuthLayout, SetupLayout
+├── features/               # Feature modules (auth, setup, dashboard, …)
+├── types/                  # Cross-feature types (e.g. PaginatedResponse)
+└── utils/                  # mergeClasses, getApiErrorMessage, …
+```
+
+## Feature modules
+
+Each feature under `src/features/{name}/` typically has:
+
+- `{Name}.tsx` or `pages/` — route page components
+- `components/` — feature-specific UI
+- `types.ts` — feature types/interfaces
+- `services.ts` — API functions
+- `utils.ts` — mappers, validators, payload builders (when needed)
+- `routes.tsx` — route definitions (lazy-loaded pages)
+
+### Setup wizard (`features/setup/`)
+
+- **Shared setup** (stepper, progress, getSetup): `setup/types/`, `setup/services/services.ts`, `setup/utils/`, `SetupStepPage.tsx`, `routes.tsx`
+- **Each step** gets its own folder, e.g. `school-profile/`, `teachers/`, `fees/`:
+  - Page: `SchoolProfile.tsx`, `Teachers.tsx`, …
+  - `components/` — forms, tables, modals for that step
+  - `types.ts`, `services.ts`, `utils.ts` — step-local only
+- After setup progress: use `handleSetupProgressResponse` from `@/features/setup/utils/handle-setup-progress-response`
+
+## Pages & data fetching
+
+- Use **TanStack Query** (`useQuery` / `useMutation`) in page components, not in presentational children when avoidable.
+- On mutation success: `toast` + invalidate relevant query keys + `handleSetupProgressResponse` for setup complete steps.
+- Use `getApiErrorMessage(error, 'Fallback message')` from `@/utils` for error toasts.
+- Loading: `LoadingSpinner` from `@/components/ui`; empty lists: `EmptyState` + `TableWrapper` from `@/components/shared`.
+
+## Forms
+
+- **react-hook-form** + **zod** (`zodResolver`) for forms.
+- Use `FormLabel`, `InputField`, `SelectField`, `Button` from `@/components/ui`.
+- `ChoicePillGroup`, `ImageUpload` from `@/components/shared` when appropriate.
+- Match existing patterns in `SchoolProfileForm`, `AddTeacherForm`, etc.
+
+## Tables
+
+- Use compound `Table` + `TableWrapper` from `@/components/shared/data-table` (or `@/components/shared`).
+- `TableWrapper` variants: `form-field` (default, slate bg + border) or `card` (white bg, shadow, no border).
+- Paginated lists: pass `PaginatedResponse` to `TableWrapper` / `Pagination`; type from `@/types/generalTypes`.
+
+## Styling
+
+- **Tailwind CSS** only; use `mergeClasses` from `@/utils` for conditional classes.
+- Form sections: `form-field-wrapper` (defined in `index.css`) for bordered slate containers.
+- Icons: `@iconify/react` (project uses `hugeicons:*` and `mdi:*`).
+
+## TypeScript
+
+- Prefer `interface` / `type` in feature `types.ts` files; export response and payload types alongside form types.
+- Use strict typing on API responses: `api.get<ResponseType>(...)`.
+- Avoid `any`; use `unknown` + narrowing for errors.
+
+## What not to do
+
+- Do not add new API clients or fetch wrappers outside `@/app/api/api`.
+- Do not import from `src/...` without the `@/` alias (except same-folder relatives).
+- Do not commit `.env` or secrets.
+- Keep diffs focused — match surrounding naming, file layout, and patterns before introducing new abstractions.

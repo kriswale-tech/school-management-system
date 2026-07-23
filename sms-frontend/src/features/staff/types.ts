@@ -1,0 +1,40 @@
+export type StaffGender = 'male' | 'female'
+
+export type StaffFormData = {
+  first_name: string
+  last_name: string
+  gender?: StaffGender
+  phone_number: string
+  phone_number_alt?: string
+  email?: string
+  date_of_birth?: string
+  address?: string
+}
+
+export const GENDER_OPTIONS = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+] as const
+
+export interface StaffProfile {
+    profile_picture: string | null
+    bio: string | null
+    date_of_birth: string | null
+    gender: string | null
+    address: string | null
+    phone_number_alt: string | null
+  }
+
+export interface Staff {
+    id: string
+    full_name: string
+    first_name: string
+    last_name: string
+    phone_number: string
+    email: string | null
+    role: string
+    is_active: boolean
+    profile: StaffProfile
+    school_setup_completed: boolean
+    school_id: string
+}

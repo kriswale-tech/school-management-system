@@ -4,6 +4,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -12,13 +13,20 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.cookies import clear_auth_cookies, set_auth_cookies
+from accounts.helpers import save_user_serializer
+from accounts.permissions import CanManageUser
 from accounts.serializers import (
+    AddUserSerializer,
     AdminSignUpSerializer,
     AdminVerifyOtpSerializer,
+    DeleteUserResponseSerializer,
     MessageResponseSerializer,
     ResendOtpSerializer,
+    UpdateUserSerializer,
     UserSerializer,
 )
+from accounts.services.users import delete_user, get_school_user, list_school_users
+from core.pagination import StandardResultsSetPagination, paginated_schema
 from accounts.services.otp import (
     OtpResendCooldownError,
     OtpResendError,
@@ -350,3 +358,140 @@ class LogoutView(APIView):
         )
         clear_auth_cookies(response)
         return response
+
+
+class UserListCreateView(APIView):
+    permission_classes = [CanManageUser]
+    pagination_class = StandardResultsSetPagination
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    @extend_schema(
+        tags=['Accounts'],
+        summary='List users',
+        description=(
+            'Returns paginated users in the current school that the requester can manage. '
+            'Admins see all roles; staff see teachers only.'
+        ),
+        responses={
+            200: paginated_schema(UserSerializer, name='PaginatedUserList'),
+        },
+    )
+    def get(self, request):
+        role = request.query_params.get('role')
+        is_active_param = request.query_params.get('is_active')
+        is_active = None
+        if is_active_param is not None:
+            is_active = is_active_param.lower() in ('true', '1', 'yes')
+
+        users = list_school_users(
+            request.user,
+            role=role,
+            is_active=is_active,
+        )
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(users, request)
+        serializer = UserSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+    @extend_schema(
+        tags=['Accounts'],
+        summary='Add user',
+        description=(
+            'Create a user in the current school. Admins can add any role; '
+            'staff can add teachers only. Send multipart/form-data when '
+            'including an optional profile_picture file.'
+        ),
+        request=AddUserSerializer,
+        responses={
+            201: UserSerializer,
+            400: OpenApiResponse(description='Validation error'),
+            403: OpenApiResponse(description='Permission denied'),
+        },
+    )
+    def post(self, request):
+        serializer = AddUserSerializer(
+            data=request.data,
+            context={'request': request, 'school': request.user.school},
+        )
+        serializer.is_valid(raise_exception=True)
+        user = save_user_serializer(serializer)
+        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+
+
+class UserDetailView(APIView):
+    permission_classes = [CanManageUser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_user(self, request, pk):
+        user = get_school_user(request.user.school, pk)
+        self.check_object_permissions(request, user)
+        return user
+
+    @extend_schema(
+        tags=['Accounts'],
+        summary='Get user',
+        description='Returns a user in the current school.',
+        responses={
+            200: UserSerializer,
+            404: OpenApiResponse(description='User not found'),
+        },
+    )
+    def get(self, request, pk):
+        user = self.get_user(request, pk)
+        return Response(UserSerializer(user).data)
+
+    @extend_schema(
+        tags=['Accounts'],
+        summary='Update user',
+        description=(
+            'Partially update a user in the current school. Admins can update any '
+            'manageable user; staff can update teachers only. During incomplete '
+            'school setup, admins may also change a user\'s primary phone number. '
+            'Send multipart/form-data when updating profile_picture.'
+        ),
+        request=UpdateUserSerializer,
+        responses={
+            200: UserSerializer,
+            400: OpenApiResponse(description='Validation error'),
+            403: OpenApiResponse(description='Permission denied'),
+            404: OpenApiResponse(description='User not found'),
+        },
+    )
+    def patch(self, request, pk):
+        user = self.get_user(request, pk)
+        serializer = UpdateUserSerializer(
+            user,
+            data=request.data,
+            partial=True,
+            context={'request': request},
+        )
+        serializer.is_valid(raise_exception=True)
+        user = save_user_serializer(serializer)
+        return Response(UserSerializer(user).data)
+
+    @extend_schema(
+        tags=['Accounts'],
+        summary='Delete user',
+        description=(
+            'Removes a user when school setup is incomplete. After setup is '
+            'complete, or when linked records prevent deletion, the user is '
+            'deactivated instead.'
+        ),
+        responses={
+            200: DeleteUserResponseSerializer,
+            400: OpenApiResponse(description='Validation error'),
+            403: OpenApiResponse(description='Permission denied'),
+            404: OpenApiResponse(description='User not found'),
+        },
+    )
+    def delete(self, request, pk):
+        user = self.get_user(request, pk)
+        result = delete_user(request.user, user)
+        response_data = {
+            'hard_deleted': result.hard_deleted,
+            'user': None if result.hard_deleted else UserSerializer(result.user).data,
+        }
+        return Response(
+            DeleteUserResponseSerializer(response_data).data,
+            status=status.HTTP_200_OK,
+        )

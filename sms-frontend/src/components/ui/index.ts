@@ -7,6 +7,8 @@ import Button from './Button'
 import AvatarComponent from './AvatarComponent'
 import LoadingSpinner from './LoadingSpinner'
 import Modal from './Modal'
+import Tooltip from './Tooltip'
+import ActionButton from './ActionButton'
 
 export {
   FormLabel,
@@ -18,4 +20,6 @@ export {
   AvatarComponent,
   LoadingSpinner,
   Modal,
+  Tooltip,
+  ActionButton,
 }
