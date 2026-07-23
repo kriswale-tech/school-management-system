@@ -254,3 +254,5 @@ class CompleteTeachersSetupViewTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['next_step'], 'staff')
         self.assertIn('teachers', response.data['completed_steps'])
+        self.assertFalse(response.data['is_complete'])
+        self.assertEqual(response.data['progress_percentage'], 100)

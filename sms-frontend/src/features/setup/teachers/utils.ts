@@ -5,11 +5,12 @@ import type {
   LevelWithRelatedClassesAndSubjects,
   StreamForSetup,
 } from '@/features/setup/classes-and-subjects/types'
+import type { Staff } from '@/features/staff/types'
+import { getStaffProfileImage, mapStaffToFormData } from '@/features/staff/utils'
 import type {
   ClassTeacherAssignment,
   Teacher,
   TeacherFormData,
-  TeacherGender,
   TeachingAssignment,
 } from './types'
 
@@ -25,23 +26,11 @@ export type ClassOption = {
   subjects: ClassSubjectForSetup[]
 }
 
-export const getTeacherProfileImage = (teacher: Teacher) =>
-  teacher.profile.profile_picture ?? DEFAULT_PROFILE_IMAGE
+export const getTeacherProfileImage = (teacher: Pick<Teacher, 'profile'>) =>
+  getStaffProfileImage(teacher)
 
-export const mapTeacherToFormData = (teacher: Teacher): TeacherFormData => {
-  const gender = teacher.profile.gender
-
-  return {
-    first_name: teacher.first_name,
-    last_name: teacher.last_name,
-    gender: gender === 'male' || gender === 'female' ? (gender as TeacherGender) : undefined,
-    phone_number: teacher.phone_number,
-    phone_number_alt: teacher.profile.phone_number_alt ?? '',
-    email: teacher.email ?? '',
-    date_of_birth: teacher.profile.date_of_birth ?? '',
-    address: teacher.profile.address ?? '',
-  }
-}
+export const mapTeacherToFormData = (teacher: Teacher): TeacherFormData =>
+  mapStaffToFormData(teacher as Staff)
 
 export const buildClassOptions = (
   levels: LevelWithRelatedClassesAndSubjects,

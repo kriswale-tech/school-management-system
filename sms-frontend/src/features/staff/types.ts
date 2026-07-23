@@ -1,5 +1,14 @@
 export type StaffGender = 'male' | 'female'
 
+export type StaffQueryParams = {
+  page?: number
+  page_size?: number
+  search?: string
+  role?: string
+  is_active?: boolean
+  exclude?: string
+}
+
 export type StaffFormData = {
   first_name: string
   last_name: string

@@ -100,7 +100,7 @@ class SetupClassesAndSubjectsViewTests(APITestCase):
         self.assertEqual(
             [class_level['name'] for class_level in pre_school['classes']],
             [
-                'Crèche / Daycare (Ages 0-2)',
+                'Crèche / Daycare',
                 'Nursery 1',
                 'Nursery 2',
             ],
@@ -108,7 +108,7 @@ class SetupClassesAndSubjectsViewTests(APITestCase):
 
         creche = next(
             class_level for class_level in pre_school['classes']
-            if class_level['name'] == 'Crèche / Daycare (Ages 0-2)'
+            if class_level['name'] == 'Crèche / Daycare'
         )
         nursery_1 = next(
             class_level for class_level in pre_school['classes']
@@ -315,7 +315,7 @@ class SetupClassesAndSubjectsMutationTests(APITestCase):
         )
         self.assertFalse(
             SubjectGroup.objects.filter(
-                class_subject__class_level__name='Crèche / Daycare (Ages 0-2)',
+                class_subject__class_level__name='Crèche / Daycare',
                 name='Twi',
             ).exists(),
         )
@@ -348,7 +348,7 @@ class SetupClassesAndSubjectsMutationTests(APITestCase):
         self.assertEqual(
             orders,
             [
-                ('Crèche / Daycare (Ages 0-2)', 1),
+                ('Crèche / Daycare', 1),
                 ('Playgroup', 2),
                 ('Nursery 1', 3),
                 ('Nursery 2', 4),

@@ -28,21 +28,13 @@ def can_manage_user(actor: User, target: User) -> bool:
     return target.role in manageable_roles
 
 
-def list_school_users(actor: User, *, role=None, is_active=None):
+def list_school_users(actor: User):
     manageable_roles = MANAGEABLE_ROLES_BY_REQUESTER.get(actor.role, set())
-    queryset = (
+    return (
         User.objects.filter(school=actor.school, role__in=manageable_roles)
         .select_related('school', 'profile')
         .order_by('last_name', 'first_name')
     )
-
-    if role is not None:
-        queryset = queryset.filter(role=role)
-
-    if is_active is not None:
-        queryset = queryset.filter(is_active=is_active)
-
-    return queryset
 
 
 def get_school_user(school, user_id) -> User:

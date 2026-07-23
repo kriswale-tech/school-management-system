@@ -2,8 +2,8 @@ import { Button, FormLabel, InputField, SelectField } from '@/components/ui'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
-import { GENDER_OPTIONS, type Teacher, type TeacherFormData } from '../types'
-import { mapTeacherToFormData } from '../utils'
+import { GENDER_OPTIONS, type Staff, type StaffFormData } from '../types'
+import { mapStaffToFormData } from '../utils'
 
 const ghanaPhoneSchema = z.string().regex(/^(\+233|0)[0-9]{9}$/, 'Invalid Ghana phone number')
 
@@ -28,15 +28,20 @@ const schema = z.object({
   address: z.string().optional(),
 })
 
-type AddTeacherFormProps = {
-  onSubmit: (_data: TeacherFormData) => void
+type StaffUserFormSubmitPayload = {
+  data: StaffFormData
+  dirtyFields: Partial<Record<keyof StaffFormData, boolean>>
+}
+
+type StaffUserFormProps = {
+  onSubmit: (payload: StaffUserFormSubmitPayload) => void
   onCancel: () => void
   isSubmitting?: boolean
-  teacher?: Teacher | null
+  user?: Staff | null
   submitLabel?: string
 }
 
-const defaultValues: TeacherFormData = {
+const defaultValues: StaffFormData = {
   first_name: '',
   last_name: '',
   gender: undefined,
@@ -47,25 +52,28 @@ const defaultValues: TeacherFormData = {
   address: '',
 }
 
-const AddTeacherForm = ({
+const StaffUserForm = ({
   onSubmit,
   onCancel,
   isSubmitting = false,
-  teacher,
-  submitLabel = 'Add Teacher',
-}: AddTeacherFormProps) => {
+  user,
+  submitLabel = 'Save',
+}: StaffUserFormProps) => {
   const {
     register,
     handleSubmit,
     control,
-    formState: { errors },
-  } = useForm<TeacherFormData>({
+    formState: { errors, dirtyFields },
+  } = useForm<StaffFormData>({
     resolver: zodResolver(schema),
-    defaultValues: teacher ? mapTeacherToFormData(teacher) : defaultValues,
+    defaultValues: user ? mapStaffToFormData(user) : defaultValues,
   })
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form
+      onSubmit={handleSubmit((data) => onSubmit({ data, dirtyFields }))}
+      className="space-y-6"
+    >
       <div className="flex gap-4 items-start justify-between">
         <div className="w-1/2 space-y-2">
           <FormLabel label="First Name" className="font-normal text-base" required />
@@ -132,7 +140,7 @@ const AddTeacherForm = ({
       <div className="space-y-2">
         <FormLabel label="Email Address" className="font-normal text-base" />
         <InputField
-          placeholder="e.g. teacher@school.com"
+          placeholder="e.g. user@school.com"
           type="email"
           error={errors.email?.message}
           {...register('email')}
@@ -160,4 +168,4 @@ const AddTeacherForm = ({
   )
 }
 
-export default AddTeacherForm
+export default StaffUserForm

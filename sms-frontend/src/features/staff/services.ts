@@ -1,13 +1,14 @@
 import api from "@/app/api/api"
 import type { PaginatedResponse } from "@/types/generalTypes"
 import type { Staff } from "./types"
+import type { StaffQueryParams } from "./types"
+import { getQueryUrl } from "@/utils/get-query-url"
 
 
 
-export const getStaff = async (page = 1): Promise<PaginatedResponse<Staff>> => {
-  const response = await api.get<PaginatedResponse<Staff>>('/accounts/users/', {
-    params: { page },
-  })
+export const getStaff = async (params: StaffQueryParams): Promise<PaginatedResponse<Staff>> => {
+  const url = getQueryUrl<StaffQueryParams>('/accounts/users/', params)
+  const response = await api.get<PaginatedResponse<Staff>>(url)
   return response.data
 }
 

@@ -1,6 +1,7 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { AppToaster, AuthLoading } from '@/components/shared'
 import { useAuth } from '@/features/auth/hooks'
+import NavBar from '@/components/shared/NavBar'
 
 const AppLayout = () => {
   const { isReady, isAuthenticated, user } = useAuth({ requireAuth: true })
@@ -22,6 +23,7 @@ const AppLayout = () => {
     <>
       <AppToaster />
       <div>
+        <NavBar />
         <Outlet />
       </div>
     </>

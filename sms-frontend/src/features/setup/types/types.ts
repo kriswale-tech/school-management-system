@@ -2,6 +2,7 @@ export interface Step {
   step: string
   name: string
   completed: boolean
+  required: boolean
 }
 
 export interface Setup {

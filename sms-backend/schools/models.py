@@ -34,7 +34,7 @@ class SchoolSetup(models.Model):
         ASSESSMENT = 'assessment', 'Assessment'
         FEES = 'fees', 'Fees'
         TEACHERS = 'teachers', 'Add Teachers'
-        STAFF = 'staff', 'Add Staff'
+        STAFF = 'staff', 'Add Staff'  # Optional; setup can be finalized without it.
         COMPLETED = 'completed', 'Completed'
 
     school = models.OneToOneField(

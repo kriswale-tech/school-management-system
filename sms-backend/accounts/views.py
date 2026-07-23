@@ -2,8 +2,9 @@ from django.conf import settings
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -13,7 +14,9 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.cookies import clear_auth_cookies, set_auth_cookies
+from accounts.filters import UserFilter
 from accounts.helpers import save_user_serializer
+from accounts.models import User
 from accounts.permissions import CanManageUser
 from accounts.serializers import (
     AddUserSerializer,
@@ -370,24 +373,44 @@ class UserListCreateView(APIView):
         summary='List users',
         description=(
             'Returns paginated users in the current school that the requester can manage. '
-            'Admins see all roles; staff see teachers only.'
+            'Admins see all roles; staff see teachers only. '
+            'Filter by role, is_active, search, or exclude roles from results.'
         ),
+        parameters=[
+            OpenApiParameter(
+                name='role',
+                type=str,
+                enum=[choice[0] for choice in User.RoleChoices.choices],
+                description='Filter by role.',
+            ),
+            OpenApiParameter(
+                name='is_active',
+                type=bool,
+                description='Filter by active status.',
+            ),
+            OpenApiParameter(
+                name='exclude',
+                type=str,
+                description='Exclude role(s), comma-separated (e.g. teacher,staff).',
+            ),
+            OpenApiParameter(
+                name='search',
+                type=str,
+                description='Search first name, last name, email, or phone number.',
+            ),
+            OpenApiParameter(name='page', type=int, description='Page number.'),
+            OpenApiParameter(name='page_size', type=int, description='Page size (max 100).'),
+        ],
         responses={
             200: paginated_schema(UserSerializer, name='PaginatedUserList'),
         },
     )
     def get(self, request):
-        role = request.query_params.get('role')
-        is_active_param = request.query_params.get('is_active')
-        is_active = None
-        if is_active_param is not None:
-            is_active = is_active_param.lower() in ('true', '1', 'yes')
-
-        users = list_school_users(
-            request.user,
-            role=role,
-            is_active=is_active,
-        )
+        queryset = list_school_users(request.user)
+        filterset = UserFilter(request.query_params, queryset=queryset)
+        if not filterset.is_valid():
+            raise ValidationError(filterset.errors)
+        users = filterset.qs
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(users, request)
         serializer = UserSerializer(page, many=True)

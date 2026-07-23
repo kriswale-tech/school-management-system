@@ -4,6 +4,7 @@ from schools.setup_views import (
     CompleteAssessmentSetupView,
     CompleteClassesAndSubjectsSetupView,
     CompleteFeesSetupView,
+    CompleteSetupView,
     CompleteTeachersSetupView,
     SchoolSetupView,
     SetupAcademicYearTermView,
@@ -181,6 +182,11 @@ urlpatterns = [
         'setup/teachers/complete/',
         CompleteTeachersSetupView.as_view(),
         name='school-setup-teachers-complete',
+    ),
+    path(
+        'setup/complete/',
+        CompleteSetupView.as_view(),
+        name='school-setup-complete',
     ),
     path('school/', SchoolView.as_view(), name='school'),
 ]

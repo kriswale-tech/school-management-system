@@ -1,6 +1,8 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from schools.services.setup import OPTIONAL_SETUP_STEP_VALUES
+
 from .models import School, SchoolSetup
 
 
@@ -16,6 +18,7 @@ class SchoolSetupStepSerializer(serializers.Serializer):
     step = serializers.CharField()
     name = serializers.CharField()
     completed = serializers.BooleanField()
+    required = serializers.BooleanField()
 
 
 class SchoolSetupSerializer(serializers.ModelSerializer):
@@ -33,6 +36,7 @@ class SchoolSetupSerializer(serializers.ModelSerializer):
                 'step': value,
                 'name': label,
                 'completed': value in completed,
+                'required': value not in OPTIONAL_SETUP_STEP_VALUES,
             }
             for value, label in SchoolSetup.SetupStep.choices
             if value != SchoolSetup.SetupStep.COMPLETED

@@ -194,13 +194,7 @@ def delete_fee_item(school, *, fee_item_id):
     fee_item.delete()
 
 
-def complete_fees_setup(school):
-    school_setup, _ = SchoolSetup.objects.get_or_create(school=school)
-    require_prior_setup_steps(
-        school_setup,
-        SchoolSetup.SetupStep.FEES,
-    )
-
+def validate_fees_setup_ready(school):
     term = _get_active_term(school)
     fee_structure = FeeStructure.objects.filter(school=school, term=term).first()
     if fee_structure is None:
@@ -212,6 +206,15 @@ def complete_fees_setup(school):
         validate_fee_structure_ready(fee_structure)
     except DjangoValidationError as exc:
         _raise_drf(exc)
+
+
+def complete_fees_setup(school):
+    school_setup, _ = SchoolSetup.objects.get_or_create(school=school)
+    require_prior_setup_steps(
+        school_setup,
+        SchoolSetup.SetupStep.FEES,
+    )
+    validate_fees_setup_ready(school)
 
     return advance_setup_if_needed(
         school_setup,

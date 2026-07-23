@@ -95,3 +95,61 @@ class UpdateUserPhoneDuringSetupTests(AccountsAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.admin.school.refresh_from_db()
         self.assertEqual(self.admin.school.phone_number, '+233244567899')
+
+
+class UserListFilterTests(AccountsAPITestCase):
+    def setUp(self):
+        self.admin = create_user(is_active=True)
+        self.teacher = create_user(
+            phone_number=TEACHER_PHONE,
+            email='teacher@test.com',
+            school=self.admin.school,
+            role=User.RoleChoices.TEACHER,
+            is_active=True,
+            first_name='Ama',
+            last_name='Boateng',
+        )
+        self.staff = create_user(
+            phone_number='+233244567893',
+            email='staff@test.com',
+            school=self.admin.school,
+            role=User.RoleChoices.STAFF,
+            is_active=True,
+            first_name='Kofi',
+            last_name='Mensah',
+        )
+        set_client_auth_cookies(self.client, self.admin)
+        self.url = reverse('user-list')
+
+    def test_filter_by_role(self):
+        response = self.client.get(self.url, {'role': User.RoleChoices.TEACHER})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        roles = {item['role'] for item in response.data['results']}
+        self.assertEqual(roles, {User.RoleChoices.TEACHER})
+
+    def test_exclude_role(self):
+        response = self.client.get(self.url, {'exclude': User.RoleChoices.TEACHER})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        roles = {item['role'] for item in response.data['results']}
+        self.assertNotIn(User.RoleChoices.TEACHER, roles)
+        self.assertIn(User.RoleChoices.ADMIN, roles)
+        self.assertIn(User.RoleChoices.STAFF, roles)
+
+    def test_exclude_multiple_roles(self):
+        response = self.client.get(
+            self.url,
+            {'exclude': f'{User.RoleChoices.TEACHER},{User.RoleChoices.STAFF}'},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        roles = {item['role'] for item in response.data['results']}
+        self.assertEqual(roles, {User.RoleChoices.ADMIN})
+
+    def test_search_by_name(self):
+        response = self.client.get(self.url, {'search': 'Ama'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['first_name'], 'Ama')

@@ -1,9 +1,22 @@
-import type { StaffFormData } from './types'
+import type { Staff, StaffFormData, StaffGender } from './types'
 
 type BuildStaffFormDataOptions = {
   role: string
   profilePicture?: File | null
 }
+
+export const DEFAULT_PROFILE_IMAGE = '/images/default_profile.webp'
+
+const STAFF_FORM_FIELDS: (keyof StaffFormData)[] = [
+  'first_name',
+  'last_name',
+  'phone_number',
+  'gender',
+  'phone_number_alt',
+  'email',
+  'date_of_birth',
+  'address',
+]
 
 /** Builds multipart FormData ready for POST to `/accounts/users/`. */
 export function buildStaffFormData(data: StaffFormData, options: BuildStaffFormDataOptions) {
@@ -26,3 +39,61 @@ export function buildStaffFormData(data: StaffFormData, options: BuildStaffFormD
 
   return payload
 }
+
+type BuildStaffUpdateFormDataOptions = {
+  dirtyFields: Partial<Record<keyof StaffFormData, boolean>>
+  profilePicture?: File | null
+  includeProfilePicture?: boolean
+}
+
+/** Builds multipart FormData with only changed fields for PATCH to `/accounts/users/:id/`. */
+export function buildStaffUpdateFormData(
+  data: StaffFormData,
+  { dirtyFields, profilePicture, includeProfilePicture = false }: BuildStaffUpdateFormDataOptions,
+) {
+  const payload = new FormData()
+
+  for (const field of STAFF_FORM_FIELDS) {
+    if (!dirtyFields[field]) continue
+
+    const value = data[field]
+    if (value === undefined) continue
+
+    payload.append(field, value === '' ? '' : String(value))
+  }
+
+  if (includeProfilePicture && profilePicture) {
+    payload.append('profile_picture', profilePicture)
+  }
+
+  return payload
+}
+
+export const hasStaffUpdateChanges = (
+  dirtyFields: Partial<Record<keyof StaffFormData, boolean>>,
+  includeProfilePicture: boolean,
+) => Object.values(dirtyFields).some(Boolean) || includeProfilePicture
+
+export const getStaffProfileImage = (staff: Pick<Staff, 'profile'>) =>
+  staff.profile.profile_picture ?? DEFAULT_PROFILE_IMAGE
+
+export const mapStaffToFormData = (staff: Staff): StaffFormData => {
+  const gender = staff.profile.gender
+
+  return {
+    first_name: staff.first_name,
+    last_name: staff.last_name,
+    gender: gender === 'male' || gender === 'female' ? (gender as StaffGender) : undefined,
+    phone_number: staff.phone_number,
+    phone_number_alt: staff.profile.phone_number_alt ?? '',
+    email: staff.email ?? '',
+    date_of_birth: staff.profile.date_of_birth ?? '',
+    address: staff.profile.address ?? '',
+  }
+}
+
+export const formatStaffRole = (role: string) =>
+  role
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
