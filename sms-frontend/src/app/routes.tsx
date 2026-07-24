@@ -1,17 +1,25 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { authRoutes } from '@/features/auth/routes'
 import AppLayout from '@/components/layout/AppLayout'
-import { lazy } from 'react'
 import { setupRoutes } from '@/features/setup/routes'
-
-const DashboardPage = lazy(() => import('@/features/dashboard/Dashboard'))
+import { dashboardRoutes } from '@/features/dashboard/routes'
+import { studentsRoutes } from '@/features/students/routes'
+import { classesRoutes } from '@/features/classes/routes'
+import { assessmentsRoutes } from '@/features/assessments/routes'
+import { feesRoutes } from '@/features/fees/routes'
+import { staffRoutes } from '@/features/staff/routes'
 
 const AppRoutes = () => {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<AppLayout />}>
-          <Route index element={<DashboardPage />} />
+          {dashboardRoutes}
+          {studentsRoutes}
+          {classesRoutes}
+          {assessmentsRoutes}
+          {feesRoutes}
+          {staffRoutes}
         </Route>
         {authRoutes}
         {setupRoutes}
