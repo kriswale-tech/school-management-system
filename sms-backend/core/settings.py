@@ -229,6 +229,12 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Local filesystem storage for ephemeral bulk-import exports (not Cloudinary).
+BULK_IMPORT_LOCAL_MEDIA_ROOT = BASE_DIR / 'media' / 'bulk-imports'
+TEACHER_BULK_IMPORT_FAILURE_TTL = timedelta(hours=24)
+TEACHER_BULK_IMPORT_MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+TEACHER_BULK_IMPORT_MAX_ROWS = 1000
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 

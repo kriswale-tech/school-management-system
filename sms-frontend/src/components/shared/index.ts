@@ -5,6 +5,7 @@ import ChoicePillGroup from './ChoicePillGroup'
 import ConfirmDialog from './ConfirmDialog'
 import EmptyState from './EmptyState'
 import ImageUpload from './ImageUpload'
+import BulkUpload from './bulk-upload'
 import TabComponent from './TabComponent'
 import { Pagination, Table, TableSkeleton, TableWrapper } from './data-table'
 
@@ -16,6 +17,7 @@ export {
   ConfirmDialog,
   EmptyState,
   ImageUpload,
+  BulkUpload,
   TabComponent,
   Pagination,
   Table,
@@ -25,6 +27,11 @@ export {
 export type { ChoiceItem, ChoiceOption, ChoicePillGroupProps } from './ChoicePillGroup'
 export type { EmptyStateProps } from './EmptyState'
 export type { ImageUploadProps } from './ImageUpload'
+export type {
+  BulkUploadFailureInfo,
+  BulkUploadPreviewResult,
+  BulkUploadProps,
+} from './bulk-upload'
 export type {
   PaginationMeta,
   PaginationProps,

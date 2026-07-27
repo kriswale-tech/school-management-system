@@ -10,6 +10,8 @@ import { getApiErrorMessage } from '@/utils'
 import AddTeacherModal from './components/AddTeacherModal'
 import TeacherTable from './components/TeacherTable'
 import { completeTeacherSetup, getTeachers } from './services'
+import SideSlider from '@/components/shared/SideSlider'
+import BulkUploadTeachers from './components/BulkUploadTeachers'
 
 const Teachers = () => {
   const navigate = useNavigate()
@@ -19,6 +21,7 @@ const Teachers = () => {
   const [page, setPage] = useState(1)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [addModalSession, setAddModalSession] = useState(0)
+  const [isSideSliderOpen, setIsSideSliderOpen] = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey: ['teachers', page],
@@ -54,7 +57,7 @@ const Teachers = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button type="button" variant="ghost">
+            <Button type="button" variant="ghost" onClick={() => setIsSideSliderOpen(true)}>
               <Icon icon="hugeicons:upload-01" className="size-4" />
               <span className="break-keep whitespace-nowrap">Bulk Upload Teachers</span>
             </Button>
@@ -86,11 +89,19 @@ const Teachers = () => {
         Proceed to Next Step
       </Button>
 
-      <AddTeacherModal
-        open={isAddModalOpen}
-        onClose={closeAddModal}
-        sessionKey={addModalSession}
-      />
+      <AddTeacherModal open={isAddModalOpen} onClose={closeAddModal} sessionKey={addModalSession} />
+
+      <SideSlider
+        open={isSideSliderOpen}
+        onClose={() => setIsSideSliderOpen(false)}
+        title="Teacher Onboarding"
+      >
+        <BulkUploadTeachers
+          onSuccess={() => {
+            void queryClient.invalidateQueries({ queryKey: ['teachers'] })
+          }}
+        />
+      </SideSlider>
     </div>
   )
 }

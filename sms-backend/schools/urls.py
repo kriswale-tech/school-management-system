@@ -33,6 +33,9 @@ from schools.setup_views import (
     SetupTeachingAssignmentCreateView,
     SetupTeachingAssignmentDetailView,
     CompleteTeachersSetupView,
+    TeacherBulkImportTemplateView,
+    TeacherBulkImportUploadView,
+    TeacherBulkImportFailuresDownloadView,
 )
 from schools.views import SchoolView
 
@@ -182,6 +185,21 @@ urlpatterns = [
         'setup/teachers/complete/',
         CompleteTeachersSetupView.as_view(),
         name='school-setup-teachers-complete',
+    ),
+    path(
+        'setup/teachers/bulk-upload/template/',
+        TeacherBulkImportTemplateView.as_view(),
+        name='school-setup-teachers-bulk-upload-template',
+    ),
+    path(
+        'setup/teachers/bulk-upload/',
+        TeacherBulkImportUploadView.as_view(),
+        name='school-setup-teachers-bulk-upload',
+    ),
+    path(
+        'setup/teachers/bulk-upload/failures/<uuid:token>/',
+        TeacherBulkImportFailuresDownloadView.as_view(),
+        name='school-setup-teachers-bulk-upload-failures',
     ),
     path(
         'setup/complete/',

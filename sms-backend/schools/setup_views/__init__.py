@@ -34,6 +34,11 @@ from schools.setup_views.teachers import (
     SetupTeachingAssignmentCreateView,
     SetupTeachingAssignmentDetailView,
 )
+from schools.setup_views.teachers_bulk_upload import (
+    TeacherBulkImportFailuresDownloadView,
+    TeacherBulkImportTemplateView,
+    TeacherBulkImportUploadView,
+)
 from schools.setup_views.common import SchoolSetupView, advance_setup_if_needed
 from schools.setup_views.complete import CompleteSetupView
 from schools.setup_views.school_profile import SetupSchoolProfileView
@@ -70,5 +75,8 @@ __all__ = [
     'SetupTeachersView',
     'SetupTeachingAssignmentCreateView',
     'SetupTeachingAssignmentDetailView',
+    'TeacherBulkImportFailuresDownloadView',
+    'TeacherBulkImportTemplateView',
+    'TeacherBulkImportUploadView',
     'advance_setup_if_needed',
 ]
