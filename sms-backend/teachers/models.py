@@ -1,8 +1,23 @@
 from django.core.exceptions import ValidationError
 from django.db import models
 
-from accounts.models import User
+from accounts.models import SchoolMembership, User
 from shared.models import BaseModel
+
+
+def validate_teacher_for_term(teacher_id, term) -> None:
+    """A teacher must hold an active teacher role in the school owning the term."""
+    membership = SchoolMembership.objects.filter(
+        user_id=teacher_id,
+        school_id=term.school_id,
+        is_active=True,
+    ).first()
+
+    if membership is None:
+        raise ValidationError({'teacher': 'Teacher must belong to the term school.'})
+
+    if membership.role != User.RoleChoices.TEACHER:
+        raise ValidationError({'teacher': 'User must have the teacher role.'})
 
 
 class ClassTeacher(BaseModel):
@@ -46,12 +61,8 @@ class ClassTeacher(BaseModel):
     def clean(self):
         super().clean()
 
-        if self.teacher_id and self.teacher.role != User.RoleChoices.TEACHER:
-            raise ValidationError({'teacher': 'User must have the teacher role.'})
-
         if self.teacher_id and self.term_id:
-            if self.teacher.school_id != self.term.school_id:
-                raise ValidationError({'teacher': 'Teacher must belong to the term school.'})
+            validate_teacher_for_term(self.teacher_id, self.term)
 
         if self.class_level_id and self.term_id:
             if self.class_level.school_id != self.term.school_id:
@@ -123,12 +134,8 @@ class TeachingAssignment(BaseModel):
     def clean(self):
         super().clean()
 
-        if self.teacher_id and self.teacher.role != User.RoleChoices.TEACHER:
-            raise ValidationError({'teacher': 'User must have the teacher role.'})
-
         if self.teacher_id and self.term_id:
-            if self.teacher.school_id != self.term.school_id:
-                raise ValidationError({'teacher': 'Teacher must belong to the term school.'})
+            validate_teacher_for_term(self.teacher_id, self.term)
 
         if self.class_subject_id and self.term_id:
             if self.class_subject.school_id != self.term.school_id:

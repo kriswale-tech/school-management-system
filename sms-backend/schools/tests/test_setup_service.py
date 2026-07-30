@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from accounts.tests.factories import create_user
+from accounts.tests.factories import create_user, user_school
 from schools.models import SchoolSetup
 from schools.services.setup import require_prior_setup_steps
 from schools.tests.factories import create_school_setup
@@ -9,7 +9,7 @@ from schools.tests.factories import create_school_setup
 class RequirePriorSetupStepsTests(TestCase):
     def setUp(self):
         self.user = create_user(is_active=True)
-        self.school_setup = create_school_setup(self.user.school)
+        self.school_setup = create_school_setup(user_school(self.user))
 
     def test_blocks_academic_year_step_without_school_profile(self):
         from rest_framework.exceptions import ValidationError

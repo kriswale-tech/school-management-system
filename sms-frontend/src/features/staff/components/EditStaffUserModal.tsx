@@ -46,8 +46,12 @@ const EditStaffUserModal = ({
 
   const { mutate: saveUser, isPending } = useMutation({
     mutationFn: (payload: FormData) => updateStaff(user!.id, payload),
-    onSuccess: () => {
-      toast.success(savedMessage)
+    onSuccess: (response) => {
+      toast.success(
+        response.linked_existing_user
+          ? 'Phone number matched an existing person; they were linked to this school.'
+          : savedMessage,
+      )
       void queryClient.invalidateQueries({ queryKey: [invalidateQueryKey] })
       onClose()
     },

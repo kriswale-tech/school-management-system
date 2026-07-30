@@ -3,7 +3,7 @@ from django.db import IntegrityError
 from django.db.models import Prefetch
 from rest_framework.exceptions import NotFound, ValidationError
 
-from accounts.models import Profile, User
+from accounts.models import Profile, SchoolMembership, User
 from academics.models import ClassLevel, ClassSubject, ClassStream, SubjectGroup
 from schools.models import SchoolSetup, Term
 from schools.services.setup import advance_setup_if_needed, require_prior_setup_steps
@@ -77,7 +77,8 @@ def _serialize_teaching_assignment(assignment) -> dict:
     }
 
 
-def _serialize_teacher(user) -> dict:
+def _serialize_teacher(membership) -> dict:
+    user = membership.user
     return {
         'id': user.id,
         'full_name': user.get_full_name(),
@@ -85,8 +86,8 @@ def _serialize_teacher(user) -> dict:
         'last_name': user.last_name,
         'phone_number': user.phone_number,
         'email': user.email,
-        'role': user.role,
-        'is_active': user.is_active,
+        'role': membership.role,
+        'is_active': membership.is_active,
         'profile': _serialize_profile(user),
         'class_teacher_assignments': [
             _serialize_class_teacher_assignment(assignment)
@@ -103,22 +104,22 @@ def get_teachers_setup_queryset(school):
     term = _get_active_term(school)
 
     return (
-        User.objects.filter(
+        SchoolMembership.objects.filter(
             school=school,
             role=User.RoleChoices.TEACHER,
             is_active=True,
         )
-        .select_related('profile')
+        .select_related('user', 'user__profile')
         .prefetch_related(
             Prefetch(
-                'class_teacher_assignments',
+                'user__class_teacher_assignments',
                 queryset=ClassTeacher.objects.filter(term=term).select_related(
                     'class_level',
                     'stream',
                 ),
             ),
             Prefetch(
-                'teaching_assignments',
+                'user__teaching_assignments',
                 queryset=TeachingAssignment.objects.filter(term=term).select_related(
                     'class_subject__class_level',
                     'class_subject__subject',
@@ -127,12 +128,12 @@ def get_teachers_setup_queryset(school):
                 ),
             ),
         )
-        .order_by('last_name', 'first_name')
+        .order_by('user__last_name', 'user__first_name')
     )
 
 
-def serialize_teacher_for_setup(user) -> dict:
-    return _serialize_teacher(user)
+def serialize_teacher_for_setup(membership) -> dict:
+    return _serialize_teacher(membership)
 
 
 def get_teachers_setup(school):
@@ -146,9 +147,9 @@ def _get_school_teacher(school, teacher_id) -> User:
     try:
         return User.objects.get(
             pk=teacher_id,
-            school=school,
-            role=User.RoleChoices.TEACHER,
-            is_active=True,
+            memberships__school=school,
+            memberships__role=User.RoleChoices.TEACHER,
+            memberships__is_active=True,
         )
     except User.DoesNotExist as exc:
         raise ValidationError({'teacher_id': 'Teacher not found.'}) from exc
@@ -296,7 +297,7 @@ def delete_teaching_assignment(school, *, assignment_id):
 def validate_teachers_setup_ready(school):
     _get_active_term(school)
 
-    if not User.objects.filter(
+    if not SchoolMembership.objects.filter(
         school=school,
         role=User.RoleChoices.TEACHER,
         is_active=True,

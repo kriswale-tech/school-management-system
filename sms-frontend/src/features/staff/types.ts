@@ -46,4 +46,11 @@ export interface Staff {
     profile: StaffProfile
     school_setup_completed: boolean
     school_id: string
+    membership_id?: string
+}
+
+/** PATCH /accounts/users/{id}/ — id may differ from the URL when linking an existing person. */
+export interface UpdateStaffResponse {
+  user: Staff
+  linked_existing_user: boolean
 }

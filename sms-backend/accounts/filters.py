@@ -1,9 +1,12 @@
 import django_filters
+from django.db.models import Q
 
-from accounts.models import User
+from accounts.models import SchoolMembership, User
 
 
-class UserFilter(django_filters.FilterSet):
+class SchoolMemberFilter(django_filters.FilterSet):
+    """Filters memberships, so role and is_active mean 'in this school'."""
+
     role = django_filters.ChoiceFilter(choices=User.RoleChoices.choices)
     is_active = django_filters.BooleanFilter()
     exclude = django_filters.CharFilter(
@@ -16,7 +19,7 @@ class UserFilter(django_filters.FilterSet):
     )
 
     class Meta:
-        model = User
+        model = SchoolMembership
         fields = ['role', 'is_active']
 
     def filter_exclude(self, queryset, name, value):
@@ -35,11 +38,9 @@ class UserFilter(django_filters.FilterSet):
         if not term:
             return queryset
 
-        from django.db.models import Q
-
         return queryset.filter(
-            Q(first_name__icontains=term)
-            | Q(last_name__icontains=term)
-            | Q(email__icontains=term)
-            | Q(phone_number__icontains=term),
+            Q(user__first_name__icontains=term)
+            | Q(user__last_name__icontains=term)
+            | Q(user__email__icontains=term)
+            | Q(user__phone_number__icontains=term),
         )

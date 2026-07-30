@@ -1,7 +1,6 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from schools.services.fees import (
     complete_fees_setup,
@@ -17,6 +16,7 @@ from schools.setup_serializers.fees import (
     SetupFeesDataSerializer,
     UpdateFeeItemSerializer,
 )
+from shared.views import SchoolScopedAPIView
 
 
 @extend_schema(
@@ -27,10 +27,10 @@ from schools.setup_serializers.fees import (
     ),
     responses={200: SetupFeesDataSerializer},
 )
-class SetupFeesView(APIView):
+class SetupFeesView(SchoolScopedAPIView):
     def get(self, request):
         data = get_fees_setup(
-            request.user.school,
+            self.school,
             created_by=request.user,
         )
         return Response(SetupFeesDataSerializer(data).data)
@@ -42,12 +42,12 @@ class SetupFeesView(APIView):
     request=CreateFeeItemSerializer,
     responses={201: SetupFeeItemSerializer},
 )
-class SetupFeeItemCreateView(APIView):
+class SetupFeeItemCreateView(SchoolScopedAPIView):
     def post(self, request):
         serializer = CreateFeeItemSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = create_fee_item(
-            request.user.school,
+            self.school,
             created_by=request.user,
             **serializer.validated_data,
         )
@@ -67,19 +67,19 @@ class SetupFeeItemCreateView(APIView):
     description='Removes a fee item from the active term structure while it is still editable.',
     responses={204: None},
 )
-class SetupFeeItemDetailView(APIView):
+class SetupFeeItemDetailView(SchoolScopedAPIView):
     def patch(self, request, fee_item_id):
         serializer = UpdateFeeItemSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         data = update_fee_item(
-            request.user.school,
+            self.school,
             fee_item_id=fee_item_id,
             **serializer.validated_data,
         )
         return Response(SetupFeeItemSerializer(data).data)
 
     def delete(self, request, fee_item_id):
-        delete_fee_item(request.user.school, fee_item_id=fee_item_id)
+        delete_fee_item(self.school, fee_item_id=fee_item_id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -92,7 +92,7 @@ class SetupFeeItemDetailView(APIView):
     request=None,
     responses={200: SetupStepResponseSerializer},
 )
-class CompleteFeesSetupView(APIView):
+class CompleteFeesSetupView(SchoolScopedAPIView):
     def post(self, request):
-        result = complete_fees_setup(request.user.school)
+        result = complete_fees_setup(self.school)
         return Response(SetupStepResponseSerializer(result).data)

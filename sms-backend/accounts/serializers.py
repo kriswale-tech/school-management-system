@@ -1,16 +1,28 @@
-from django.db import transaction
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from shared.helpers import format_phone_number
-from accounts.models import User, Profile
-from accounts.services.users import (
-    MANAGEABLE_ROLES_BY_REQUESTER,
-    PROFILE_FIELDS,
-    update_user,
+from accounts.models import Profile, SchoolMembership, User
+from accounts.services.registration import (
+    create_additional_school,
+    ensure_school_name_available,
+    register_school_admin,
 )
-from academics.services.curriculum import provision_school_curriculum
-from schools.models import School, SchoolSetup
+from accounts.services.users import (
+    add_school_member,
+    email_taken,
+    manageable_roles,
+    update_school_member,
+)
+
+GENDER_CHOICES = [('male', 'Male'), ('female', 'Female'), ('other', 'Other')]
+
+
+def _formatted_phone(value: str) -> str:
+    try:
+        return format_phone_number(value)
+    except ValueError as exc:
+        raise serializers.ValidationError(str(exc))
 
 
 class AdminSignUpSerializer(serializers.Serializer):
@@ -21,15 +33,7 @@ class AdminSignUpSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
     def validate_phone_number(self, value):
-        try:
-            phone = format_phone_number(value)
-        except ValueError as e:
-            raise serializers.ValidationError(str(e))
-
-        if User.objects.filter(phone_number=phone, is_active=True).exists():
-            raise serializers.ValidationError('Account with this phone number already exists')
-
-        return phone
+        return _formatted_phone(value)
 
     def validate_email(self, value):
         phone = self.initial_data.get('phone_number')
@@ -41,52 +45,44 @@ class AdminSignUpSerializer(serializers.Serializer):
             except ValueError:
                 pass
 
-        qs = User.objects.filter(email=value, is_active=True)
+        queryset = User.objects.filter(email=value, is_active=True)
         if formatted_phone:
-            qs = qs.exclude(phone_number=formatted_phone)
+            queryset = queryset.exclude(phone_number=formatted_phone)
 
-        if qs.exists():
+        if queryset.exists():
             raise serializers.ValidationError('Email already exists')
 
         return value
 
+    def validate(self, attrs):
+        # Catch same-name collisions before OTP so the form can fix the name.
+        existing = User.objects.filter(
+            phone_number=attrs['phone_number'],
+            is_active=True,
+        ).first()
+        if existing is not None:
+            ensure_school_name_available(existing, attrs['school_name'])
+        return attrs
+
     def create(self, validated_data):
-        with transaction.atomic():
-            existing_user = User.objects.filter(
-                phone_number=validated_data['phone_number'],
-                is_active=False,
-            ).select_related('school').first()
+        return register_school_admin(validated_data)
 
-            if existing_user:
-                school = existing_user.school
-                school.name = validated_data['school_name']
-                school.phone_number = validated_data['phone_number']
-                school.save()
 
-                existing_user.email = validated_data['email']
-                existing_user.first_name = validated_data['first_name']
-                existing_user.last_name = validated_data['last_name']
-                existing_user.role = User.RoleChoices.ADMIN
-                existing_user.save()
-                SchoolSetup.objects.get_or_create(school=school)
-                return existing_user
+class CreateSchoolSerializer(serializers.Serializer):
+    school_name = serializers.CharField(max_length=255)
+    phone_number = serializers.CharField(max_length=15, required=False, allow_blank=True)
 
-            school = School.objects.create(
-                name=validated_data['school_name'],
-                phone_number=validated_data['phone_number'],
-            )
-            SchoolSetup.objects.create(school=school)
-            provision_school_curriculum(school)
+    def validate_phone_number(self, value):
+        if not value:
+            return value
+        return _formatted_phone(value)
 
-            return User.objects.create(
-                phone_number=validated_data['phone_number'],
-                email=validated_data['email'],
-                first_name=validated_data['first_name'],
-                last_name=validated_data['last_name'],
-                school=school,
-                role=User.RoleChoices.ADMIN,
-                is_active=False,
-            )
+    def validate_school_name(self, value):
+        ensure_school_name_available(self.context['request'].user, value)
+        return value
+
+    def create(self, validated_data):
+        return create_additional_school(self.context['request'].user, validated_data)
 
 
 class AdminVerifyOtpSerializer(serializers.Serializer):
@@ -94,20 +90,18 @@ class AdminVerifyOtpSerializer(serializers.Serializer):
     otp = serializers.CharField(max_length=6)
 
     def validate_phone_number(self, value):
-        try:
-            return format_phone_number(value)
-        except ValueError as e:
-            raise serializers.ValidationError(str(e))
+        return _formatted_phone(value)
 
 
 class ResendOtpSerializer(serializers.Serializer):
     phone_number = serializers.CharField(max_length=15)
 
     def validate_phone_number(self, value):
-        try:
-            return format_phone_number(value)
-        except ValueError as e:
-            raise serializers.ValidationError(str(e))
+        return _formatted_phone(value)
+
+
+class SelectSchoolSerializer(serializers.Serializer):
+    school_id = serializers.UUIDField()
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -119,38 +113,132 @@ class ProfileSerializer(serializers.ModelSerializer):
         ]
 
 
+def _profile_data(user: User):
+    try:
+        return ProfileSerializer(user.profile).data
+    except Profile.DoesNotExist:
+        return None
+
+
+class SchoolMembershipSerializer(serializers.ModelSerializer):
+    """One school a user can act in; used to populate the school picker."""
+
+    school_id = serializers.UUIDField(read_only=True)
+    school_name = serializers.CharField(source='school.name', read_only=True)
+    school_logo = serializers.ImageField(source='school.logo', read_only=True)
+    school_setup_completed = serializers.BooleanField(
+        source='school.setup_completed',
+        read_only=True,
+    )
+
+    class Meta:
+        model = SchoolMembership
+        fields = [
+            'id', 'school_id', 'school_name', 'school_logo',
+            'role', 'school_setup_completed', 'last_active_at',
+        ]
+
+
 class UserSerializer(serializers.ModelSerializer):
+    """The authenticated identity plus the school the request is scoped to."""
+
     profile = serializers.SerializerMethodField()
     full_name = serializers.SerializerMethodField()
+    role = serializers.SerializerMethodField()
+    school_id = serializers.SerializerMethodField()
     school_setup_completed = serializers.SerializerMethodField()
+    schools = serializers.SerializerMethodField()
+    requires_school_selection = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'full_name', 'first_name', 'last_name',
             'phone_number', 'email', 'role', 'is_active', 'profile',
-            'school_setup_completed',
-            'school_id',
+            'school_setup_completed', 'school_id',
+            'schools', 'requires_school_selection',
         ]
+
+    @property
+    def _membership(self) -> SchoolMembership | None:
+        return self.context.get('membership')
 
     def get_full_name(self, obj):
         return obj.get_full_name()
-    
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_role(self, obj):
+        membership = self._membership
+        return membership.role if membership else None
+
+    @extend_schema_field(serializers.UUIDField(allow_null=True))
+    def get_school_id(self, obj):
+        membership = self._membership
+        return str(membership.school_id) if membership else None
+
+    @extend_schema_field(serializers.BooleanField(allow_null=True))
+    def get_school_setup_completed(self, obj):
+        membership = self._membership
+        return membership.school.setup_completed if membership else None
+
+    @extend_schema_field(SchoolMembershipSerializer(many=True))
+    def get_schools(self, obj):
+        return SchoolMembershipSerializer(
+            self.context.get('memberships', []),
+            many=True,
+        ).data
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_requires_school_selection(self, obj):
+        return self._membership is None
+
+    @extend_schema_field(ProfileSerializer(allow_null=True))
+    def get_profile(self, obj):
+        return _profile_data(obj)
+
+
+class SchoolMemberSerializer(serializers.Serializer):
+    """A person as seen from inside one school; role and status are per-school."""
+
+    id = serializers.UUIDField(source='user.id', read_only=True)
+    membership_id = serializers.UUIDField(source='id', read_only=True)
+    first_name = serializers.CharField(source='user.first_name', read_only=True)
+    last_name = serializers.CharField(source='user.last_name', read_only=True)
+    phone_number = serializers.CharField(source='user.phone_number', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+    role = serializers.CharField(read_only=True)
+    is_active = serializers.BooleanField(read_only=True)
+    school_id = serializers.UUIDField(read_only=True)
+    full_name = serializers.SerializerMethodField()
+    school_setup_completed = serializers.SerializerMethodField()
+    profile = serializers.SerializerMethodField()
+
+    def get_full_name(self, obj) -> str:
+        return obj.user.get_full_name()
+
     @extend_schema_field(serializers.BooleanField())
     def get_school_setup_completed(self, obj):
         return obj.school.setup_completed
 
     @extend_schema_field(ProfileSerializer(allow_null=True))
     def get_profile(self, obj):
-        try:
-            return ProfileSerializer(obj.profile).data
-        except Profile.DoesNotExist:
-            return None
+        return _profile_data(obj.user)
 
 
 class MessageResponseSerializer(serializers.Serializer):
     message = serializers.CharField(read_only=True)
     retry_after_seconds = serializers.IntegerField(read_only=True, required=False)
+    linked_existing_account = serializers.BooleanField(read_only=True, required=False)
+
+
+class AuthResponseSerializer(serializers.Serializer):
+    """Login/OTP result, telling the client whether a school must be chosen."""
+
+    message = serializers.CharField(read_only=True)
+    requires_school_selection = serializers.BooleanField(read_only=True)
+    linked_existing_account = serializers.BooleanField(read_only=True, default=False)
+    active_school = SchoolMembershipSerializer(read_only=True, allow_null=True)
+    schools = SchoolMembershipSerializer(many=True, read_only=True)
 
 
 class AddUserSerializer(serializers.Serializer):
@@ -163,7 +251,7 @@ class AddUserSerializer(serializers.Serializer):
     bio = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     date_of_birth = serializers.DateField(required=False, allow_null=True)
     gender = serializers.ChoiceField(
-        choices=[('male', 'Male'), ('female', 'Female'), ('other', 'Other')],
+        choices=GENDER_CHOICES,
         required=False,
         allow_null=True,
     )
@@ -176,13 +264,18 @@ class AddUserSerializer(serializers.Serializer):
     )
 
     def validate_phone_number(self, value):
-        try:
-            phone = format_phone_number(value)
-        except ValueError as e:
-            raise serializers.ValidationError(str(e))
+        phone = _formatted_phone(value)
+        school = self.context['school']
 
-        if User.objects.filter(phone_number=phone).exists():
-            raise serializers.ValidationError('Account with this phone number already exists')
+        already_member = SchoolMembership.objects.filter(
+            user__phone_number=phone,
+            school=school,
+            is_active=True,
+        ).exists()
+        if already_member:
+            raise serializers.ValidationError(
+                'This person is already a member of this school.',
+            )
 
         return phone
 
@@ -191,8 +284,7 @@ class AddUserSerializer(serializers.Serializer):
         if not request:
             return value
 
-        allowed_roles = MANAGEABLE_ROLES_BY_REQUESTER.get(request.user.role, set())
-        if value not in allowed_roles:
+        if value not in manageable_roles(request.membership.role):
             raise serializers.ValidationError(
                 'You do not have permission to add a user with this role.',
             )
@@ -203,7 +295,19 @@ class AddUserSerializer(serializers.Serializer):
         if not value:
             return value
 
-        if User.objects.filter(email=value, is_active=True).exists():
+        # Reusing an existing identity keeps that person's own email, so only a
+        # different person holding the address is a conflict.
+        phone = self.initial_data.get('phone_number')
+        owner = None
+        if phone:
+            try:
+                owner = User.objects.filter(
+                    phone_number=format_phone_number(phone),
+                ).first()
+            except ValueError:
+                owner = None
+
+        if email_taken(value, exclude_user=owner):
             raise serializers.ValidationError('Email already exists')
 
         return value
@@ -211,34 +315,10 @@ class AddUserSerializer(serializers.Serializer):
     def validate_phone_number_alt(self, value):
         if not value:
             return value
-
-        try:
-            return format_phone_number(value)
-        except ValueError as e:
-            raise serializers.ValidationError(str(e))
+        return _formatted_phone(value)
 
     def create(self, validated_data):
-        profile_data = {
-            field: validated_data.pop(field)
-            for field in PROFILE_FIELDS
-            if field in validated_data
-        }
-        school = self.context['school']
-
-        user = User.objects.create(
-            school=school,
-            first_name=validated_data['first_name'],
-            last_name=validated_data['last_name'],
-            phone_number=validated_data['phone_number'],
-            role=validated_data['role'],
-            email=validated_data.get('email') or '',
-            is_active=True,
-        )
-        user.set_unusable_password()
-        user.save(update_fields=['password'])
-
-        Profile.objects.create(user=user, **profile_data)
-        return user
+        return add_school_member(self.context['school'], validated_data)
 
 
 class UpdateUserSerializer(serializers.Serializer):
@@ -251,7 +331,7 @@ class UpdateUserSerializer(serializers.Serializer):
     bio = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     date_of_birth = serializers.DateField(required=False, allow_null=True)
     gender = serializers.ChoiceField(
-        choices=[('male', 'Male'), ('female', 'Female'), ('other', 'Other')],
+        choices=GENDER_CHOICES,
         required=False,
         allow_null=True,
     )
@@ -268,8 +348,7 @@ class UpdateUserSerializer(serializers.Serializer):
         if not request:
             return value
 
-        allowed_roles = MANAGEABLE_ROLES_BY_REQUESTER.get(request.user.role, set())
-        if value not in allowed_roles:
+        if value not in manageable_roles(request.membership.role):
             raise serializers.ValidationError(
                 'You do not have permission to assign this role.',
             )
@@ -277,30 +356,14 @@ class UpdateUserSerializer(serializers.Serializer):
         return value
 
     def validate_phone_number(self, value):
-        try:
-            phone = format_phone_number(value)
-        except ValueError as e:
-            raise serializers.ValidationError(str(e))
-
-        queryset = User.objects.filter(phone_number=phone)
-        if self.instance:
-            queryset = queryset.exclude(pk=self.instance.pk)
-
-        if queryset.exists():
-            raise serializers.ValidationError('Account with this phone number already exists')
-
-        return phone
+        return _formatted_phone(value)
 
     def validate_email(self, value):
         if not value:
             return value
 
-        target = self.instance
-        queryset = User.objects.filter(email=value, is_active=True)
-        if target:
-            queryset = queryset.exclude(pk=target.pk)
-
-        if queryset.exists():
+        target_user = self.instance.user if self.instance else None
+        if email_taken(value, exclude_user=target_user):
             raise serializers.ValidationError('Email already exists')
 
         return value
@@ -308,21 +371,21 @@ class UpdateUserSerializer(serializers.Serializer):
     def validate_phone_number_alt(self, value):
         if not value:
             return value
-
-        try:
-            return format_phone_number(value)
-        except ValueError as e:
-            raise serializers.ValidationError(str(e))
+        return _formatted_phone(value)
 
     def update(self, instance, validated_data):
-        return update_user(
-            self.context['request'].user,
+        return update_school_member(
+            self.context['request'].membership,
             instance,
             validated_data,
         )
 
 
+class UpdateUserResponseSerializer(serializers.Serializer):
+    user = SchoolMemberSerializer(read_only=True)
+    linked_existing_user = serializers.BooleanField(read_only=True)
+
+
 class DeleteUserResponseSerializer(serializers.Serializer):
     hard_deleted = serializers.BooleanField()
-    user = UserSerializer(required=False, allow_null=True)
-
+    user = SchoolMemberSerializer(required=False, allow_null=True)

@@ -8,7 +8,8 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from accounts.models import Profile, User
+from accounts.models import Profile, SchoolMembership, User
+from accounts.services.memberships import link_user_to_school
 from shared.helpers import format_phone_number
 from shared.services.spreadsheets import (
     build_csv_bytes,
@@ -28,6 +29,10 @@ IMPORT_COLUMNS = set(IMPORT_HEADERS)
 ASSIGNMENT_TYPE_CLASS_TEACHER = 'class_teacher'
 ASSIGNMENT_TYPE_TEACHING = 'teaching'
 SUPPORTED_UPLOAD_FORMATS = {'xlsx', 'csv'}
+
+ACTION_CREATE = 'create'
+ACTION_UPDATE = 'update'
+ACTION_LINK = 'link'
 
 
 @dataclass
@@ -76,10 +81,12 @@ class TeacherBulkImportSummary:
     rows_failed: int = 0
     teachers_to_create: int = 0
     teachers_to_update: int = 0
+    teachers_to_link: int = 0
     assignments_to_create: int = 0
     assignments_to_replace: int = 0
     teachers_created: int = 0
     teachers_updated: int = 0
+    teachers_linked: int = 0
     assignments_created: int = 0
     assignments_replaced: int = 0
 
@@ -153,10 +160,12 @@ def preview_teacher_bulk_import(school, rows: list[ParsedTeacherBulkRow]) -> Tea
             status = 'valid'
             summary.rows_valid += 1
 
-        if teacher_action == 'create':
+        if teacher_action == ACTION_CREATE:
             summary.teachers_to_create += 1
-        elif teacher_action == 'update':
+        elif teacher_action == ACTION_UPDATE:
             summary.teachers_to_update += 1
+        elif teacher_action == ACTION_LINK:
+            summary.teachers_to_link += 1
 
         if assignment_action == 'create':
             summary.assignments_to_create += 1
@@ -285,11 +294,11 @@ def _to_parsed_row(raw_row: dict) -> ParsedTeacherBulkRow:
 
 def _load_existing_teacher_phones(school) -> dict[str, User]:
     return {
-        user.phone_number: user
-        for user in User.objects.filter(
+        membership.user.phone_number: membership.user
+        for membership in SchoolMembership.objects.filter(
             school=school,
             role=User.RoleChoices.TEACHER,
-        )
+        ).select_related('user')
     }
 
 
@@ -315,17 +324,26 @@ def _resolve_teacher_action(
 
     existing = User.objects.filter(phone_number=phone).first()
     if existing:
-        if existing.role != User.RoleChoices.TEACHER:
-            messages.append('ERROR: Phone number belongs to a non-teacher account.')
+        membership = SchoolMembership.objects.filter(
+            user=existing,
+            school=school,
+        ).first()
+
+        if membership is None:
+            # The person is known from another school; this import gives them
+            # access here too rather than rejecting the row.
+            return ACTION_LINK
+
+        if membership.role != User.RoleChoices.TEACHER:
+            messages.append(
+                'ERROR: Phone number belongs to a non-teacher account in this school.',
+            )
             return None
-        if existing.school_id != school.id:
-            messages.append('ERROR: Phone number belongs to another school.')
-            return None
-        return 'update'
+        return ACTION_UPDATE
 
     if phone in existing_phones:
-        return 'update'
-    return 'create'
+        return ACTION_UPDATE
+    return ACTION_CREATE
 
 
 def _resolve_assignment_action(context, row: ParsedTeacherBulkRow) -> tuple[str | None, list[str]]:
@@ -414,7 +432,7 @@ def _upsert_teacher(
     summary: TeacherBulkImportSummary,
     messages: list[str],
 ) -> User:
-    _resolve_teacher_action(row, school, existing_phones, messages)
+    action = _resolve_teacher_action(row, school, existing_phones, messages)
     if messages:
         raise ValidationError({'detail': messages[-1].replace('ERROR: ', '')})
 
@@ -422,32 +440,50 @@ def _upsert_teacher(
     if phone in teacher_cache:
         return teacher_cache[phone]
 
-    user = User.objects.filter(phone_number=phone).first()
-    if user:
+    if action == ACTION_LINK:
+        # Identity is owned by another school, so their own name, email, and
+        # profile stay authoritative; this school only gains access.
+        user = User.objects.get(phone_number=phone)
+        link_user_to_school(user, school, User.RoleChoices.TEACHER)
+        summary.teachers_linked += 1
+        existing_phones[phone] = user
+    elif action == ACTION_UPDATE:
+        user = User.objects.get(phone_number=phone)
         user.first_name = row.first_name
         user.last_name = row.last_name
         user.email = row.email or ''
         user.is_active = True
         user.save(update_fields=['first_name', 'last_name', 'email', 'is_active', 'updated_at'])
+        _reactivate_teacher_membership(user, school)
         summary.teachers_updated += 1
     else:
         user = User.objects.create(
-            school=school,
             first_name=row.first_name,
             last_name=row.last_name,
             phone_number=phone,
-            role=User.RoleChoices.TEACHER,
             email=row.email or '',
             is_active=True,
         )
         user.set_unusable_password()
         user.save(update_fields=['password'])
         Profile.objects.get_or_create(user=user)
+        link_user_to_school(user, school, User.RoleChoices.TEACHER)
         summary.teachers_created += 1
         existing_phones[phone] = user
 
     teacher_cache[phone] = user
     return user
+
+
+def _reactivate_teacher_membership(user: User, school) -> None:
+    membership = SchoolMembership.objects.filter(user=user, school=school).first()
+    if membership is None:
+        link_user_to_school(user, school, User.RoleChoices.TEACHER)
+        return
+
+    if not membership.is_active:
+        membership.is_active = True
+        membership.save(update_fields=['is_active', 'updated_at'])
 
 
 def _apply_assignment(

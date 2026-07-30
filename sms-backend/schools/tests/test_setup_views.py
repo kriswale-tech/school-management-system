@@ -2,7 +2,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from accounts.tests.factories import create_user, set_client_auth_cookies
+from accounts.tests.factories import create_user, set_client_auth_cookies, user_school
 from schools.models import AcademicYear, SchoolSetup, Term
 from schools.tests.factories import academic_year_term_payload, create_school_setup
 
@@ -11,7 +11,7 @@ class SchoolsAPITestCase(APITestCase):
     def setUp(self):
         self.user = create_user(is_active=True)
         set_client_auth_cookies(self.client, self.user)
-        self.school = self.user.school
+        self.school = user_school(self.user)
 
 
 class SetupAcademicYearTermViewTests(SchoolsAPITestCase):

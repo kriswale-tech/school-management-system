@@ -8,8 +8,13 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from academics.services.curriculum import provision_school_curriculum, seed_ghana_curriculum
-from accounts.models import User
-from accounts.tests.factories import create_user, set_client_auth_cookies
+from accounts.models import SchoolMembership, User
+from accounts.tests.factories import (
+    create_school,
+    create_user,
+    set_client_auth_cookies,
+    user_school,
+)
 from schools.models import AcademicYear, SchoolSetup, Term
 from schools.services.teachers_bulk_import import get_failure_export_path
 from schools.services.teachers_bulk_template import build_teacher_failure_xlsx
@@ -22,7 +27,7 @@ class TeacherBulkImportTests(APITestCase):
     def setUp(self):
         self.admin = create_user(is_active=True)
         set_client_auth_cookies(self.client, self.admin)
-        self.school = self.admin.school
+        self.school = user_school(self.admin)
         seed_ghana_curriculum()
         provision_school_curriculum(self.school)
         self.academic_year = AcademicYear.objects.create(
@@ -91,6 +96,85 @@ class TeacherBulkImportTests(APITestCase):
         self.assertEqual(response.data['summary']['rows_with_errors'], 1)
         self.assertEqual(response.data['rows'][0]['status'], 'error')
 
+    def test_dry_run_reports_teacher_from_another_school_as_a_link(self):
+        create_user(
+            phone_number='+233244567891',
+            email='ama@other.com',
+            school=create_school(name='Other School', phone_number='+233200000000'),
+            role=User.RoleChoices.TEACHER,
+            is_active=True,
+            first_name='Ama',
+            last_name='Boateng',
+        )
+
+        upload = self._csv_upload([
+            {
+                'first_name': 'Ama',
+                'last_name': 'Boateng',
+                'phone_number': '0244567891',
+                'assignment_type': 'class_teacher',
+                'class_name': 'Basic 4',
+            },
+        ])
+
+        response = self.client.post(
+            f'{self.upload_url}?dry_run=true',
+            {'file': upload},
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['summary']['rows_with_errors'], 0)
+        self.assertEqual(response.data['summary']['teachers_to_link'], 1)
+        self.assertEqual(response.data['summary']['teachers_to_create'], 0)
+
+    def test_commit_links_teacher_from_another_school_without_renaming_them(self):
+        existing = create_user(
+            phone_number='+233244567891',
+            email='ama@other.com',
+            school=create_school(name='Other School', phone_number='+233200000000'),
+            role=User.RoleChoices.TEACHER,
+            is_active=True,
+            first_name='Ama',
+            last_name='Boateng',
+        )
+
+        upload = self._csv_upload([
+            {
+                'first_name': 'Wrong',
+                'last_name': 'Name',
+                'phone_number': '0244567891',
+                'assignment_type': 'class_teacher',
+                'class_name': 'Basic 4',
+            },
+        ])
+
+        response = self.client.post(
+            f'{self.upload_url}?dry_run=false',
+            {'file': upload},
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['summary']['rows_succeeded'], 1)
+        self.assertEqual(response.data['summary']['teachers_linked'], 1)
+        self.assertEqual(User.objects.filter(phone_number='+233244567891').count(), 1)
+
+        existing.refresh_from_db()
+        self.assertEqual(existing.first_name, 'Ama')
+        self.assertTrue(
+            SchoolMembership.objects.filter(
+                user=existing,
+                school=self.school,
+                role=User.RoleChoices.TEACHER,
+                is_active=True,
+            ).exists(),
+        )
+        self.assertEqual(
+            ClassTeacher.objects.filter(teacher=existing, term=self.term).count(),
+            1,
+        )
+
     def test_commit_creates_teacher_and_assignments(self):
         upload = self._csv_upload([
             {
@@ -118,10 +202,11 @@ class TeacherBulkImportTests(APITestCase):
         self.assertEqual(response.data['summary']['rows_succeeded'], 2)
         self.assertIsNone(response.data['failures'])
         self.assertTrue(
-            User.objects.filter(
+            SchoolMembership.objects.filter(
                 school=self.school,
-                phone_number='+233244567891',
+                user__phone_number='+233244567891',
                 role=User.RoleChoices.TEACHER,
+                is_active=True,
             ).exists(),
         )
         self.assertEqual(

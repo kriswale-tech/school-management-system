@@ -109,11 +109,29 @@ class ResendSignupOtpTests(TestCase):
         self.assertGreater(ctx.exception.retry_after_seconds, 0)
         self.assertLessEqual(ctx.exception.retry_after_seconds, 60)
 
-    def test_resend_rejects_active_user(self):
+    def test_resend_rejects_active_user_without_pending_school(self):
+        from django.core.cache import cache
+
+        cache.clear()
         create_user(is_active=True)
 
         with self.assertRaisesMessage(OtpResendError, 'Phone number already verified'):
             resend_signup_otp(PHONE)
+
+    def test_resend_allows_active_user_with_pending_school(self):
+        from accounts.services.registration import stage_pending_school
+
+        create_user(is_active=True)
+        stage_pending_school(PHONE, 'Second Academy')
+
+        resend_signup_otp(PHONE)
+
+        self.assertTrue(
+            PhoneOtp.objects.filter(
+                phone_number=PHONE,
+                purpose=PhoneOtp.Purpose.SIGNUP,
+            ).exists(),
+        )
 
     def test_resend_rejects_unknown_phone(self):
         with self.assertRaisesMessage(OtpResendError, 'No pending signup for this phone number'):
@@ -126,12 +144,14 @@ class VerifySignupOtpTests(TestCase):
         self.phone_otp = create_phone_otp()
 
     def test_valid_otp_activates_user_and_creates_profile(self):
-        user = verify_signup_otp(PHONE, OTP)
+        result = verify_signup_otp(PHONE, OTP)
+        user = result.user
 
         user.refresh_from_db()
         self.phone_otp.refresh_from_db()
 
         self.assertTrue(user.is_active)
+        self.assertFalse(result.linked_existing_account)
         self.assertTrue(self.phone_otp.is_verified)
         self.assertTrue(Profile.objects.filter(user=user).exists())
 

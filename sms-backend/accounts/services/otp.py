@@ -7,7 +7,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounts.helpers import generate_otp
-from accounts.models import PhoneOtp, Profile, User
+from accounts.models import PhoneOtp, Profile, SchoolMembership, User
 
 logger = logging.getLogger(__name__)
 
@@ -72,12 +72,16 @@ def _check_resend_cooldown(phone_number: str, purpose: str) -> None:
 
 
 def _validate_resend(phone_number: str, purpose: str) -> None:
+    from accounts.services.registration import get_pending_school
+
     user = User.objects.filter(phone_number=phone_number).first()
 
     if purpose == PhoneOtp.Purpose.SIGNUP:
         if not user:
             raise OtpResendError('No pending signup for this phone number')
-        if user.is_active:
+        # Returning users may also be creating a school via signup; they keep a
+        # staged school name until OTP succeeds.
+        if user.is_active and get_pending_school(phone_number) is None:
             raise OtpResendError('Phone number already verified')
         return
 
@@ -165,10 +169,14 @@ def verify_otp(phone_number: str, otp: str, purpose: str) -> User:
 
             user = User.objects.select_for_update().get(phone_number=phone_number)
 
-            if purpose == PhoneOtp.Purpose.SIGNUP:
+            if purpose == PhoneOtp.Purpose.SIGNUP and not user.is_active:
                 user.is_active = True
                 user.save(update_fields=['is_active', 'updated_at'])
                 Profile.objects.get_or_create(user=user)
+                # Verifying the phone confirms the school access granted at signup.
+                SchoolMembership.objects.filter(user=user, is_active=False).update(
+                    is_active=True,
+                )
 
             return user
 
@@ -177,8 +185,35 @@ def verify_otp(phone_number: str, otp: str, purpose: str) -> User:
         raise OtpVerificationError('Invalid OTP')
 
 
-def verify_signup_otp(phone_number: str, otp: str) -> User:
-    return verify_otp(phone_number, otp, PhoneOtp.Purpose.SIGNUP)
+def verify_signup_otp(phone_number: str, otp: str):
+    """Verify signup OTP. Returning users also get their staged school created."""
+    from accounts.services.registration import (
+        CompleteSignupResult,
+        complete_pending_school_creation,
+    )
+
+    existing = User.objects.filter(phone_number=phone_number).first()
+    was_active = bool(existing and existing.is_active)
+
+    user = verify_otp(phone_number, otp, PhoneOtp.Purpose.SIGNUP)
+    membership = complete_pending_school_creation(user)
+
+    if was_active:
+        if membership is None:
+            raise OtpVerificationError(
+                'Your school creation request expired. Please start signup again.',
+            )
+        return CompleteSignupResult(
+            user=user,
+            membership=membership,
+            linked_existing_account=True,
+        )
+
+    return CompleteSignupResult(
+        user=user,
+        membership=membership,
+        linked_existing_account=False,
+    )
 
 
 def verify_login_otp(phone_number: str, otp: str) -> User:

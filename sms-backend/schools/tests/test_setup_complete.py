@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APITestCase
 
-from accounts.tests.factories import create_user, set_client_auth_cookies
+from accounts.tests.factories import create_user, set_client_auth_cookies, user_school
 from schools.models import AcademicYear, SchoolSetup, Term
 from schools.services.setup import (
     REQUIRED_SETUP_STEPS,
@@ -19,7 +19,7 @@ from schools.tests.factories import create_school_setup
 class AdvanceSetupStepTests(APITestCase):
     def setUp(self):
         self.user = create_user(is_active=True)
-        self.school = self.user.school
+        self.school = user_school(self.user)
         self.school_setup = create_school_setup(self.school)
 
     def test_completing_all_required_steps_does_not_finalize_setup(self):
@@ -38,7 +38,7 @@ class AdvanceSetupStepTests(APITestCase):
 class ValidateSetupReadyTests(APITestCase):
     def setUp(self):
         self.user = create_user(is_active=True)
-        self.school = self.user.school
+        self.school = user_school(self.user)
         academic_year = AcademicYear.objects.create(
             school=self.school,
             academic_year='2025/2026',
@@ -93,7 +93,7 @@ class ValidateSetupReadyTests(APITestCase):
 class CompleteSchoolSetupServiceTests(APITestCase):
     def setUp(self):
         self.user = create_user(is_active=True)
-        self.school = self.user.school
+        self.school = user_school(self.user)
         self.school_setup = create_school_setup(
             self.school,
             completed_steps=[step.value for step in REQUIRED_SETUP_STEPS],
@@ -129,7 +129,7 @@ class CompleteSetupViewTests(APITestCase):
     def setUp(self):
         self.admin = create_user(is_active=True)
         set_client_auth_cookies(self.client, self.admin)
-        self.school = self.admin.school
+        self.school = user_school(self.admin)
         self.url = reverse('school-setup-complete')
 
     @patch('schools.setup_views.complete.complete_school_setup')

@@ -1,7 +1,6 @@
 import api from "@/app/api/api"
 import type { PaginatedResponse } from "@/types/generalTypes"
-import type { Staff } from "./types"
-import type { StaffQueryParams } from "./types"
+import type { Staff, StaffQueryParams, UpdateStaffResponse } from "./types"
 import { getQueryUrl } from "@/utils/get-query-url"
 
 
@@ -17,8 +16,8 @@ export const createStaff = async (data: FormData): Promise<Staff> => {
   return response.data
 }
 
-export const updateStaff = async (id: string, data: FormData): Promise<Staff> => {
-  const response = await api.patch<Staff>(`/accounts/users/${id}/`, data)
+export const updateStaff = async (id: string, data: FormData): Promise<UpdateStaffResponse> => {
+  const response = await api.patch<UpdateStaffResponse>(`/accounts/users/${id}/`, data)
   return response.data
 }
 

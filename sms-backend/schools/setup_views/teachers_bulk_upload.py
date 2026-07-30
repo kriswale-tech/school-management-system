@@ -7,9 +7,8 @@ from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_sche
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
-from accounts.permissions import CanManageUser
+from accounts.permissions import CanManageUser, HasActiveSchool
 from schools.services.teachers_bulk_import import (
     commit_teacher_bulk_import,
     detect_upload_format,
@@ -22,6 +21,7 @@ from schools.setup_serializers.teachers_bulk_import import (
     TeacherBulkImportConfirmResponseSerializer,
     TeacherBulkImportPreviewResponseSerializer,
 )
+from shared.views import SchoolScopedAPIView
 
 
 def _parse_dry_run(value: str | None) -> bool:
@@ -88,11 +88,11 @@ def _serialize_confirm_result(result):
         200: OpenApiResponse(description='Excel template file (.xlsx).'),
     },
 )
-class TeacherBulkImportTemplateView(APIView):
-    permission_classes = [CanManageUser]
+class TeacherBulkImportTemplateView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, CanManageUser]
 
     def get(self, request):
-        payload = build_teacher_import_template(request.user.school)
+        payload = build_teacher_import_template(self.school)
         return FileResponse(
             io.BytesIO(payload),
             as_attachment=True,
@@ -132,8 +132,8 @@ class TeacherBulkImportTemplateView(APIView):
         201: TeacherBulkImportConfirmResponseSerializer,
     },
 )
-class TeacherBulkImportUploadView(APIView):
-    permission_classes = [CanManageUser]
+class TeacherBulkImportUploadView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, CanManageUser]
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
@@ -147,11 +147,11 @@ class TeacherBulkImportUploadView(APIView):
             raise ValidationError({'file': 'No import rows were found in the uploaded file.'})
 
         if dry_run:
-            result = preview_teacher_bulk_import(request.user.school, rows)
+            result = preview_teacher_bulk_import(self.school, rows)
             return Response(_serialize_preview_result(result))
 
         result = commit_teacher_bulk_import(
-            request.user.school,
+            self.school,
             rows,
             upload_format=upload_format,
         )
@@ -169,11 +169,11 @@ class TeacherBulkImportUploadView(APIView):
         404: OpenApiResponse(description='Failure export not found or expired.'),
     },
 )
-class TeacherBulkImportFailuresDownloadView(APIView):
-    permission_classes = [CanManageUser]
+class TeacherBulkImportFailuresDownloadView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, CanManageUser]
 
     def get(self, request, token):
-        path, upload_format = load_failure_export(request.user.school_id, token)
+        path, upload_format = load_failure_export(self.school.id, token)
         filename = f'teacher-import-failures.{upload_format}'
         content_type = (
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'

@@ -4,7 +4,7 @@ from rest_framework.test import APITestCase
 
 from academics.models import SubjectGroup
 from academics.services.curriculum import provision_school_curriculum, seed_ghana_curriculum
-from accounts.tests.factories import create_user, set_client_auth_cookies
+from accounts.tests.factories import create_user, set_client_auth_cookies, user_school
 from schools.models import SchoolSetup
 from schools.tests.factories import create_school_setup
 
@@ -13,7 +13,7 @@ class SetupClassesAndSubjectsViewTests(APITestCase):
     def setUp(self):
         self.user = create_user(is_active=True)
         set_client_auth_cookies(self.client, self.user)
-        self.school = self.user.school
+        self.school = user_school(self.user)
         self.url = reverse('school-setup-classes-and-subjects')
 
     def test_get_returns_empty_array_when_none_exist(self):
@@ -165,7 +165,7 @@ class SetupClassesAndSubjectsMutationTests(APITestCase):
     def setUp(self):
         self.user = create_user(is_active=True)
         set_client_auth_cookies(self.client, self.user)
-        self.school = self.user.school
+        self.school = user_school(self.user)
         seed_ghana_curriculum()
         provision_school_curriculum(self.school)
         create_school_setup(

@@ -1,7 +1,6 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from schools.services import classes_and_subjects as setup_service
 from schools.setup_serializers.classes_and_subjects import (
@@ -23,6 +22,7 @@ from schools.setup_serializers.classes_and_subjects import (
     UpdateSubjectSerializer,
 )
 from schools.setup_serializers.common import SetupStepResponseSerializer
+from shared.views import SchoolScopedAPIView
 
 
 @extend_schema(
@@ -36,9 +36,9 @@ from schools.setup_serializers.common import SetupStepResponseSerializer
     ),
     responses={200: SetupLevelSerializer(many=True)},
 )
-class SetupClassesAndSubjectsView(APIView):
+class SetupClassesAndSubjectsView(SchoolScopedAPIView):
     def get(self, request):
-        data = setup_service.get_classes_and_subjects_setup(request.user.school)
+        data = setup_service.get_classes_and_subjects_setup(self.school)
         return Response(SetupLevelSerializer(data, many=True).data)
 
 
@@ -53,9 +53,9 @@ class SetupClassesAndSubjectsView(APIView):
     request=None,
     responses={200: SetupStepResponseSerializer},
 )
-class CompleteClassesAndSubjectsSetupView(APIView):
+class CompleteClassesAndSubjectsSetupView(SchoolScopedAPIView):
     def post(self, request):
-        result = setup_service.complete_classes_and_subjects_setup(request.user.school)
+        result = setup_service.complete_classes_and_subjects_setup(self.school)
         return Response(SetupStepResponseSerializer(result).data)
 
 
@@ -68,12 +68,12 @@ class CompleteClassesAndSubjectsSetupView(APIView):
     request=CreateStreamSerializer,
     responses={201: SetupClassStreamSerializer},
 )
-class SetupClassStreamCreateView(APIView):
+class SetupClassStreamCreateView(SchoolScopedAPIView):
     def post(self, request, class_id):
         serializer = CreateStreamSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = setup_service.add_stream(
-            request.user.school,
+            self.school,
             class_id=class_id,
             **serializer.validated_data,
         )
@@ -92,19 +92,19 @@ class SetupClassStreamCreateView(APIView):
     description='Deletes a non-default stream when it has no student associations.',
     responses={204: None},
 )
-class SetupClassStreamDetailView(APIView):
+class SetupClassStreamDetailView(SchoolScopedAPIView):
     def patch(self, request, stream_id):
         serializer = UpdateStreamSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = setup_service.edit_stream(
-            request.user.school,
+            self.school,
             stream_id=stream_id,
             **serializer.validated_data,
         )
         return Response(SetupClassStreamSerializer(data).data)
 
     def delete(self, request, stream_id):
-        setup_service.remove_stream(request.user.school, stream_id=stream_id)
+        setup_service.remove_stream(self.school, stream_id=stream_id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -118,12 +118,12 @@ class SetupClassStreamDetailView(APIView):
     request=CreateSubjectGroupSerializer,
     responses={201: SetupSubjectGroupSerializer},
 )
-class SetupSubjectGroupCreateView(APIView):
+class SetupSubjectGroupCreateView(SchoolScopedAPIView):
     def post(self, request, level_id, subject_id):
         serializer = CreateSubjectGroupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = setup_service.add_subject_group(
-            request.user.school,
+            self.school,
             level_id=level_id,
             subject_id=subject_id,
             **serializer.validated_data,
@@ -143,19 +143,19 @@ class SetupSubjectGroupCreateView(APIView):
     description='Deletes the group when no students are assigned to it.',
     responses={204: None},
 )
-class SetupSubjectGroupDetailView(APIView):
+class SetupSubjectGroupDetailView(SchoolScopedAPIView):
     def patch(self, request, group_id):
         serializer = UpdateSubjectGroupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = setup_service.edit_subject_group(
-            request.user.school,
+            self.school,
             group_id=group_id,
             **serializer.validated_data,
         )
         return Response(SetupSubjectGroupSerializer(data).data)
 
     def delete(self, request, group_id):
-        setup_service.remove_subject_group(request.user.school, group_id=group_id)
+        setup_service.remove_subject_group(self.school, group_id=group_id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -164,12 +164,12 @@ class SetupSubjectGroupDetailView(APIView):
     request=CreateCustomClassSerializer,
     responses={201: SetupClassLevelSerializer},
 )
-class SetupCustomClassCreateView(APIView):
+class SetupCustomClassCreateView(SchoolScopedAPIView):
     def post(self, request, level_id):
         serializer = CreateCustomClassSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = setup_service.add_custom_class(
-            request.user.school,
+            self.school,
             level_id=level_id,
             **serializer.validated_data,
         )
@@ -188,19 +188,19 @@ class SetupCustomClassCreateView(APIView):
     description='Deletes a custom class when it has no student associations.',
     responses={204: None},
 )
-class SetupCustomClassDetailView(APIView):
+class SetupCustomClassDetailView(SchoolScopedAPIView):
     def patch(self, request, class_id):
         serializer = UpdateCustomClassSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = setup_service.edit_custom_class(
-            request.user.school,
+            self.school,
             class_id=class_id,
             **serializer.validated_data,
         )
         return Response(SetupClassLevelSerializer(data).data)
 
     def delete(self, request, class_id):
-        setup_service.remove_custom_class(request.user.school, class_id=class_id)
+        setup_service.remove_custom_class(self.school, class_id=class_id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -214,12 +214,12 @@ class SetupCustomClassDetailView(APIView):
     request=CreateSubjectSerializer,
     responses={201: SubjectDetailSerializer},
 )
-class SetupSubjectCreateView(APIView):
+class SetupSubjectCreateView(SchoolScopedAPIView):
     def post(self, request):
         serializer = CreateSubjectSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = setup_service.add_subject(
-            request.user.school,
+            self.school,
             **serializer.validated_data,
         )
         return Response(SubjectDetailSerializer(data).data, status=status.HTTP_201_CREATED)
@@ -240,19 +240,19 @@ class SetupSubjectCreateView(APIView):
     summary='Delete a custom subject',
     responses={204: None},
 )
-class SetupSubjectDetailView(APIView):
+class SetupSubjectDetailView(SchoolScopedAPIView):
     def patch(self, request, subject_id):
         serializer = UpdateSubjectSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = setup_service.edit_subject(
-            request.user.school,
+            self.school,
             subject_id=subject_id,
             **serializer.validated_data,
         )
         return Response(SubjectDetailSerializer(data).data)
 
     def delete(self, request, subject_id):
-        setup_service.remove_subject(request.user.school, subject_id=subject_id)
+        setup_service.remove_subject(self.school, subject_id=subject_id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -275,10 +275,10 @@ class SetupSubjectDetailView(APIView):
     ),
     responses={204: None},
 )
-class SetupClassSubjectAssignmentView(APIView):
+class SetupClassSubjectAssignmentView(SchoolScopedAPIView):
     def post(self, request, class_id, subject_id):
         data = setup_service.assign_subject_to_class(
-            request.user.school,
+            self.school,
             class_id=class_id,
             subject_id=subject_id,
         )
@@ -286,7 +286,7 @@ class SetupClassSubjectAssignmentView(APIView):
 
     def delete(self, request, class_id, subject_id):
         setup_service.remove_subject_from_class(
-            request.user.school,
+            self.school,
             class_id=class_id,
             subject_id=subject_id,
         )
@@ -298,12 +298,12 @@ class SetupClassSubjectAssignmentView(APIView):
     request=ActivationSerializer,
     responses={200: ActivationResponseSerializer},
 )
-class SetupLevelStatusView(APIView):
+class SetupLevelStatusView(SchoolScopedAPIView):
     def patch(self, request, level_id):
         serializer = ActivationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = setup_service.set_level_status(
-            request.user.school,
+            self.school,
             level_id=level_id,
             **serializer.validated_data,
         )
@@ -315,12 +315,12 @@ class SetupLevelStatusView(APIView):
     request=ActivationSerializer,
     responses={200: ActivationResponseSerializer},
 )
-class SetupClassStatusView(APIView):
+class SetupClassStatusView(SchoolScopedAPIView):
     def patch(self, request, class_id):
         serializer = ActivationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = setup_service.set_class_status(
-            request.user.school,
+            self.school,
             class_id=class_id,
             **serializer.validated_data,
         )
@@ -332,12 +332,12 @@ class SetupClassStatusView(APIView):
     request=ActivationSerializer,
     responses={200: ActivationResponseSerializer},
 )
-class SetupSubjectStatusView(APIView):
+class SetupSubjectStatusView(SchoolScopedAPIView):
     def patch(self, request, subject_id):
         serializer = ActivationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = setup_service.set_subject_status(
-            request.user.school,
+            self.school,
             subject_id=subject_id,
             **serializer.validated_data,
         )

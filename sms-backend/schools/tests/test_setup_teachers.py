@@ -5,7 +5,13 @@ from rest_framework.test import APITestCase
 from academics.models import SubjectGroup
 from academics.services.curriculum import provision_school_curriculum, seed_ghana_curriculum
 from accounts.models import User
-from accounts.tests.factories import create_user, set_client_auth_cookies
+from accounts.tests.factories import (
+    create_membership,
+    create_school,
+    create_user,
+    set_client_auth_cookies,
+    user_school,
+)
 from schools.models import AcademicYear, SchoolSetup, Term
 from schools.tests.factories import create_school_setup
 from teachers.models import ClassTeacher, TeachingAssignment
@@ -15,7 +21,7 @@ class SetupTeacherAssignmentViewTests(APITestCase):
     def setUp(self):
         self.admin = create_user(is_active=True)
         set_client_auth_cookies(self.client, self.admin)
-        self.school = self.admin.school
+        self.school = user_school(self.admin)
         seed_ghana_curriculum()
         provision_school_curriculum(self.school)
         self.academic_year = AcademicYear.objects.create(
@@ -83,6 +89,45 @@ class SetupTeacherAssignmentViewTests(APITestCase):
                 stream__isnull=True,
             ).exists(),
         )
+
+    def test_cannot_assign_a_teacher_who_is_not_a_member_of_this_school(self):
+        outsider = create_user(
+            phone_number='+233244567899',
+            email='outsider@test.com',
+            school=create_school(name='Other School', phone_number='+233200000000'),
+            role=User.RoleChoices.TEACHER,
+            is_active=True,
+        )
+
+        response = self.client.post(
+            self.class_teacher_url,
+            {
+                'teacher_id': str(outsider.id),
+                'class_level_id': str(self.class_level.id),
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(ClassTeacher.objects.filter(teacher=outsider).exists())
+
+    def test_teacher_shared_with_another_school_can_be_assigned_here(self):
+        create_membership(
+            self.teacher,
+            create_school(name='Other School', phone_number='+233200000000'),
+            role=User.RoleChoices.TEACHER,
+        )
+
+        response = self.client.post(
+            self.class_teacher_url,
+            {
+                'teacher_id': str(self.teacher.id),
+                'class_level_id': str(self.class_level.id),
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_teaching_assignment_for_class_subject(self):
         response = self.client.post(
@@ -206,7 +251,7 @@ class CompleteTeachersSetupViewTests(APITestCase):
     def setUp(self):
         self.admin = create_user(is_active=True)
         set_client_auth_cookies(self.client, self.admin)
-        self.school = self.admin.school
+        self.school = user_school(self.admin)
         self.academic_year = AcademicYear.objects.create(
             school=self.school,
             academic_year='2025/2026',

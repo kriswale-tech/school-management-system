@@ -3,7 +3,12 @@ from rest_framework import status
 
 from accounts.models import PhoneOtp, User
 from accounts.tests.base import AccountsAPITestCase
-from accounts.tests.factories import PHONE, create_user, set_client_auth_cookies
+from accounts.tests.factories import (
+    PHONE,
+    create_user,
+    set_client_auth_cookies,
+    user_school,
+)
 
 
 TEACHER_PHONE = '+233244567891'
@@ -15,10 +20,11 @@ NEW_TEACHER_LOCAL_PHONE = '0244567892'
 class UpdateUserPhoneDuringSetupTests(AccountsAPITestCase):
     def setUp(self):
         self.admin = create_user(is_active=True)
+        self.school = user_school(self.admin)
         self.teacher = create_user(
             phone_number=TEACHER_PHONE,
             email='teacher@test.com',
-            school=self.admin.school,
+            school=self.school,
             role=User.RoleChoices.TEACHER,
             is_active=True,
             first_name='Ama',
@@ -43,7 +49,8 @@ class UpdateUserPhoneDuringSetupTests(AccountsAPITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['phone_number'], NEW_TEACHER_PHONE)
+        self.assertEqual(response.data['user']['phone_number'], NEW_TEACHER_PHONE)
+        self.assertFalse(response.data['linked_existing_user'])
         self.teacher.refresh_from_db()
         self.assertEqual(self.teacher.phone_number, NEW_TEACHER_PHONE)
         self.assertFalse(
@@ -51,9 +58,8 @@ class UpdateUserPhoneDuringSetupTests(AccountsAPITestCase):
         )
 
     def test_admin_cannot_change_phone_after_setup_completed(self):
-        school = self.admin.school
-        school.setup_completed = True
-        school.save(update_fields=['setup_completed', 'updated_at'])
+        self.school.setup_completed = True
+        self.school.save(update_fields=['setup_completed', 'updated_at'])
 
         response = self.client.patch(
             self.url,
@@ -69,7 +75,7 @@ class UpdateUserPhoneDuringSetupTests(AccountsAPITestCase):
         staff = create_user(
             phone_number='+233244567893',
             email='staff@test.com',
-            school=self.admin.school,
+            school=self.school,
             role=User.RoleChoices.STAFF,
             is_active=True,
         )
@@ -93,17 +99,18 @@ class UpdateUserPhoneDuringSetupTests(AccountsAPITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.admin.school.refresh_from_db()
-        self.assertEqual(self.admin.school.phone_number, '+233244567899')
+        self.school.refresh_from_db()
+        self.assertEqual(self.school.phone_number, '+233244567899')
 
 
 class UserListFilterTests(AccountsAPITestCase):
     def setUp(self):
         self.admin = create_user(is_active=True)
+        self.school = user_school(self.admin)
         self.teacher = create_user(
             phone_number=TEACHER_PHONE,
             email='teacher@test.com',
-            school=self.admin.school,
+            school=self.school,
             role=User.RoleChoices.TEACHER,
             is_active=True,
             first_name='Ama',
@@ -112,7 +119,7 @@ class UserListFilterTests(AccountsAPITestCase):
         self.staff = create_user(
             phone_number='+233244567893',
             email='staff@test.com',
-            school=self.admin.school,
+            school=self.school,
             role=User.RoleChoices.STAFF,
             is_active=True,
             first_name='Kofi',

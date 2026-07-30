@@ -2,9 +2,9 @@ from drf_spectacular.utils import extend_schema
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from shared.exceptions import cloudinary_error_detail
+from shared.views import SchoolScopedAPIView
 from schools.models import SchoolSetup
 from schools.services.setup import advance_setup_step
 from schools.setup_serializers import (
@@ -23,11 +23,11 @@ from schools.setup_views.common import advance_setup_if_needed
     request=SetupSchoolProfileSerializer,
     responses={200: SetupStepResponseSerializer},
 )
-class SetupSchoolProfileView(APIView):
+class SetupSchoolProfileView(SchoolScopedAPIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def post(self, request):
-        school = request.user.school
+        school = self.school
         school_setup, _ = SchoolSetup.objects.get_or_create(school=school)
 
         serializer = SetupSchoolProfileSerializer(

@@ -16,6 +16,7 @@ from accounts.tests.factories import (
     create_user,
     set_client_auth_cookies,
     signup_payload,
+    user_school,
 )
 
 
@@ -48,13 +49,30 @@ class AdminSignupViewTests(AccountsAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('phone_number', response.data)
 
-    def test_signup_rejects_active_duplicate_phone(self):
+    def test_signup_rejects_duplicate_school_name_for_active_user(self):
         create_user(is_active=True)
 
-        response = self.client.post(self.url, signup_payload(), format='json')
+        response = self.client.post(
+            self.url,
+            signup_payload(school_name='Test School'),
+            format='json',
+        )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('phone_number', response.data)
+
+    def test_signup_allows_active_user_to_create_another_school(self):
+        create_user(is_active=True)
+
+        response = self.client.post(
+            self.url,
+            signup_payload(school_name='Second Academy'),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['message'], 'OTP sent successfully')
+        self.assertTrue(response.data['linked_existing_account'])
+        self.assertEqual(User.objects.filter(phone_number=PHONE).count(), 1)
 
     def test_signup_allows_inactive_user_to_resubmit(self):
         existing = create_user(is_active=False, first_name='Old')
@@ -70,7 +88,7 @@ class AdminSignupViewTests(AccountsAPITestCase):
 
         existing.refresh_from_db()
         self.assertEqual(existing.first_name, 'New')
-        self.assertEqual(existing.school.name, 'Updated Academy')
+        self.assertEqual(user_school(existing).name, 'Updated Academy')
 
 
 class AdminVerifyOtpViewTests(AccountsAPITestCase):

@@ -9,20 +9,62 @@ from shared.models import BaseModel
 
 
 class User(BaseModel, AbstractUser):
+    """A person. Identity only; school access lives on SchoolMembership."""
+
     class RoleChoices(models.TextChoices):
         ADMIN = 'admin', 'Admin'
         TEACHER = 'teacher', 'Teacher'
         ACCOUNTANT = 'accountant', 'Accountant'
         STAFF = 'staff', 'Staff'
 
-    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, related_name='users')
-    role = models.CharField(max_length=50, choices=RoleChoices.choices)
     phone_number = models.CharField(max_length=15, unique=True)
 
     username = None
 
     USERNAME_FIELD = 'phone_number'
     REQUIRED_FIELDS = []
+
+
+class SchoolMembership(BaseModel):
+    """Grants a user a role in one school. A user may belong to many schools."""
+
+    user = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.CASCADE,
+        related_name='memberships',
+    )
+    school = models.ForeignKey(
+        'schools.School',
+        on_delete=models.CASCADE,
+        related_name='memberships',
+    )
+    role = models.CharField(max_length=50, choices=User.RoleChoices.choices)
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name='active in this school',
+    )
+    last_active_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='last acted in this school at',
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'school'],
+                name='unique_membership_per_user_and_school',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['school', 'role']),
+        ]
+        # Never-used memberships sort last so the picker leads with the school
+        # the person actually works in most recently.
+        ordering = [models.F('last_active_at').desc(nulls_last=True), 'school__name']
+
+    def __str__(self):
+        return f'{self.user.get_full_name()} - {self.get_role_display()} @ {self.school.name}'
 
 
 class Profile(BaseModel):

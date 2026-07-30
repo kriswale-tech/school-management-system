@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from academics.models import ClassLevel, Level
-from accounts.tests.factories import create_user, set_client_auth_cookies
+from accounts.tests.factories import create_user, set_client_auth_cookies, user_school
 from fees.models import FeeItem, FeeStructure
 from schools.models import AcademicYear, SchoolSetup, Term
 from schools.tests.factories import create_school_setup
@@ -15,7 +15,7 @@ class SetupFeesViewTests(APITestCase):
     def setUp(self):
         self.user = create_user(is_active=True)
         set_client_auth_cookies(self.client, self.user)
-        self.school = self.user.school
+        self.school = user_school(self.user)
         self.academic_year = AcademicYear.objects.create(
             school=self.school,
             academic_year='2025/2026',
@@ -173,7 +173,7 @@ class AcademicsLookupViewTests(APITestCase):
     def setUp(self):
         self.user = create_user(is_active=True)
         set_client_auth_cookies(self.client, self.user)
-        self.school = self.user.school
+        self.school = user_school(self.user)
         self.level = Level.objects.create(
             school=self.school,
             name='Primary',

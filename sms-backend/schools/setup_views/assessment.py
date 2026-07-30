@@ -1,6 +1,5 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from schools.services.assessment import (
     complete_assessment_setup,
@@ -13,6 +12,7 @@ from schools.setup_serializers.assessment import (
     SetupAssessmentLevelSerializer,
 )
 from schools.setup_serializers.common import SetupStepResponseSerializer
+from shared.views import SchoolScopedAPIView
 
 
 @extend_schema(
@@ -24,9 +24,9 @@ from schools.setup_serializers.common import SetupStepResponseSerializer
     ),
     responses={200: SetupAssessmentDataSerializer},
 )
-class SetupAssessmentView(APIView):
+class SetupAssessmentView(SchoolScopedAPIView):
     def get(self, request):
-        data = get_assessment_setup(request.user.school)
+        data = get_assessment_setup(self.school)
         return Response(SetupAssessmentDataSerializer(data).data)
 
 
@@ -41,12 +41,12 @@ class SetupAssessmentView(APIView):
     request=SaveLevelAssessmentConfigSerializer,
     responses={200: SetupAssessmentLevelSerializer},
 )
-class SetupAssessmentLevelConfigView(APIView):
+class SetupAssessmentLevelConfigView(SchoolScopedAPIView):
     def put(self, request, level_id):
         serializer = SaveLevelAssessmentConfigSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = save_level_assessment_config(
-            request.user.school,
+            self.school,
             level_id=level_id,
             **serializer.validated_data,
         )
@@ -62,7 +62,7 @@ class SetupAssessmentLevelConfigView(APIView):
     request=None,
     responses={200: SetupStepResponseSerializer},
 )
-class CompleteAssessmentSetupView(APIView):
+class CompleteAssessmentSetupView(SchoolScopedAPIView):
     def post(self, request):
-        result = complete_assessment_setup(request.user.school)
+        result = complete_assessment_setup(self.school)
         return Response(SetupStepResponseSerializer(result).data)

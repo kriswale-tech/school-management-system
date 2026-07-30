@@ -1,9 +1,9 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from schools.services.setup import complete_school_setup
 from schools.setup_serializers import SetupStepResponseSerializer
+from shared.views import SchoolScopedAPIView
 
 __all__ = ['CompleteSetupView']
 
@@ -18,7 +18,7 @@ __all__ = ['CompleteSetupView']
     request=None,
     responses={200: SetupStepResponseSerializer},
 )
-class CompleteSetupView(APIView):
+class CompleteSetupView(SchoolScopedAPIView):
     def post(self, request):
-        result = complete_school_setup(request.user.school)
+        result = complete_school_setup(self.school)
         return Response(SetupStepResponseSerializer(result).data)

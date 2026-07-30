@@ -1,22 +1,19 @@
-from django.shortcuts import render
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from .models import School, SchoolSetup
-from .serializers import SchoolSerializer, SchoolSetupSerializer
 from drf_spectacular.utils import extend_schema
-# Create your views here.
+from rest_framework.response import Response
+
+from shared.views import SchoolScopedAPIView
+from .serializers import SchoolSerializer
 
 
 @extend_schema(
     summary="Get school",
-    description="Get the school",
+    description="Get the school the session is currently scoped to.",
     responses={
         200: SchoolSerializer,
     }
 )
-class SchoolView(APIView):
+class SchoolView(SchoolScopedAPIView):
     def get(self, request):
-        school = School.objects.get(id=request.user.school_id)
-        return Response(SchoolSerializer(school).data)
+        return Response(SchoolSerializer(self.school).data)
 
     # update school.

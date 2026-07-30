@@ -1,6 +1,12 @@
 import api from '@/app/api/api'
 import type { InternalAxiosRequestConfig } from 'axios'
-import type { SignupData, VerifyOTPData, User } from './types'
+import type {
+  AuthResponse,
+  SelectSchoolData,
+  SignupData,
+  User,
+  VerifyOTPData,
+} from './types'
 
 // signup endpoing
 export const signup = async (data: SignupData) => {
@@ -10,7 +16,7 @@ export const signup = async (data: SignupData) => {
 
 // verify OTP endpoint
 export const verifyOTP = async (data: VerifyOTPData) => {
-  const response = await api.post<{ message: string }>('/accounts/verify-otp/', data)
+  const response = await api.post<AuthResponse>('/accounts/verify-otp/', data)
   return response.data
 }
 
@@ -50,12 +56,18 @@ export const login = async (data: {phone_number: string}) => {
 
 // verify login OTP endpoint
 export const verifyLoginOTP = async (data: VerifyOTPData) => {
-  const response = await api.post<{ message: string }>('/accounts/login/verify-otp/', data)
+  const response = await api.post<AuthResponse>('/accounts/login/verify-otp/', data)
   return response.data
 }
 
 // resend login OTP endpoint
 export const resendLoginOTP = async (data: {phone_number: string}) => {
   const response = await api.post<{ message: string }>('/accounts/login/resend-otp/', data)
+  return response.data
+}
+
+// select or switch school (scopes session and re-issues auth cookies)
+export const selectSchool = async (data: SelectSchoolData) => {
+  const response = await api.post<AuthResponse>('/accounts/select-school/', data)
   return response.data
 }

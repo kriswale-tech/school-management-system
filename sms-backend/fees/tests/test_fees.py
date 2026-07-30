@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from academics.models import ClassLevel, Level
-from accounts.tests.factories import create_user
+from accounts.tests.factories import create_user, user_school
 from fees.models import FeeItem, FeeStructure, Payment, StudentFee
 from fees.services import (
     apply_fee_structure,
@@ -20,7 +20,7 @@ from students.models import ClassEnrollment, Student
 class FeeStructureTests(TestCase):
     def setUp(self):
         self.user = create_user(is_active=True)
-        self.school = self.user.school
+        self.school = user_school(self.user)
         self.academic_year = AcademicYear.objects.create(
             school=self.school,
             academic_year='2025/2026',

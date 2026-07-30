@@ -64,6 +64,17 @@ const ProfileComponent = () => {
             </p>
           </div>
           <div className="my-1 h-px bg-slate-100" />
+          {(user?.schools?.length ?? 0) > 1 ? (
+            <Link
+              to="/auth/select-school"
+              role="menuitem"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
+            >
+              <Icon icon="hugeicons:school" className="text-lg" />
+              Switch school
+            </Link>
+          ) : null}
           <Link
             to="/profile"
             role="menuitem"

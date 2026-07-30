@@ -3,7 +3,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from academics.models import Level
-from accounts.tests.factories import create_user, set_client_auth_cookies
+from accounts.tests.factories import create_user, set_client_auth_cookies, user_school
 from assessments.constants.grade_templates import (
     BECE_STANDARD_NUMERICAL_GRADES,
     GES_INTERNAL_LETTER_GRADES,
@@ -18,7 +18,7 @@ class SetupAssessmentViewTests(APITestCase):
     def setUp(self):
         self.user = create_user(is_active=True)
         set_client_auth_cookies(self.client, self.user)
-        self.school = self.user.school
+        self.school = user_school(self.user)
         self.url = reverse('school-setup-assessment')
 
     def test_get_returns_templates_and_empty_levels_when_none_exist(self):
@@ -105,7 +105,7 @@ class SetupAssessmentMutationTests(APITestCase):
     def setUp(self):
         self.user = create_user(is_active=True)
         set_client_auth_cookies(self.client, self.user)
-        self.school = self.user.school
+        self.school = user_school(self.user)
         create_school_setup(
             self.school,
             completed_steps=[

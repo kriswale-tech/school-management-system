@@ -1,8 +1,8 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from academics.models import ClassLevel, Level
+from shared.views import SchoolScopedAPIView
 
 
 class ActiveLevelListSerializerMixin:
@@ -35,10 +35,10 @@ class ActiveLevelListSerializerMixin:
         },
     },
 )
-class ActiveLevelListView(APIView, ActiveLevelListSerializerMixin):
+class ActiveLevelListView(SchoolScopedAPIView, ActiveLevelListSerializerMixin):
     def get(self, request):
         levels = Level.objects.filter(
-            school=request.user.school,
+            school=self.school,
             is_active=True,
         ).order_by('order', 'name')
         return Response(self.serialize_levels(levels))
@@ -63,10 +63,10 @@ class ActiveLevelListView(APIView, ActiveLevelListSerializerMixin):
         },
     },
 )
-class ActiveClassLevelListView(APIView):
+class ActiveClassLevelListView(SchoolScopedAPIView):
     def get(self, request):
         class_levels = ClassLevel.objects.filter(
-            school=request.user.school,
+            school=self.school,
             is_active=True,
             level__is_active=True,
         ).select_related('level').order_by('level__order', 'order', 'name')

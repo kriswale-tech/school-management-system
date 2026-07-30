@@ -1,6 +1,5 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from schools.models import SchoolSetup
 from schools.services.academic import get_academic_year_setup
@@ -11,6 +10,7 @@ from schools.setup_serializers import (
     SetupAcademicYearTermSerializer,
 )
 from schools.setup_views.common import advance_setup_if_needed
+from shared.views import SchoolScopedAPIView
 
 
 @extend_schema(
@@ -29,13 +29,13 @@ from schools.setup_views.common import advance_setup_if_needed
     request=SetupAcademicYearTermSerializer,
     responses={200: SetupAcademicYearTermPostResponseSerializer},
 )
-class SetupAcademicYearTermView(APIView):
+class SetupAcademicYearTermView(SchoolScopedAPIView):
     def get(self, request):
-        data = get_academic_year_setup(request.user.school)
+        data = get_academic_year_setup(self.school)
         return Response(AcademicYearTermDataSerializer(data).data)
 
     def post(self, request):
-        school = request.user.school
+        school = self.school
         school_setup, _ = SchoolSetup.objects.get_or_create(school=school)
 
         require_prior_setup_steps(

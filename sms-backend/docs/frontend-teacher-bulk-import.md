@@ -146,6 +146,8 @@ export interface TeacherBulkImportPreviewSummary {
   rows_with_warnings: number;
   teachers_to_create: number;
   teachers_to_update: number;
+  /** Teachers already in the system who will be given access to this school. */
+  teachers_to_link: number;
   assignments_to_create: number;
   assignments_to_replace: number;
 }
@@ -170,6 +172,8 @@ export interface TeacherBulkImportConfirmSummary {
   rows_failed: number;
   teachers_created: number;
   teachers_updated: number;
+  /** Teachers already in the system who were given access to this school. */
+  teachers_linked: number;
   assignments_created: number;
   assignments_replaced: number;
 }
@@ -219,6 +223,7 @@ export interface ApiValidationError {
     "rows_with_warnings": 0,
     "teachers_to_create": 1,
     "teachers_to_update": 0,
+    "teachers_to_link": 0,
     "assignments_to_create": 1,
     "assignments_to_replace": 0
   },
@@ -269,6 +274,7 @@ export interface ApiValidationError {
     "rows_failed": 1,
     "teachers_created": 1,
     "teachers_updated": 0,
+    "teachers_linked": 0,
     "assignments_created": 1,
     "assignments_replaced": 0
   },

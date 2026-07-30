@@ -1,9 +1,9 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from core.pagination import StandardResultsSetPagination, paginated_schema
+from shared.views import SchoolScopedAPIView
 from schools.services.teachers import (
     complete_teachers_setup,
     create_class_teacher_assignment,
@@ -33,11 +33,11 @@ from schools.setup_serializers.teachers import (
         200: paginated_schema(SetupTeacherSerializer, name='PaginatedSetupTeacherList'),
     },
 )
-class SetupTeachersView(APIView):
+class SetupTeachersView(SchoolScopedAPIView):
     pagination_class = StandardResultsSetPagination
 
     def get(self, request):
-        teachers = get_teachers_setup_queryset(request.user.school)
+        teachers = get_teachers_setup_queryset(self.school)
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(teachers, request)
         data = [serialize_teacher_for_setup(teacher) for teacher in page]
@@ -54,12 +54,12 @@ class SetupTeachersView(APIView):
     request=CreateClassTeacherAssignmentSerializer,
     responses={201: SetupClassTeacherAssignmentSerializer},
 )
-class SetupClassTeacherAssignmentCreateView(APIView):
+class SetupClassTeacherAssignmentCreateView(SchoolScopedAPIView):
     def post(self, request):
         serializer = CreateClassTeacherAssignmentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = create_class_teacher_assignment(
-            request.user.school,
+            self.school,
             **serializer.validated_data,
         )
         return Response(
@@ -73,10 +73,10 @@ class SetupClassTeacherAssignmentCreateView(APIView):
     description='Removes a class teacher assignment for the active term.',
     responses={204: None},
 )
-class SetupClassTeacherAssignmentDetailView(APIView):
+class SetupClassTeacherAssignmentDetailView(SchoolScopedAPIView):
     def delete(self, request, assignment_id):
         delete_class_teacher_assignment(
-            request.user.school,
+            self.school,
             assignment_id=assignment_id,
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -91,12 +91,12 @@ class SetupClassTeacherAssignmentDetailView(APIView):
     request=CreateTeachingAssignmentSerializer,
     responses={201: SetupTeachingAssignmentSerializer},
 )
-class SetupTeachingAssignmentCreateView(APIView):
+class SetupTeachingAssignmentCreateView(SchoolScopedAPIView):
     def post(self, request):
         serializer = CreateTeachingAssignmentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = create_teaching_assignment(
-            request.user.school,
+            self.school,
             **serializer.validated_data,
         )
         return Response(
@@ -110,10 +110,10 @@ class SetupTeachingAssignmentCreateView(APIView):
     description='Removes a teaching assignment for the active term.',
     responses={204: None},
 )
-class SetupTeachingAssignmentDetailView(APIView):
+class SetupTeachingAssignmentDetailView(SchoolScopedAPIView):
     def delete(self, request, assignment_id):
         delete_teaching_assignment(
-            request.user.school,
+            self.school,
             assignment_id=assignment_id,
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -128,7 +128,7 @@ class SetupTeachingAssignmentDetailView(APIView):
     request=None,
     responses={200: SetupStepResponseSerializer},
 )
-class CompleteTeachersSetupView(APIView):
+class CompleteTeachersSetupView(SchoolScopedAPIView):
     def post(self, request):
-        result = complete_teachers_setup(request.user.school)
+        result = complete_teachers_setup(self.school)
         return Response(SetupStepResponseSerializer(result).data)

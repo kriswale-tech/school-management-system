@@ -73,7 +73,11 @@ const VerifyOTPPage = () => {
       onSuccess: (user) => {
         setUser(user)
         clearVerificationPhone()
-        toast.success(successMessage)
+        toast.success(
+          user.requires_school_selection
+            ? 'Verified. Select a school to continue.'
+            : successMessage,
+        )
       },
       onError: (mutationError) => {
         toast.error(getApiErrorMessage(mutationError, 'Unable to verify code. Please try again.'))

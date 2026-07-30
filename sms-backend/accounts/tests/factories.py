@@ -1,4 +1,4 @@
-from accounts.models import PhoneOtp, User
+from accounts.models import PhoneOtp, SchoolMembership, User
 from schools.models import School
 
 PHONE = '+233244567890'
@@ -31,20 +31,45 @@ def create_user(
     is_active=False,
     first_name='Kofi',
     last_name='Mensah',
+    membership_is_active=True,
 ):
+    """Create a person with access to one school.
+
+    is_active is identity-level (phone verified), membership_is_active is
+    school-level access; an unverified signup still owns their new school.
+    """
     school = school or create_school(phone_number=phone_number)
     user = User.objects.create(
         phone_number=phone_number,
         email=email,
         first_name=first_name,
         last_name=last_name,
-        school=school,
-        role=role,
         is_active=is_active,
     )
     user.set_unusable_password()
     user.save(update_fields=['password'])
+    create_membership(user, school, role=role, is_active=membership_is_active)
     return user
+
+
+def create_membership(user, school, role=User.RoleChoices.ADMIN, is_active=True):
+    return SchoolMembership.objects.create(
+        user=user,
+        school=school,
+        role=role,
+        is_active=is_active,
+    )
+
+
+def get_membership(user, school=None) -> SchoolMembership:
+    queryset = SchoolMembership.objects.select_related('school').filter(user=user)
+    if school is not None:
+        queryset = queryset.filter(school=school)
+    return queryset.first()
+
+
+def user_school(user, school=None) -> School:
+    return get_membership(user, school).school
 
 
 def create_phone_otp(
@@ -69,11 +94,14 @@ def create_phone_otp(
     )
 
 
-def set_client_auth_cookies(client, user):
+def set_client_auth_cookies(client, user, school=None, scoped=True):
+    """Authenticate a test client, scoped to a school unless scoped=False."""
     from django.conf import settings
-    from rest_framework_simplejwt.tokens import RefreshToken
 
-    refresh = RefreshToken.for_user(user)
+    from accounts.tokens import build_token
+
+    membership = get_membership(user, school) if scoped else None
+    refresh = build_token(user, membership)
     client.cookies[settings.SIMPLE_JWT['AUTH_COOKIE']] = str(refresh.access_token)
     client.cookies[settings.SIMPLE_JWT['AUTH_COOKIE_REFRESH']] = str(refresh)
     return refresh

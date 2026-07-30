@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { AppToaster, AuthLoading } from '@/components/shared'
 import { useAuth } from '@/features/auth/hooks'
@@ -10,12 +10,12 @@ import { getSetup } from '@/features/setup/services/services'
 const SetupLayout = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { isReady, isAuthenticated } = useAuth({ requireAuth: true })
+  const { isReady, isAuthenticated, user } = useAuth({ requireAuth: true })
 
   const { data: setup, isLoading } = useQuery({
     queryKey: ['setup'],
     queryFn: getSetup,
-    enabled: isReady && isAuthenticated,
+    enabled: isReady && isAuthenticated && !user?.requires_school_selection,
   })
 
   const urlStep = location.pathname.replace(/^\/setup\/?/, '').split('/')[0] || null
@@ -30,7 +30,20 @@ const SetupLayout = () => {
     }
   }, [setup, urlStep, navigate])
 
-  if (!isReady || !isAuthenticated || isLoading || !setup) {
+  if (!isReady || !isAuthenticated) {
+    return (
+      <>
+        <AppToaster />
+        <AuthLoading />
+      </>
+    )
+  }
+
+  if (user?.requires_school_selection) {
+    return <Navigate to="/auth/select-school" replace />
+  }
+
+  if (isLoading || !setup) {
     return (
       <>
         <AppToaster />

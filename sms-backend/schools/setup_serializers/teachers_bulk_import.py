@@ -15,6 +15,9 @@ class TeacherBulkImportPreviewSummarySerializer(serializers.Serializer):
     rows_with_warnings = serializers.IntegerField()
     teachers_to_create = serializers.IntegerField()
     teachers_to_update = serializers.IntegerField()
+    teachers_to_link = serializers.IntegerField(
+        help_text='Teachers already in the system who will be given access to this school.',
+    )
     assignments_to_create = serializers.IntegerField()
     assignments_to_replace = serializers.IntegerField()
 
@@ -26,6 +29,9 @@ class TeacherBulkImportConfirmSummarySerializer(serializers.Serializer):
     rows_failed = serializers.IntegerField()
     teachers_created = serializers.IntegerField()
     teachers_updated = serializers.IntegerField()
+    teachers_linked = serializers.IntegerField(
+        help_text='Teachers already in the system who were given access to this school.',
+    )
     assignments_created = serializers.IntegerField()
     assignments_replaced = serializers.IntegerField()
 

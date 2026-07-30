@@ -3,6 +3,7 @@ from django.urls import path
 from accounts.views import (
     AdminSignUpView,
     AdminVerifyOtpView,
+    CreateSchoolView,
     LoginVerifyOtpView,
     LoginView,
     LogoutView,
@@ -10,12 +11,15 @@ from accounts.views import (
     RefreshTokenView,
     ResendLoginOtpView,
     ResendOtpView,
+    SelectSchoolView,
     UserDetailView,
     UserListCreateView,
 )
 
 urlpatterns = [
     path('me/', MeView.as_view(), name='me'),
+    path('schools/', CreateSchoolView.as_view(), name='create-school'),
+    path('select-school/', SelectSchoolView.as_view(), name='select-school'),
     path('signup/', AdminSignUpView.as_view(), name='admin-signup'),
     path('verify-otp/', AdminVerifyOtpView.as_view(), name='admin-verify-otp'),
     path('resend-otp/', ResendOtpView.as_view(), name='resend-otp'),

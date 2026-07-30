@@ -16,6 +16,10 @@ const AppLayout = () => {
     )
   }
 
+  if (user?.requires_school_selection) {
+    return <Navigate to="/auth/select-school" replace />
+  }
+
   if (user && !user.school_setup_completed) {
     return <Navigate to="/setup" replace />
   }

@@ -54,6 +54,10 @@ db.sqlite3-journal
 media/
 staticfiles/
 
+# Database dumps (contain real data)
+backups/
+*.sql
+
 # Environment files
 .env
 .env.*
