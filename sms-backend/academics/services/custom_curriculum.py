@@ -258,8 +258,9 @@ def delete_custom_subject(subject):
 
 
 def stream_has_associations(stream):
-    """Reserved for ClassEnrollment once that model is wired."""
-    return False
+    from students.models import ClassEnrollment
+
+    return ClassEnrollment.objects.filter(stream=stream).exists()
 
 
 def create_stream(school, *, class_level, name, description=None):

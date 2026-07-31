@@ -1,8 +1,11 @@
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.response import Response
 
 from academics.models import ClassLevel, Level
+from academics.serializers import AllClassesSerializer
+from academics.services.all_classes import get_all_classes
 from shared.views import SchoolScopedAPIView
+from students.services import resolve_term
 
 
 class ActiveLevelListSerializerMixin:
@@ -19,8 +22,9 @@ class ActiveLevelListSerializerMixin:
 
 
 @extend_schema(
+    tags=['Academics'],
     summary='List active levels',
-    description='Returns active levels for the authenticated user\'s school.',
+    description="Returns active levels for the authenticated user's school.",
     responses={
         200: {
             'type': 'array',
@@ -45,8 +49,9 @@ class ActiveLevelListView(SchoolScopedAPIView, ActiveLevelListSerializerMixin):
 
 
 @extend_schema(
+    tags=['Academics'],
     summary='List active class levels',
-    description='Returns active classes for the authenticated user\'s school.',
+    description="Returns active classes for the authenticated user's school.",
     responses={
         200: {
             'type': 'array',
@@ -81,3 +86,32 @@ class ActiveClassLevelListView(SchoolScopedAPIView):
             }
             for class_level in class_levels
         ])
+
+
+@extend_schema(
+    tags=['Academics'],
+    summary='All classes for assignment',
+    description=(
+        'Returns active levels with flat selectable class entries. '
+        'Each entry id is a stream UUID for enrollment. Named streams are listed '
+        'as separate entries; classes with only a default stream expose that '
+        'default using the class display name. student_count is for the active '
+        'term (or optional term query param).'
+    ),
+    parameters=[
+        OpenApiParameter(
+            name='term',
+            type=str,
+            description='Optional term UUID. Defaults to the school active term.',
+        ),
+    ],
+    responses={200: AllClassesSerializer},
+)
+class AllClassesView(SchoolScopedAPIView):
+    def get(self, request):
+        term = resolve_term(
+            self.school,
+            request.query_params.get('term'),
+        )
+        payload = get_all_classes(school=self.school, term=term)
+        return Response(AllClassesSerializer(payload).data)

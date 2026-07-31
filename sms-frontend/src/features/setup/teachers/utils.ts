@@ -5,7 +5,6 @@ import type {
   LevelWithRelatedClassesAndSubjects,
   StreamForSetup,
 } from '@/features/setup/classes-and-subjects/types'
-import type { Staff } from '@/features/staff/types'
 import { getStaffProfileImage, mapStaffToFormData } from '@/features/staff/utils'
 import type {
   ClassTeacherAssignment,
@@ -30,7 +29,7 @@ export const getTeacherProfileImage = (teacher: Pick<Teacher, 'profile'>) =>
   getStaffProfileImage(teacher)
 
 export const mapTeacherToFormData = (teacher: Teacher): TeacherFormData =>
-  mapStaffToFormData(teacher as Staff)
+  mapStaffToFormData(teacher)
 
 export const buildClassOptions = (
   levels: LevelWithRelatedClassesAndSubjects,

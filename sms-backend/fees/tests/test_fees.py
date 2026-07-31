@@ -14,7 +14,7 @@ from fees.services import (
     publish_fee_structure,
 )
 from schools.models import AcademicYear, Term
-from students.models import ClassEnrollment, Student
+from students.tests.factories import create_student, enroll_student
 
 
 class FeeStructureTests(TestCase):
@@ -54,12 +54,13 @@ class FeeStructureTests(TestCase):
             name='JHS 1',
             is_system_generated=False,
         )
-        self.student = Student.objects.create(
+        self.student = create_student(
             school=self.school,
+            student_id='STU-100',
             first_name='Ama',
             last_name='Mensah',
         )
-        ClassEnrollment.objects.create(
+        enroll_student(
             student=self.student,
             term=self.first_term,
             class_level=self.class_level,
@@ -146,12 +147,13 @@ class FeeStructureTests(TestCase):
         self.assertEqual(len(balance['payments']), 1)
 
     def test_new_student_fee_item_only_applies_to_new_students(self):
-        continuing_student = Student.objects.create(
+        continuing_student = create_student(
             school=self.school,
+            student_id='STU-101',
             first_name='Kofi',
             last_name='Boateng',
         )
-        ClassEnrollment.objects.create(
+        enroll_student(
             student=continuing_student,
             term=self.first_term,
             class_level=self.class_level,

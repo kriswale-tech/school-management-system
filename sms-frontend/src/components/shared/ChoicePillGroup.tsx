@@ -2,44 +2,57 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { mergeClasses } from '@/utils'
 
-export type ChoiceOption = {
+export type ChoiceValue = string | boolean
+
+export type ChoiceOption<T extends ChoiceValue = string> = {
   label: string
-  value: string
+  value: T
 }
 
-export type ChoiceItem =
-  | { label: string; value: string; options?: never }
-  | { label: string; value?: never; options: ChoiceOption[] }
+export type ChoiceItem<T extends ChoiceValue = string> =
+  | { label: string; value: T; options?: never }
+  | { label: string; value?: never; options: ChoiceOption<T>[] }
 
-export type ChoicePillGroupProps = {
-  items: ChoiceItem[]
-  value: string | null
-  onChange: (value: string) => void
+export type ChoicePillGroupProps<T extends ChoiceValue = string> = {
+  items: ChoiceItem<T>[]
+  value: T | null
+  onChange: (value: T) => void
   name?: string
   className?: string
 }
 
-const hasOptions = (item: ChoiceItem): item is Extract<ChoiceItem, { options: ChoiceOption[] }> =>
+const hasOptions = <T extends ChoiceValue>(
+  item: ChoiceItem<T>,
+): item is Extract<ChoiceItem<T>, { options: ChoiceOption<T>[] }> =>
   Array.isArray(item.options) && item.options.length > 0
 
-const getSelectedNestedOption = (item: ChoiceItem, value: string | null) => {
-  if (!value || !hasOptions(item)) return null
+const getSelectedNestedOption = <T extends ChoiceValue>(
+  item: ChoiceItem<T>,
+  value: T | null,
+) => {
+  if (value === null || !hasOptions(item)) return null
   return item.options.find((option) => option.value === value) ?? null
 }
 
-const isItemSelected = (item: ChoiceItem, value: string | null) => {
-  if (!value) return false
+const isItemSelected = <T extends ChoiceValue>(item: ChoiceItem<T>, value: T | null) => {
+  if (value === null) return false
   if (hasOptions(item)) return item.options.some((option) => option.value === value)
   return item.value === value
 }
 
-const getButtonLabel = (item: ChoiceItem, value: string | null) => {
+const getButtonLabel = <T extends ChoiceValue>(item: ChoiceItem<T>, value: T | null) => {
   const selectedOption = getSelectedNestedOption(item, value)
   if (selectedOption) return `${item.label} - ${selectedOption.label}`
   return item.label
 }
 
-const ChoicePillGroup = ({ items, value, onChange, name, className }: ChoicePillGroupProps) => {
+function ChoicePillGroup<T extends ChoiceValue = string>({
+  items,
+  value,
+  onChange,
+  name,
+  className,
+}: ChoicePillGroupProps<T>) {
   const groupId = useId()
   const [openIndex, setOpenIndex] = useState<number | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -82,7 +95,7 @@ const ChoicePillGroup = ({ items, value, onChange, name, className }: ChoicePill
         if (!nested) {
           return (
             <button
-              key={item.value}
+              key={String(item.value)}
               type="button"
               role="radio"
               aria-checked={selected}
@@ -134,7 +147,7 @@ const ChoicePillGroup = ({ items, value, onChange, name, className }: ChoicePill
                   const optionSelected = value === option.value
                   return (
                     <button
-                      key={option.value}
+                      key={String(option.value)}
                       type="button"
                       role="option"
                       aria-selected={optionSelected}

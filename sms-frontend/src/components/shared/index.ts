@@ -24,7 +24,7 @@ export {
   TableSkeleton,
   TableWrapper,
 }
-export type { ChoiceItem, ChoiceOption, ChoicePillGroupProps } from './ChoicePillGroup'
+export type { ChoiceItem, ChoiceOption, ChoicePillGroupProps, ChoiceValue } from './ChoicePillGroup'
 export type { EmptyStateProps } from './EmptyState'
 export type { ImageUploadProps } from './ImageUpload'
 export type {

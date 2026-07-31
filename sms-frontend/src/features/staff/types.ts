@@ -49,6 +49,17 @@ export interface Staff {
     membership_id?: string
 }
 
+/** Minimal shape needed to edit a staff/teacher user in shared modals/forms. */
+export type EditableStaffUser = {
+  id: string
+  role: string
+  first_name: string
+  last_name: string
+  phone_number: string
+  email: string | null
+  profile: StaffProfile
+}
+
 /** PATCH /accounts/users/{id}/ — id may differ from the URL when linking an existing person. */
 export interface UpdateStaffResponse {
   user: Staff

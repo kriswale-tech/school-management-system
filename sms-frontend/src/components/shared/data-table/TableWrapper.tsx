@@ -22,7 +22,7 @@ export type TableWrapperProps = {
 
 const variantClasses: Record<TableWrapperVariant, string> = {
   'form-field': 'form-field-wrapper overflow-x-auto py-5 bg-slate-50',
-  card: 'form-field-wrapper overflow-x-auto py-5 bg-white',
+  card: 'form-field-wrapper overflow-x-auto py-5 bg-white rounded-none border-none custom-shadow-md',
 }
 
 const TableWrapper = ({

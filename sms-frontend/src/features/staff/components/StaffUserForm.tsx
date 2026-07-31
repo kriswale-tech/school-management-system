@@ -2,7 +2,7 @@ import { Button, FormLabel, InputField, SelectField } from '@/components/ui'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
-import { GENDER_OPTIONS, type Staff, type StaffFormData } from '../types'
+import { GENDER_OPTIONS, type EditableStaffUser, type StaffFormData } from '../types'
 import { mapStaffToFormData } from '../utils'
 
 const ghanaPhoneSchema = z.string().regex(/^(\+233|0)[0-9]{9}$/, 'Invalid Ghana phone number')
@@ -37,7 +37,7 @@ type StaffUserFormProps = {
   onSubmit: (payload: StaffUserFormSubmitPayload) => void
   onCancel: () => void
   isSubmitting?: boolean
-  user?: Staff | null
+  user?: EditableStaffUser | null
   submitLabel?: string
 }
 

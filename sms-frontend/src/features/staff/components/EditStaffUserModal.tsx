@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ImageUpload } from '@/components/shared'
 import { Modal } from '@/components/ui'
 import { getApiErrorMessage } from '@/utils'
 import { updateStaff } from '../services'
-import type { Staff } from '../types'
+import type { EditableStaffUser } from '../types'
 import {
   buildStaffUpdateFormData,
   formatStaffRole,
@@ -15,7 +15,7 @@ import StaffUserForm from './StaffUserForm'
 
 type EditStaffUserModalProps = {
   open: boolean
-  user: Staff | null
+  user: EditableStaffUser | null
   onClose: () => void
   title?: string
   successMessage?: string
@@ -23,29 +23,32 @@ type EditStaffUserModalProps = {
   previewAlt?: string
 }
 
-const EditStaffUserModal = ({
-  open,
+type EditStaffUserModalContentProps = {
+  user: EditableStaffUser
+  title?: string
+  successMessage?: string
+  invalidateQueryKey: string
+  previewAlt: string
+  onClose: () => void
+}
+
+const EditStaffUserModalContent = ({
   user,
-  onClose,
   title,
   successMessage,
   invalidateQueryKey,
-  previewAlt = 'Profile photo preview',
-}: EditStaffUserModalProps) => {
+  previewAlt,
+  onClose,
+}: EditStaffUserModalContentProps) => {
   const queryClient = useQueryClient()
   const photoFileRef = useRef<File | null>(null)
   const [photoChanged, setPhotoChanged] = useState(false)
 
-  const modalTitle = title ?? (user ? `Edit ${formatStaffRole(user.role)}` : 'Edit User')
-  const savedMessage = successMessage ?? `${user ? formatStaffRole(user.role) : 'User'} updated`
-
-  useEffect(() => {
-    photoFileRef.current = null
-    setPhotoChanged(false)
-  }, [user?.id])
+  const modalTitle = title ?? `Edit ${formatStaffRole(user.role)}`
+  const savedMessage = successMessage ?? `${formatStaffRole(user.role)} updated`
 
   const { mutate: saveUser, isPending } = useMutation({
-    mutationFn: (payload: FormData) => updateStaff(user!.id, payload),
+    mutationFn: (payload: FormData) => updateStaff(user.id, payload),
     onSuccess: (response) => {
       toast.success(
         response.linked_existing_user
@@ -67,8 +70,6 @@ const EditStaffUserModal = ({
     data: Parameters<typeof buildStaffUpdateFormData>[0]
     dirtyFields: Partial<Record<keyof typeof data, boolean>>
   }) => {
-    if (!user) return
-
     const includeProfilePicture = photoChanged && Boolean(photoFileRef.current)
 
     if (!hasStaffUpdateChanges(dirtyFields, includeProfilePicture)) {
@@ -91,11 +92,9 @@ const EditStaffUserModal = ({
     onClose()
   }
 
-  if (!open || !user) return null
-
   return (
-    <Modal open={open} title={modalTitle} onClose={handleClose} scrollable className="max-w-4xl">
-      <div key={user.id} className="space-y-6">
+    <Modal open title={modalTitle} onClose={handleClose} scrollable className="max-w-4xl">
+      <div className="space-y-6">
         <ImageUpload
           label="Profile Photo"
           imageUrl={user.profile.profile_picture ?? undefined}
@@ -114,6 +113,30 @@ const EditStaffUserModal = ({
         />
       </div>
     </Modal>
+  )
+}
+
+const EditStaffUserModal = ({
+  open,
+  user,
+  onClose,
+  title,
+  successMessage,
+  invalidateQueryKey,
+  previewAlt = 'Profile photo preview',
+}: EditStaffUserModalProps) => {
+  if (!open || !user) return null
+
+  return (
+    <EditStaffUserModalContent
+      key={user.id}
+      user={user}
+      title={title}
+      successMessage={successMessage}
+      invalidateQueryKey={invalidateQueryKey}
+      previewAlt={previewAlt}
+      onClose={onClose}
+    />
   )
 }
 

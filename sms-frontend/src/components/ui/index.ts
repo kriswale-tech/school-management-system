@@ -2,6 +2,7 @@ import FormLabel from './FormLabel'
 import CheckboxField from './CheckboxField'
 import InputField from './InputField'
 import SelectField from './SelectField'
+import SearchAndSelect from './SearchAndSelect'
 import OTPInput from './OTPInput'
 import Button from './Button'
 import AvatarComponent from './AvatarComponent'
@@ -14,6 +15,7 @@ export {
   FormLabel,
   InputField,
   SelectField,
+  SearchAndSelect,
   OTPInput,
   CheckboxField,
   Button,

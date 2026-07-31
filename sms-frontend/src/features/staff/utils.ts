@@ -1,4 +1,4 @@
-import type { Staff, StaffFormData, StaffGender } from './types'
+import type { StaffFormData, StaffGender, StaffProfile } from './types'
 
 type BuildStaffFormDataOptions = {
   role: string
@@ -74,10 +74,16 @@ export const hasStaffUpdateChanges = (
   includeProfilePicture: boolean,
 ) => Object.values(dirtyFields).some(Boolean) || includeProfilePicture
 
-export const getStaffProfileImage = (staff: Pick<Staff, 'profile'>) =>
+export const getStaffProfileImage = (staff: { profile: Pick<StaffProfile, 'profile_picture'> }) =>
   staff.profile.profile_picture ?? DEFAULT_PROFILE_IMAGE
 
-export const mapStaffToFormData = (staff: Staff): StaffFormData => {
+export const mapStaffToFormData = (staff: {
+  first_name: string
+  last_name: string
+  phone_number: string
+  email: string | null
+  profile: Pick<StaffProfile, 'gender' | 'phone_number_alt' | 'date_of_birth' | 'address'>
+}): StaffFormData => {
   const gender = staff.profile.gender
 
   return {

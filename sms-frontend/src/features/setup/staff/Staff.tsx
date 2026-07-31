@@ -14,7 +14,7 @@ const STAFF_ROLES = [
   {
     title: 'Admin',
     description: 'Full access to all school operations and management.',
-    image: '/icons/staff.svg',
+    image: '/icons/admin.svg',
     value: 'admin',
   },
   {
