@@ -4,22 +4,36 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from core.pagination import StandardResultsSetPagination, paginated_schema
+from fees.services import get_student_current_year_fees, get_student_fee_history
 from shared.views import SchoolScopedAPIView
 from students.filters import ParentFilter, StudentEnrollmentFilter
 from students.serializers import (
+    GuardianCreateSerializer,
+    GuardianUpdateSerializer,
     ParentListSerializer,
+    StudentDetailSerializer,
+    StudentFeeHistorySerializer,
+    StudentGuardianSerializer,
     StudentListSerializer,
     StudentOnboardSerializer,
     StudentStatsSerializer,
+    StudentUpdateSerializer,
+    StudentYearFeesSerializer,
 )
 from students.services import (
+    add_student_guardian,
+    build_student_detail,
+    get_student,
     get_student_stats,
     list_enrollments_for_term,
     list_parents_for_school,
+    list_student_guardians,
     onboard_student,
+    remove_student_guardian,
     resolve_term,
+    update_student,
+    update_student_guardian,
 )
-
 
 class StudentListView(SchoolScopedAPIView):
     pagination_class = StandardResultsSetPagination
@@ -151,3 +165,152 @@ class StudentStatsView(SchoolScopedAPIView):
         term = resolve_term(self.school, request.query_params.get('term'))
         stats = get_student_stats(school=self.school, term=term)
         return Response(StudentStatsSerializer(stats).data)
+
+
+class StudentDetailView(SchoolScopedAPIView):
+    @extend_schema(
+        tags=['Students'],
+        summary='Get student detail',
+        description=(
+            'Returns full student profile for the selected school, including age, '
+            'active-term class assignment, is_active, is_new_student, and guardians.'
+        ),
+        responses={200: StudentDetailSerializer},
+    )
+    def get(self, request, student_id):
+        student = get_student(school=self.school, student_id=student_id)
+        detail = build_student_detail(school=self.school, student=student)
+        return Response(StudentDetailSerializer(detail).data)
+
+    @extend_schema(
+        tags=['Students'],
+        summary='Update student profile',
+        description=(
+            'Partially updates editable student profile fields. '
+            'student_id, age, is_new_student, and class assignment are not editable here.'
+        ),
+        request=StudentUpdateSerializer,
+        responses={200: StudentDetailSerializer},
+    )
+    def patch(self, request, student_id):
+        serializer = StudentUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        detail = update_student(
+            school=self.school,
+            student_id=student_id,
+            **serializer.validated_data,
+        )
+        return Response(StudentDetailSerializer(detail).data)
+
+
+class StudentGuardianListCreateView(SchoolScopedAPIView):
+    @extend_schema(
+        tags=['Students'],
+        summary='List student guardians',
+        responses={200: StudentGuardianSerializer(many=True)},
+    )
+    def get(self, request, student_id):
+        guardians = list_student_guardians(school=self.school, student_id=student_id)
+        return Response(StudentGuardianSerializer(guardians, many=True).data)
+
+    @extend_schema(
+        tags=['Students'],
+        summary='Add student guardian',
+        request=GuardianCreateSerializer,
+        responses={201: StudentGuardianSerializer},
+    )
+    def post(self, request, student_id):
+        serializer = GuardianCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        guardian = add_student_guardian(
+            school=self.school,
+            student_id=student_id,
+            guardian=serializer.validated_data,
+        )
+        return Response(
+            StudentGuardianSerializer(guardian).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class StudentGuardianDetailView(SchoolScopedAPIView):
+    @extend_schema(
+        tags=['Students'],
+        summary='Update student guardian',
+        description=(
+            'Updates the guardian association and/or shared parent contact fields '
+            'within this school. Use is_primary=true to promote this guardian.'
+        ),
+        request=GuardianUpdateSerializer,
+        responses={200: StudentGuardianSerializer},
+    )
+    def patch(self, request, student_id, link_id):
+        serializer = GuardianUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        guardian = update_student_guardian(
+            school=self.school,
+            student_id=student_id,
+            link_id=link_id,
+            **serializer.validated_data,
+        )
+        return Response(StudentGuardianSerializer(guardian).data)
+
+    @extend_schema(
+        tags=['Students'],
+        summary='Remove student guardian association',
+        description=(
+            'Removes the StudentParent link only. Cannot remove the last guardian. '
+            'If the primary is removed, another guardian is silently promoted.'
+        ),
+        responses={204: None},
+    )
+    def delete(self, request, student_id, link_id):
+        remove_student_guardian(
+            school=self.school,
+            student_id=student_id,
+            link_id=link_id,
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class StudentCurrentYearFeesView(SchoolScopedAPIView):
+    @extend_schema(
+        tags=['Students'],
+        summary='Current academic year fees',
+        description=(
+            'Returns fee breakdown for the active academic year: year paid/total, '
+            'per-term paid/total, and billed fee items for each term.'
+        ),
+        responses={200: StudentYearFeesSerializer},
+    )
+    def get(self, request, student_id):
+        student = get_student(school=self.school, student_id=student_id)
+        data = get_student_current_year_fees(school=self.school, student=student)
+        return Response(StudentYearFeesSerializer(data).data)
+
+
+class StudentFeeHistoryView(SchoolScopedAPIView):
+    @extend_schema(
+        tags=['Students'],
+        summary='Student fee history',
+        description=(
+            'Returns academic years that have fee or payment data for this student. '
+            'Optionally filter to a single academic year UUID.'
+        ),
+        parameters=[
+            OpenApiParameter(
+                name='academic_year',
+                type=str,
+                description='Optional academic year UUID. Only years with data are returned.',
+            ),
+        ],
+        responses={200: StudentFeeHistorySerializer},
+    )
+    def get(self, request, student_id):
+        student = get_student(school=self.school, student_id=student_id)
+        data = get_student_fee_history(
+            school=self.school,
+            student=student,
+            academic_year_id=request.query_params.get('academic_year'),
+        )
+        return Response(StudentFeeHistorySerializer(data).data)

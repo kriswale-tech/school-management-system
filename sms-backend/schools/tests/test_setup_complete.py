@@ -1,3 +1,4 @@
+from decimal import Decimal
 from unittest.mock import patch
 
 from django.urls import reverse
@@ -5,7 +6,9 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APITestCase
 
+from academics.models import ClassLevel, Level
 from accounts.tests.factories import create_user, set_client_auth_cookies, user_school
+from fees.models import FeeItem, FeeStructure, StudentFee
 from schools.models import AcademicYear, SchoolSetup, Term
 from schools.services.setup import (
     REQUIRED_SETUP_STEPS,
@@ -14,6 +17,7 @@ from schools.services.setup import (
     validate_setup_ready,
 )
 from schools.tests.factories import create_school_setup
+from students.tests.factories import create_student, enroll_student, ensure_default_stream
 
 
 class AdvanceSetupStepTests(APITestCase):
@@ -100,13 +104,15 @@ class CompleteSchoolSetupServiceTests(APITestCase):
             current_step=SchoolSetup.SetupStep.STAFF,
         )
 
+    @patch('schools.services.fees.apply_active_term_fees')
     @patch('schools.services.setup.validate_setup_ready')
-    def test_marks_school_setup_complete(self, mock_validate):
+    def test_marks_school_setup_complete(self, mock_validate, mock_apply_fees):
         result = complete_school_setup(self.school)
 
         self.school.refresh_from_db()
         self.school_setup.refresh_from_db()
         mock_validate.assert_called_once_with(self.school, self.school_setup)
+        mock_apply_fees.assert_called_once_with(self.school)
         self.assertTrue(result['is_complete'])
         self.assertEqual(result['next_step'], SchoolSetup.SetupStep.COMPLETED)
         self.assertEqual(result['progress_percentage'], 100)
@@ -123,6 +129,71 @@ class CompleteSchoolSetupServiceTests(APITestCase):
 
         with self.assertRaises(ValidationError):
             complete_school_setup(self.school)
+
+    @patch('schools.services.setup.validate_setup_ready')
+    def test_applies_active_term_fees_on_complete(self, mock_validate):
+        academic_year = AcademicYear.objects.create(
+            school=self.school,
+            academic_year='2025/2026',
+            start_date='2025-09-01',
+            end_date='2026-07-31',
+            is_active=True,
+        )
+        term = Term.objects.create(
+            school=self.school,
+            academic_year=academic_year,
+            term=Term.TermChoices.FIRST_TERM,
+            start_date='2025-09-01',
+            end_date='2025-12-15',
+            is_active=True,
+        )
+        level = Level.objects.create(
+            school=self.school,
+            name='Junior High',
+            is_system_generated=False,
+        )
+        class_level = ClassLevel.objects.create(
+            school=self.school,
+            level=level,
+            name='JHS 1',
+            is_system_generated=False,
+        )
+        stream = ensure_default_stream(class_level)
+        student = create_student(
+            school=self.school,
+            student_id='TA-0001',
+            first_name='Ama',
+            last_name='Mensah',
+        )
+        enroll_student(
+            student=student,
+            term=term,
+            stream=stream,
+            is_new_student=True,
+        )
+
+        structure = FeeStructure.objects.create(
+            school=self.school,
+            term=term,
+            created_by=self.user,
+        )
+        FeeItem.objects.create(
+            fee_structure=structure,
+            name='Tuition Fee',
+            amount=Decimal('500.00'),
+            applies_to_type=FeeItem.AppliesToType.SCHOOL,
+            student_type=FeeItem.StudentType.ALL_STUDENTS,
+        )
+
+        complete_school_setup(self.school)
+
+        structure.refresh_from_db()
+        self.assertEqual(structure.status, FeeStructure.Status.APPLIED)
+        self.assertEqual(StudentFee.objects.filter(student=student).count(), 1)
+        self.assertEqual(
+            StudentFee.objects.get(student=student).amount,
+            Decimal('500.00'),
+        )
 
 
 class CompleteSetupViewTests(APITestCase):

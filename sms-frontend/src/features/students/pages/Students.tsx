@@ -12,13 +12,14 @@ import { getStudentStats, getStudents } from '../services'
 import type { StudentQueryParams } from '../types'
 import SideSlider from '@/components/shared/SideSlider'
 import StudentOnboarding from '../components/student-onboarding/StudentOnboarding'
+import { useNavigate } from 'react-router-dom'
 
 const Students = () => {
   const [search, setSearch] = useState('')
   const [classLevel, setClassLevel] = useState<FilterSelection>('')
   const [page, setPage] = useState(1)
   const [open, setOpen] = useState(false)
-
+  const navigate = useNavigate()
   const queryParams: StudentQueryParams = {
     page,
     search: search || undefined,
@@ -86,6 +87,9 @@ const Students = () => {
         isLoading={isLoading}
         pagination={data ?? null}
         onPageChange={setPage}
+        onViewStudent={(student) => {
+          navigate(`/students/${student.id}`)
+        }}
       />
 
       <SideSlider open={open} title="Student Onboarding" onClose={() => setOpen(false)}>

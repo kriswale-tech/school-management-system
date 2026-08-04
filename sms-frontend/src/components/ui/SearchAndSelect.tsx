@@ -1,4 +1,11 @@
-import { forwardRef, useEffect, useId, useRef, useState, type MouseEvent } from 'react'
+import {
+  forwardRef,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from 'react'
 import { Icon } from '@iconify/react'
 import { mergeClasses } from '@/utils'
 
@@ -134,7 +141,7 @@ const SearchAndSelect = forwardRef<HTMLButtonElement, SearchAndSelectProps>(
       onBlur?.()
     }
 
-    const clearSelection = (event: MouseEvent) => {
+    const clearSelection = (event: ReactMouseEvent) => {
       event.stopPropagation()
       if (props.multiple) {
         props.onChange([])
@@ -143,7 +150,7 @@ const SearchAndSelect = forwardRef<HTMLButtonElement, SearchAndSelectProps>(
       }
     }
 
-    const removeChip = (event: MouseEvent, optionValue: string) => {
+    const removeChip = (event: ReactMouseEvent, optionValue: string) => {
       event.stopPropagation()
       if (!props.multiple) return
       props.onChange(props.value.filter((item) => item !== optionValue))

@@ -144,3 +144,121 @@ class StudentOnboardSerializer(serializers.Serializer):
     guardians = GuardianInputSerializer(many=True, min_length=1)
     stream_id = serializers.UUIDField()
     is_new_student = serializers.BooleanField()
+
+
+class StudentClassAssignmentSerializer(serializers.Serializer):
+    id = serializers.UUIDField(help_text='Stream UUID used for enrollment.')
+    class_level_id = serializers.UUIDField()
+    display_name = serializers.CharField()
+    is_default = serializers.BooleanField()
+
+
+class StudentGuardianSerializer(serializers.Serializer):
+    id = serializers.UUIDField(help_text='StudentParent link id.')
+    parent_id = serializers.UUIDField()
+    name = serializers.CharField()
+    phone_number = serializers.CharField()
+    phone_number_alt = serializers.CharField(allow_blank=True)
+    email = serializers.EmailField(allow_blank=True)
+    address = serializers.CharField(allow_blank=True)
+    relationship = serializers.CharField()
+    is_primary = serializers.BooleanField()
+    is_emergency_contact = serializers.BooleanField()
+
+
+class StudentDetailSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    student_id = serializers.CharField()
+    full_name = serializers.CharField()
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    other_names = serializers.CharField(allow_blank=True)
+    gender = serializers.CharField()
+    date_of_birth = serializers.DateField()
+    age = serializers.IntegerField()
+    admission_date = serializers.DateField()
+    address = serializers.CharField(allow_blank=True)
+    is_active = serializers.BooleanField()
+    is_new_student = serializers.BooleanField(allow_null=True)
+    class_assignment = StudentClassAssignmentSerializer(allow_null=True)
+    guardians = StudentGuardianSerializer(many=True)
+    term_id = serializers.UUIDField()
+
+
+class StudentUpdateSerializer(serializers.Serializer):
+    first_name = serializers.CharField(max_length=255, required=False)
+    last_name = serializers.CharField(max_length=255, required=False)
+    other_names = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_blank=True,
+    )
+    gender = serializers.ChoiceField(
+        choices=Student.GenderChoices.choices,
+        required=False,
+    )
+    date_of_birth = serializers.DateField(required=False)
+    admission_date = serializers.DateField(required=False)
+    address = serializers.CharField(required=False, allow_blank=True)
+
+
+class GuardianUpdateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255, required=False)
+    phone_number = serializers.CharField(max_length=15, required=False)
+    phone_number_alt = serializers.CharField(
+        max_length=15,
+        required=False,
+        allow_blank=True,
+    )
+    email = serializers.EmailField(required=False, allow_blank=True)
+    address = serializers.CharField(required=False, allow_blank=True)
+    relationship = serializers.ChoiceField(
+        choices=StudentParent.RelationshipChoices.choices,
+        required=False,
+    )
+    is_primary = serializers.BooleanField(required=False)
+    is_emergency_contact = serializers.BooleanField(required=False)
+
+
+class GuardianCreateSerializer(GuardianInputSerializer):
+    is_primary = serializers.BooleanField(required=False, default=False)
+    is_emergency_contact = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, attrs):
+        base = super().validate(attrs)
+        base['is_primary'] = attrs.get('is_primary', False)
+        base['is_emergency_contact'] = attrs.get('is_emergency_contact', False)
+        return base
+
+
+class StudentFeeItemSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    name = serializers.CharField()
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+
+class StudentTermFeesSerializer(serializers.Serializer):
+    term_id = serializers.UUIDField()
+    term = serializers.CharField()
+    term_name = serializers.CharField()
+    total_billed = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_paid = serializers.DecimalField(max_digits=12, decimal_places=2)
+    balance = serializers.DecimalField(max_digits=12, decimal_places=2)
+    payment_status = serializers.CharField()
+    fee_items = StudentFeeItemSerializer(many=True)
+
+
+class StudentYearFeesSerializer(serializers.Serializer):
+    student_id = serializers.UUIDField()
+    academic_year_id = serializers.UUIDField()
+    academic_year = serializers.CharField()
+    total_billed = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_paid = serializers.DecimalField(max_digits=12, decimal_places=2)
+    balance = serializers.DecimalField(max_digits=12, decimal_places=2)
+    payment_status = serializers.CharField()
+    terms = StudentTermFeesSerializer(many=True)
+
+
+class StudentFeeHistorySerializer(serializers.Serializer):
+    student_id = serializers.UUIDField()
+    years = StudentYearFeesSerializer(many=True)

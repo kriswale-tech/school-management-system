@@ -109,3 +109,114 @@ export type StudentOnboardPayload = {
   stream_id: string
   is_new_student: boolean
 }
+
+export type StudentClassAssignment = {
+  id: string
+  class_level_id: string
+  display_name: string
+  is_default: boolean
+}
+
+export type StudentGuardian = {
+  id: string
+  parent_id: string
+  name: string
+  phone_number: string
+  phone_number_alt: string
+  email: string
+  address: string
+  relationship: GuardianRelationship
+  is_primary: boolean
+  is_emergency_contact: boolean
+}
+
+export type StudentDetail = {
+  id: string
+  student_id: string
+  full_name: string
+  first_name: string
+  last_name: string
+  other_names: string
+  gender: StudentGender
+  date_of_birth: string
+  age: number
+  admission_date: string
+  address: string
+  is_active: boolean
+  is_new_student: boolean | null
+  class_assignment: StudentClassAssignment | null
+  guardians: StudentGuardian[]
+  term_id: string
+}
+
+export type StudentBioUpdatePayload = {
+  first_name?: string
+  last_name?: string
+  other_names?: string
+  gender?: StudentGender
+  date_of_birth?: string
+  admission_date?: string
+  address?: string
+}
+
+export type GuardianCreatePayload =
+  | {
+      parent_id: string
+      relationship: GuardianRelationship
+      is_primary?: boolean
+      is_emergency_contact?: boolean
+    }
+  | {
+      name: string
+      phone_number: string
+      email?: string
+      relationship: GuardianRelationship
+      is_primary?: boolean
+      is_emergency_contact?: boolean
+    }
+
+export type GuardianUpdatePayload = {
+  name?: string
+  phone_number?: string
+  phone_number_alt?: string
+  email?: string
+  address?: string
+  relationship?: GuardianRelationship
+  is_primary?: boolean
+  is_emergency_contact?: boolean
+}
+
+export type FeePaymentStatus = 'fully_paid' | 'partially_paid' | 'owing' | 'no_fees'
+
+export type StudentFeeItem = {
+  id: string
+  name: string
+  amount: string
+}
+
+export type StudentTermFees = {
+  term_id: string
+  term: string
+  term_name: string
+  total_billed: string
+  total_paid: string
+  balance: string
+  payment_status: FeePaymentStatus
+  fee_items: StudentFeeItem[]
+}
+
+export type StudentYearFees = {
+  student_id: string
+  academic_year_id: string
+  academic_year: string
+  total_billed: string
+  total_paid: string
+  balance: string
+  payment_status: FeePaymentStatus
+  terms: StudentTermFees[]
+}
+
+export type StudentFeeHistory = {
+  student_id: string
+  years: StudentYearFees[]
+}

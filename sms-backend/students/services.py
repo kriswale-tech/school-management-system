@@ -14,7 +14,7 @@ from django.db.models import (
     When,
 )
 from django.db.models.functions import Coalesce
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
 
 from academics.models import ClassStream
 from schools.models import Term
@@ -269,3 +269,265 @@ def onboard_student(
     )
 
     return get_enrollment_for_student(school=school, term=term, student=student)
+
+
+def get_student(*, school, student_id):
+    student = (
+        Student.objects.filter(school=school, id=student_id)
+        .prefetch_related(
+            Prefetch(
+                'parent_links',
+                queryset=StudentParent.objects.select_related('parent').order_by(
+                    '-is_primary',
+                    'created_at',
+                ),
+            ),
+        )
+        .first()
+    )
+    if student is None:
+        raise NotFound({'detail': 'Student not found in this school.'})
+    return student
+
+
+def get_student_active_enrollment(*, school, student, term=None):
+    term = term or get_active_term(school)
+    return (
+        ClassEnrollment.objects.filter(student=student, term=term)
+        .select_related('stream', 'class_level')
+        .first()
+    )
+
+
+def compute_age(date_of_birth, *, today=None):
+    from datetime import date as date_cls
+
+    today = today or date_cls.today()
+    years = today.year - date_of_birth.year
+    if (today.month, today.day) < (date_of_birth.month, date_of_birth.day):
+        years -= 1
+    return years
+
+
+def build_student_detail(*, school, student, term=None):
+    term = term or get_active_term(school)
+    enrollment = get_student_active_enrollment(school=school, student=student, term=term)
+
+    class_payload = None
+    is_new_student = None
+    if enrollment is not None:
+        stream = enrollment.stream
+        class_payload = {
+            'id': stream.id,
+            'class_level_id': enrollment.class_level_id,
+            'display_name': (
+                enrollment.class_level.name
+                if stream.is_default
+                else stream.full_name
+            ),
+            'is_default': stream.is_default,
+        }
+        is_new_student = enrollment.is_new_student
+
+    guardians = [
+        {
+            'id': link.id,
+            'parent_id': link.parent_id,
+            'name': link.parent.name,
+            'phone_number': link.parent.phone_number,
+            'phone_number_alt': link.parent.phone_number_alt,
+            'email': link.parent.email,
+            'address': link.parent.address,
+            'relationship': link.relationship,
+            'is_primary': link.is_primary,
+            'is_emergency_contact': link.is_emergency_contact,
+        }
+        for link in student.parent_links.all()
+    ]
+
+    other = (student.other_names or '').strip()
+    full_name = f'{student.first_name} {other} {student.last_name}'.replace('  ', ' ').strip()
+    if not other:
+        full_name = f'{student.first_name} {student.last_name}'
+
+    return {
+        'id': student.id,
+        'student_id': student.student_id,
+        'full_name': full_name,
+        'first_name': student.first_name,
+        'last_name': student.last_name,
+        'other_names': student.other_names,
+        'gender': student.gender,
+        'date_of_birth': student.date_of_birth,
+        'age': compute_age(student.date_of_birth),
+        'admission_date': student.admission_date,
+        'address': student.address,
+        'is_active': student.is_active,
+        'is_new_student': is_new_student,
+        'class_assignment': class_payload,
+        'guardians': guardians,
+        'term_id': term.id,
+    }
+
+
+@transaction.atomic
+def update_student(*, school, student_id, **fields):
+    student = get_student(school=school, student_id=student_id)
+    allowed = {
+        'first_name',
+        'last_name',
+        'other_names',
+        'gender',
+        'date_of_birth',
+        'admission_date',
+        'address',
+    }
+    updates = []
+    for key, value in fields.items():
+        if key not in allowed:
+            continue
+        if key in ('first_name', 'last_name', 'other_names', 'address') and isinstance(value, str):
+            value = value.strip()
+        setattr(student, key, value)
+        updates.append(key)
+    if updates:
+        student.save(update_fields=[*updates, 'updated_at'])
+    return build_student_detail(
+        school=school,
+        student=get_student(school=school, student_id=student.id),
+    )
+
+
+def list_student_guardians(*, school, student_id):
+    student = get_student(school=school, student_id=student_id)
+    return build_student_detail(school=school, student=student)['guardians']
+
+
+def _get_student_parent_link(*, school, student_id, link_id):
+    link = (
+        StudentParent.objects.select_related('parent', 'student')
+        .filter(
+            id=link_id,
+            student_id=student_id,
+            student__school=school,
+        )
+        .first()
+    )
+    if link is None:
+        raise NotFound({'detail': 'Guardian association not found for this student.'})
+    return link
+
+
+def _serialize_guardian_link(link):
+    return {
+        'id': link.id,
+        'parent_id': link.parent_id,
+        'name': link.parent.name,
+        'phone_number': link.parent.phone_number,
+        'phone_number_alt': link.parent.phone_number_alt,
+        'email': link.parent.email,
+        'address': link.parent.address,
+        'relationship': link.relationship,
+        'is_primary': link.is_primary,
+        'is_emergency_contact': link.is_emergency_contact,
+    }
+
+
+@transaction.atomic
+def add_student_guardian(*, school, student_id, guardian):
+    student = get_student(school=school, student_id=student_id)
+    parent = _resolve_parent(school=school, guardian=guardian)
+    if StudentParent.objects.filter(student=student, parent=parent).exists():
+        raise ValidationError({'detail': 'This guardian is already linked to the student.'})
+
+    make_primary = guardian.get('is_primary', False)
+    if make_primary:
+        StudentParent.objects.filter(student=student, is_primary=True).update(is_primary=False)
+
+    has_primary = StudentParent.objects.filter(student=student, is_primary=True).exists()
+    link = StudentParent.objects.create(
+        student=student,
+        parent=parent,
+        relationship=guardian['relationship'],
+        is_primary=make_primary or not has_primary,
+        is_emergency_contact=guardian.get('is_emergency_contact', False),
+    )
+    return _serialize_guardian_link(link)
+
+
+@transaction.atomic
+def update_student_guardian(*, school, student_id, link_id, **fields):
+    link = _get_student_parent_link(school=school, student_id=student_id, link_id=link_id)
+    parent = link.parent
+
+    parent_updates = []
+    for key in ('name', 'phone_number', 'phone_number_alt', 'email', 'address'):
+        if key not in fields:
+            continue
+        value = fields[key]
+        if key == 'phone_number':
+            try:
+                value = format_phone_number(value)
+            except ValueError as exc:
+                raise ValidationError({'phone_number': str(exc)}) from exc
+            if (
+                Parent.objects.filter(school=school, phone_number=value)
+                .exclude(id=parent.id)
+                .exists()
+            ):
+                raise ValidationError({
+                    'phone_number': 'Another parent in this school already uses this phone number.',
+                })
+        elif isinstance(value, str) and key != 'email':
+            value = value.strip()
+        elif key == 'email' and isinstance(value, str):
+            value = value.strip()
+        setattr(parent, key, value)
+        parent_updates.append(key)
+    if parent_updates:
+        parent.save(update_fields=[*parent_updates, 'updated_at'])
+
+    link_updates = []
+    if 'relationship' in fields:
+        link.relationship = fields['relationship']
+        link_updates.append('relationship')
+    if 'is_emergency_contact' in fields:
+        link.is_emergency_contact = fields['is_emergency_contact']
+        link_updates.append('is_emergency_contact')
+    if fields.get('is_primary') is True and not link.is_primary:
+        StudentParent.objects.filter(student_id=student_id, is_primary=True).update(
+            is_primary=False,
+        )
+        link.is_primary = True
+        link_updates.append('is_primary')
+    elif fields.get('is_primary') is False and link.is_primary:
+        raise ValidationError({
+            'is_primary': 'Promote another guardian to primary instead of unsetting this one.',
+        })
+
+    if link_updates:
+        link.save(update_fields=[*link_updates, 'updated_at'])
+
+    link.refresh_from_db()
+    return _serialize_guardian_link(
+        StudentParent.objects.select_related('parent').get(id=link.id),
+    )
+
+
+@transaction.atomic
+def remove_student_guardian(*, school, student_id, link_id):
+    link = _get_student_parent_link(school=school, student_id=student_id, link_id=link_id)
+    remaining = StudentParent.objects.filter(student_id=student_id).exclude(id=link.id)
+    if not remaining.exists():
+        raise ValidationError({
+            'detail': 'Cannot remove the last guardian. A student must have at least one.',
+        })
+
+    was_primary = link.is_primary
+    link.delete()
+
+    if was_primary:
+        next_link = remaining.order_by('created_at').first()
+        if next_link is not None:
+            next_link.is_primary = True
+            next_link.save(update_fields=['is_primary', 'updated_at'])

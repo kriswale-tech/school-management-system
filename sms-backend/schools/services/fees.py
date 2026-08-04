@@ -220,3 +220,34 @@ def complete_fees_setup(school):
         school_setup,
         SchoolSetup.SetupStep.FEES,
     )
+
+
+def apply_active_term_fees(school):
+    """
+    Publish (if needed) and apply the active-term fee structure so enrolled
+    students receive StudentFee rows. No-op if already applied.
+    """
+    from fees.services import apply_fee_structure, publish_fee_structure
+
+    term = _get_active_term(school)
+    fee_structure = (
+        FeeStructure.objects.filter(school=school, term=term)
+        .prefetch_related('fee_items')
+        .first()
+    )
+    if fee_structure is None:
+        raise ValidationError({
+            'detail': 'Add at least one fee item before finishing setup.',
+        })
+
+    if fee_structure.is_locked:
+        return fee_structure
+
+    try:
+        if fee_structure.status == FeeStructure.Status.DRAFT:
+            publish_fee_structure(fee_structure)
+        apply_fee_structure(fee_structure)
+    except DjangoValidationError as exc:
+        _raise_drf(exc)
+
+    return fee_structure

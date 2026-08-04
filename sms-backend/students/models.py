@@ -47,6 +47,12 @@ class Student(BaseModel):
     gender = models.CharField(max_length=10, choices=GenderChoices.choices)
     date_of_birth = models.DateField()
     admission_date = models.DateField()
+    address = models.TextField(
+        blank=True,
+        default='',
+        help_text='Place of residence.',
+    )
+    is_active = models.BooleanField(default=True)
     parents = models.ManyToManyField(
         'students.Parent',
         related_name='students',

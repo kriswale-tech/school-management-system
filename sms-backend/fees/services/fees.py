@@ -214,3 +214,123 @@ def validate_fee_structure_ready(fee_structure):
     fee_structure.full_clean()
     if not fee_structure.fee_items.exists():
         raise ValidationError('Fee structure must contain at least one fee item.')
+
+
+def _aggregate_payment_status(*, total_billed, total_paid):
+    balance = total_billed - total_paid
+    if balance <= 0 and total_billed > 0:
+        return 'fully_paid'
+    if total_paid > 0:
+        return 'partially_paid'
+    if total_billed > 0:
+        return 'owing'
+    return 'no_fees'
+
+
+def build_student_term_fees(*, student, term):
+    """Term fee breakdown for API responses (no payment ledger)."""
+    balance = get_student_term_balance(student=student, term=term)
+    return {
+        'term_id': term.id,
+        'term': term.term,
+        'term_name': term.get_term_display(),
+        'total_billed': balance['total_billed'],
+        'total_paid': balance['total_paid'],
+        'balance': balance['balance'],
+        'payment_status': balance['payment_status'],
+        'fee_items': [
+            {
+                'id': item['id'],
+                'name': item['name'],
+                'amount': item['amount'],
+            }
+            for item in balance['fee_items']
+        ],
+    }
+
+
+def get_student_academic_year_fees(*, student, academic_year):
+    """Aggregate billed/paid totals and per-term breakdown for one academic year."""
+    terms = list(
+        Term.objects.filter(
+            school=student.school,
+            academic_year=academic_year,
+        ).order_by('-start_date'),
+    )
+    term_blocks = [build_student_term_fees(student=student, term=term) for term in terms]
+
+    total_billed = sum((block['total_billed'] for block in term_blocks), Decimal('0.00'))
+    total_paid = sum((block['total_paid'] for block in term_blocks), Decimal('0.00'))
+    balance = total_billed - total_paid
+
+    return {
+        'student_id': student.id,
+        'academic_year_id': academic_year.id,
+        'academic_year': academic_year.academic_year,
+        'total_billed': total_billed,
+        'total_paid': total_paid,
+        'balance': balance,
+        'payment_status': _aggregate_payment_status(
+            total_billed=total_billed,
+            total_paid=total_paid,
+        ),
+        'terms': term_blocks,
+    }
+
+
+def get_student_current_year_fees(*, school, student):
+    """Fees for the school's active academic year (via active term)."""
+    from students.services import get_active_term
+
+    active_term = get_active_term(
+        school,
+        detail='Set an active term before viewing student fees.',
+    )
+    return get_student_academic_year_fees(
+        student=student,
+        academic_year=active_term.academic_year,
+    )
+
+
+def get_student_fee_history(*, school, student, academic_year_id=None):
+    """
+    Academic years that have StudentFee or Payment data for this student.
+    Optional academic_year_id filters to a single year (must have data).
+    """
+    from schools.models import AcademicYear
+    from rest_framework.exceptions import NotFound, ValidationError
+
+    fee_year_ids = StudentFee.objects.filter(
+        student=student,
+        term__school=school,
+    ).values_list('term__academic_year_id', flat=True)
+    payment_year_ids = Payment.objects.filter(
+        student=student,
+        term__school=school,
+    ).values_list('term__academic_year_id', flat=True)
+    year_ids = set(fee_year_ids) | set(payment_year_ids)
+
+    if academic_year_id:
+        academic_year = AcademicYear.objects.filter(
+            school=school,
+            id=academic_year_id,
+        ).first()
+        if academic_year is None:
+            raise ValidationError({'academic_year': 'Academic year not found in this school.'})
+        if academic_year.id not in year_ids:
+            raise NotFound({'detail': 'No fee history for this student in that academic year.'})
+        years_qs = [academic_year]
+    else:
+        years_qs = list(
+            AcademicYear.objects.filter(school=school, id__in=year_ids).order_by('-start_date'),
+        )
+
+    years = [
+        get_student_academic_year_fees(student=student, academic_year=year)
+        for year in years_qs
+    ]
+
+    return {
+        'student_id': student.id,
+        'years': years,
+    }

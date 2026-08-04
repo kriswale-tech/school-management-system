@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
@@ -169,14 +170,19 @@ def complete_school_setup(school) -> dict:
 
     validate_setup_ready(school, school_setup)
 
-    school_setup.current_step = SchoolSetup.SetupStep.COMPLETED
-    school_setup.completed_at = timezone.now()
-    school_setup.progress_percentage = 100
-    school_setup.save()
+    from schools.services.fees import apply_active_term_fees
 
-    school.setup_completed = True
-    school.setup_completed_at = timezone.now()
-    school.save(update_fields=['setup_completed', 'setup_completed_at', 'updated_at'])
+    with transaction.atomic():
+        apply_active_term_fees(school)
+
+        school_setup.current_step = SchoolSetup.SetupStep.COMPLETED
+        school_setup.completed_at = timezone.now()
+        school_setup.progress_percentage = 100
+        school_setup.save()
+
+        school.setup_completed = True
+        school.setup_completed_at = timezone.now()
+        school.save(update_fields=['setup_completed', 'setup_completed_at', 'updated_at'])
 
     return {
         'next_step': SchoolSetup.SetupStep.COMPLETED,

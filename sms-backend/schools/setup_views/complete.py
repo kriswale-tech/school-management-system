@@ -12,8 +12,9 @@ __all__ = ['CompleteSetupView']
     summary='Complete school setup',
     description=(
         'Validates that all required setup steps are complete and the school '
-        'configuration is ready, then marks setup as finished. The optional '
-        'staff step does not block completion.'
+        'configuration is ready, then publishes and applies the active-term fee '
+        'structure and marks setup as finished. The optional staff step does not '
+        'block completion.'
     ),
     request=None,
     responses={200: SetupStepResponseSerializer},

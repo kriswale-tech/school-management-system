@@ -15,18 +15,18 @@ const ActionBar = ({ title, children, back = false }: ActionBarProps) => {
 
   return (
     <div className="flex items-center justify-between bg-white px-4 py-2.5  custom-shadow-sm">
-      {/* title */}
-      {back ? (
-        <button className="text-slate-900 hover:text-slate-600" onClick={onBack}>
-          <Icon icon="hugeicons:arrow-left" className="w-5 h-5" />
-        </button>
-      ) : (
-        <>
-          <h1 className="text-xl font-medium text-slate-900">{title}</h1>
-          {/* actions */}
-          <div className="flex items-center gap-2">{children}</div>
-        </>
-      )}
+      <div className="flex items-center gap-3 min-w-0">
+        {back ? (
+          <button
+            className="text-slate-500 hover:text-slate-900 flex items-center gap-2 py-1 cursor-pointer shrink-0"
+            onClick={onBack}
+          >
+            <Icon icon="hugeicons:arrow-left-02" className="size-5" /> <span>Back</span>
+          </button>
+        ) : null}
+        {title ? <h1 className="text-lg font-medium text-slate-900 truncate">{title}</h1> : null}
+      </div>
+      {children ? <div className="flex items-center gap-2 shrink-0">{children}</div> : null}
     </div>
   )
 }
