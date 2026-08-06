@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import AssignSubjectModal from '../AssignSubjectModal'
-import type { ClassForSetup, SubjectForSetup } from '../../types'
-import type { ClassSubjectSetupHandlers } from '../../class-subject-setup-handlers'
-import type { AddStreamPayload } from '../../class-subject-setup-types'
+import type { ClassForSetup, SubjectForSetup } from '../types'
+import type { CurriculumHandlers } from '../handlers'
+import type { AddStreamPayload } from '../payload-types'
 import type { ConfirmState } from './types'
 import StreamsDropdown from './StreamsDropdown'
 import SubjectCountDropdown from './SubjectCountDropdown'
@@ -16,7 +16,7 @@ const StreamAndSubjectMiniButtons = ({
 }: {
   data: ClassForSetup
   levelSubjects: SubjectForSetup[]
-  handlers: ClassSubjectSetupHandlers
+  handlers: CurriculumHandlers
   onConfirm: (state: ConfirmState) => void
   onEditStream: (streamId: string, initialValues: AddStreamPayload) => void
 }) => {

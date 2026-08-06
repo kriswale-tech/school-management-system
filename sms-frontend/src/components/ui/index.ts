@@ -10,6 +10,9 @@ import LoadingSpinner from './LoadingSpinner'
 import Modal from './Modal'
 import Tooltip from './Tooltip'
 import ActionButton from './ActionButton'
+import DotComponent from './DotComponent'
+import SearchComponent from './SearchComponent'
+import FilterComponent from './FilterComponent'
 
 export {
   FormLabel,
@@ -24,4 +27,7 @@ export {
   Modal,
   Tooltip,
   ActionButton,
+  DotComponent,
+  SearchComponent,
+  FilterComponent,
 }

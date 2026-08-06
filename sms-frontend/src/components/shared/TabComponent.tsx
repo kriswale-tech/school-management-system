@@ -6,9 +6,11 @@ interface TabComponentProps {
     label: string
     icon?: string
     onClick: () => void
+    attention?: boolean
   }[]
   activeTab: string
 }
+
 const TabComponent = ({ tabs, activeTab }: TabComponentProps) => {
   return (
     <div className="flex items-center gap-4 border-b border-slate-200">
@@ -23,6 +25,9 @@ const TabComponent = ({ tabs, activeTab }: TabComponentProps) => {
         >
           {tab.icon && <Icon icon={tab.icon} className="size-4" />}
           {tab.label}
+          {tab.attention ? (
+            <span className="text-xs font-medium text-red-600">Needs attention</span>
+          ) : null}
         </button>
       ))}
     </div>

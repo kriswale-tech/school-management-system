@@ -1,30 +1,30 @@
-import LevelClassSubjectAccordion from './LevelClassSubjectAccordion'
+import { CurriculumLevels } from '@/components/curriculum'
 import Button from '@/components/ui/Button'
-import type { LevelForSetup } from '../types'
-import type { ClassSubjectSetupHandlers } from '../class-subject-setup-handlers'
+import type { CurriculumHandlers, LevelForSetup } from '@/components/curriculum'
 
 interface ClassSubjectFormProps {
   levels: LevelForSetup[]
-  handlers: ClassSubjectSetupHandlers
+  handlers: CurriculumHandlers
+  onComplete: () => void
+  isCompleting: boolean
 }
 
-const ClassSubjectForm = ({ levels, handlers }: ClassSubjectFormProps) => {
+const ClassSubjectForm = ({
+  levels,
+  handlers,
+  onComplete,
+  isCompleting,
+}: ClassSubjectFormProps) => {
   return (
     <div className="space-y-6">
-      {levels.map((level) => (
-        <LevelClassSubjectAccordion
-          key={level.id ?? level.name}
-          level={level}
-          handlers={handlers}
-        />
-      ))}
+      <CurriculumLevels levels={levels} handlers={handlers} />
 
       <Button
         type="button"
         variant="outline"
-        loading={handlers.isCompleting}
+        loading={isCompleting}
         loadingText="Saving"
-        onClick={handlers.onComplete}
+        onClick={onComplete}
       >
         Proceed to next step
       </Button>

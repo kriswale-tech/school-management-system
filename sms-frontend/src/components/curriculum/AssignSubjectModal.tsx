@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Button, FormLabel, Modal } from '@/components/ui'
-import type { SubjectForSetup } from '../types'
+import type { SubjectForSetup } from './types'
 import { mergeClasses } from '@/utils'
 
 interface AssignSubjectModalProps {

@@ -1,50 +1,39 @@
 import { useState, type FormEvent } from 'react'
 import { Button, FormLabel, InputField, Modal } from '@/components/ui'
-import type { AddClassPayload } from '../class-subject-setup-types'
+import type { AddStreamPayload } from './payload-types'
 
-export interface ClassFormValues {
-  name: string
-  description?: string
-  order?: number
-}
-
-interface CustomClassModalProps {
+interface StreamModalProps {
   open: boolean
   mode: 'add' | 'edit'
-  initialValues?: Partial<ClassFormValues>
+  initialValues?: Partial<AddStreamPayload>
   onClose: () => void
-  onSubmit: (payload: AddClassPayload) => void
+  onSubmit: (payload: AddStreamPayload) => void
 }
 
-interface ClassModalFormProps {
+interface StreamModalFormProps {
   mode: 'add' | 'edit'
-  initialValues: ClassFormValues
+  initialValues: AddStreamPayload
   onClose: () => void
-  onSubmit: (payload: AddClassPayload) => void
+  onSubmit: (payload: AddStreamPayload) => void
 }
 
-const CustomClassModal = ({
+const StreamModal = ({
   open,
   mode,
   initialValues = {},
   onClose,
   onSubmit,
-}: CustomClassModalProps) => {
-  const defaults: ClassFormValues = {
+}: StreamModalProps) => {
+  const defaults: AddStreamPayload = {
     name: initialValues.name ?? '',
     description: initialValues.description ?? '',
-    order: initialValues.order,
   }
 
   return (
-    <Modal
-      open={open}
-      title={mode === 'add' ? 'Add Custom Class' : 'Edit Class'}
-      onClose={onClose}
-    >
+    <Modal open={open} title={mode === 'add' ? 'Add Stream' : 'Edit Stream'} onClose={onClose}>
       {open ? (
-        <ClassModalForm
-          key={`${mode}-${defaults.name}-${defaults.description}-${defaults.order}`}
+        <StreamModalForm
+          key={`${mode}-${defaults.name}-${defaults.description}`}
           mode={mode}
           initialValues={defaults}
           onClose={onClose}
@@ -55,10 +44,9 @@ const CustomClassModal = ({
   )
 }
 
-const ClassModalForm = ({ mode, initialValues, onClose, onSubmit }: ClassModalFormProps) => {
+const StreamModalForm = ({ mode, initialValues, onClose, onSubmit }: StreamModalFormProps) => {
   const [name, setName] = useState(initialValues.name)
   const [description, setDescription] = useState(initialValues.description ?? '')
-  const [order, setOrder] = useState(initialValues.order?.toString() ?? '')
   const [nameError, setNameError] = useState('')
 
   const handleSubmit = (event: FormEvent) => {
@@ -66,30 +54,27 @@ const ClassModalForm = ({ mode, initialValues, onClose, onSubmit }: ClassModalFo
     const trimmed = name.trim()
 
     if (!trimmed) {
-      setNameError('Class name is required')
+      setNameError('Stream name is required')
       return
     }
-
-    const parsedOrder = order.trim() ? Number(order) : undefined
 
     onSubmit({
       name: trimmed,
       description: description.trim() || undefined,
-      order: parsedOrder !== undefined && !Number.isNaN(parsedOrder) ? parsedOrder : undefined,
     })
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-1.5">
-        <FormLabel label="Class name" required />
+        <FormLabel label="Stream name" required />
         <InputField
           value={name}
           onChange={(event) => {
             setName(event.target.value)
             if (nameError) setNameError('')
           }}
-          placeholder="Enter class name"
+          placeholder="Enter stream name"
           error={nameError}
         />
       </div>
@@ -103,26 +88,16 @@ const ClassModalForm = ({ mode, initialValues, onClose, onSubmit }: ClassModalFo
         />
       </div>
 
-      <div className="space-y-1.5">
-        <FormLabel label="Order" helperText="optional" />
-        <InputField
-          type="number"
-          value={order}
-          onChange={(event) => setOrder(event.target.value)}
-          placeholder="Enter order"
-        />
-      </div>
-
       <div className="grid grid-cols-2 gap-3 pt-2">
         <Button type="button" variant="outline" onClick={onClose}>
           Cancel
         </Button>
         <Button type="submit" variant="solid">
-          {mode === 'add' ? 'Add Class' : 'Save Changes'}
+          {mode === 'add' ? 'Add Stream' : 'Save Changes'}
         </Button>
       </div>
     </form>
   )
 }
 
-export default CustomClassModal
+export default StreamModal

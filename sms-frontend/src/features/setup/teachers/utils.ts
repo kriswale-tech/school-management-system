@@ -4,7 +4,7 @@ import type {
   LevelForSetup,
   LevelWithRelatedClassesAndSubjects,
   StreamForSetup,
-} from '@/features/setup/classes-and-subjects/types'
+} from '@/components/curriculum'
 import { getStaffProfileImage, mapStaffToFormData } from '@/features/staff/utils'
 import type {
   ClassTeacherAssignment,

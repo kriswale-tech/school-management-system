@@ -7,4 +7,10 @@ export type {
   ClassForSetup,
   LevelForSetup,
   LevelWithRelatedClassesAndSubjects,
+  AddSubjectPayload,
+  AddSubjectResponse,
+  AddSubjectGroupResponse,
+  AddClassPayload,
+  AddStreamPayload,
+  CurriculumHandlers,
 } from '@/components/curriculum'

@@ -1,8 +1,6 @@
-import type { AddClassPayload, AddStreamPayload, AddSubjectPayload } from './class-subject-setup-types'
+import type { AddClassPayload, AddStreamPayload, AddSubjectPayload } from './payload-types'
 
-export interface ClassSubjectSetupHandlers {
-  onComplete: () => void
-  isCompleting: boolean
+export interface CurriculumHandlers {
   onLevelActiveChange: (levelId: string, isActive: boolean) => void
   onAddClass: (levelId: string, payload: AddClassPayload) => void
   onEditClass: (classId: string, payload: Partial<AddClassPayload>) => void

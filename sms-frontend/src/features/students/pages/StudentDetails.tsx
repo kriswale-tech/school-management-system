@@ -11,6 +11,7 @@ import Fees from '../components/detail-pages/Fees'
 import Guardian from '../components/detail-pages/Guardian'
 import { getStudent } from '../services'
 import { STUDENT_DETAIL_QUERY_KEY } from '../utils'
+import DotComponent from '@/components/ui/DotComponent'
 
 const TAB_BIO = 'Bio'
 const TAB_GUARDIAN = 'Guardian'
@@ -21,7 +22,12 @@ const StudentDetails = () => {
   const { id } = useParams<{ id: string }>()
   const [activeTab, setActiveTab] = useState(TAB_BIO)
 
-  const { data: student, isLoading, isError, error } = useQuery({
+  const {
+    data: student,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
     queryKey: [STUDENT_DETAIL_QUERY_KEY, id],
     queryFn: () => getStudent(id!),
     enabled: Boolean(id),
@@ -66,13 +72,13 @@ const StudentDetails = () => {
                 <span className="text-sm text-gray-500">#{student.student_id}</span>
                 {student.class_assignment ? (
                   <>
-                    <span className="inline-block size-1 align-middle rounded-full bg-slate-800 mx-4" />
+                    <DotComponent />
                     <span className="text-sm text-gray-500">
                       {student.class_assignment.display_name}
                     </span>
                   </>
                 ) : null}
-                <span className="inline-block size-1 align-middle rounded-full bg-slate-800 mx-4" />
+                <DotComponent />
                 <span
                   className={
                     student.is_active ? 'text-sm text-green-600' : 'text-sm text-slate-500'

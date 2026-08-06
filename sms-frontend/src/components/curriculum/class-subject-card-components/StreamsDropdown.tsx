@@ -1,7 +1,7 @@
 import { Icon } from '@iconify/react'
 import Button from '@/components/ui/Button'
-import type { StreamForSetup } from '../../types'
-import type { AddStreamPayload } from '../../class-subject-setup-types'
+import type { StreamForSetup } from '../types'
+import type { AddStreamPayload } from '../payload-types'
 import IconActionButton from './IconActionButton'
 import { useAnchoredDropdown } from './dropdown-utils'
 

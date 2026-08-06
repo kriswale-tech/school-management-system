@@ -1,7 +1,10 @@
 import toast from 'react-hot-toast'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
-import ClassSubjectForm from './components/ClassSubjectForm'
+import ActionBar from '@/components/shared/ActionBar'
+import { CurriculumLevels } from '@/components/curriculum'
+import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import { getApiErrorMessage } from '@/utils'
+import type { CurriculumHandlers } from './types'
 import {
   activateOrDeactivateClass,
   activateOrDeactivateLevel,
@@ -10,6 +13,7 @@ import {
   addStream,
   addSubject,
   addSubjectGroup,
+  assignSubjectToClass,
   deleteClass,
   deleteStream,
   deleteSubject,
@@ -18,28 +22,21 @@ import {
   editStream,
   editSubject,
   editSubjectGroup,
-  assignSubjectToClass,
+  getClassAndSubjects,
   removeSubjectFromClass,
-} from './class-subject-setup-services'
-import { getClassAndSubjects, updateClassAndSubjectsSetup } from './services'
-import { handleSetupProgressResponse } from '@/features/setup/utils/handle-setup-progress-response'
-import { useAuthStore } from '@/features/auth/store'
-import LoadingSpinner from '@/components/ui/LoadingSpinner'
-import { getApiErrorMessage } from '@/utils'
-import type { CurriculumHandlers } from '@/components/curriculum'
+} from './services'
 
-const ClassesAndSubjects = () => {
-  const navigate = useNavigate()
+const ManageClasses = () => {
   const queryClient = useQueryClient()
-  const setUser = useAuthStore((state) => state.setUser)
-  const user = useAuthStore((state) => state.user)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['classAndSubjects'],
+    queryKey: ['manageClasses', 'curriculum'],
     queryFn: getClassAndSubjects,
   })
 
   const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ['manageClasses', 'curriculum'] })
+    void queryClient.invalidateQueries({ queryKey: ['classes'] })
     void queryClient.invalidateQueries({ queryKey: ['classAndSubjects'] })
   }
 
@@ -52,16 +49,6 @@ const ClassesAndSubjects = () => {
     invalidate()
   }
 
-  const { mutate: completeSetup, isPending: isCompleting } = useMutation({
-    mutationFn: updateClassAndSubjectsSetup,
-    onSuccess: (response) => {
-      toast.success('Classes and subjects saved')
-      void queryClient.invalidateQueries({ queryKey: ['setup'] })
-      handleSetupProgressResponse(response, { navigate, user, setUser })
-    },
-    onError: onMutationError('Unable to complete classes and subjects setup'),
-  })
-
   const { mutate: toggleLevel } = useMutation({
     mutationFn: ({ levelId, isActive }: { levelId: string; isActive: boolean }) =>
       activateOrDeactivateLevel(levelId, isActive),
@@ -70,8 +57,13 @@ const ClassesAndSubjects = () => {
   })
 
   const { mutate: createClass } = useMutation({
-    mutationFn: ({ levelId, payload }: { levelId: string; payload: Parameters<typeof addClass>[1] }) =>
-      addClass(levelId, payload),
+    mutationFn: ({
+      levelId,
+      payload,
+    }: {
+      levelId: string
+      payload: Parameters<typeof addClass>[1]
+    }) => addClass(levelId, payload),
     onSuccess: onMutationSuccess('Class added'),
     onError: onMutationError('Unable to add class'),
   })
@@ -177,13 +169,8 @@ const ClassesAndSubjects = () => {
   })
 
   const { mutate: updateSubjectGroup } = useMutation({
-    mutationFn: ({
-      groupId,
-      payload,
-    }: {
-      groupId: string
-      payload: { name: string }
-    }) => editSubjectGroup(groupId, payload),
+    mutationFn: ({ groupId, payload }: { groupId: string; payload: { name: string } }) =>
+      editSubjectGroup(groupId, payload),
     onSuccess: onMutationSuccess('Group updated'),
     onError: onMutationError('Unable to update group'),
   })
@@ -230,16 +217,17 @@ const ClassesAndSubjects = () => {
       detachSubjectFromClass({ classId, subjectId }),
   }
 
-  if (isLoading) return <LoadingSpinner className="mx-auto" />
-
   return (
-    <ClassSubjectForm
-      levels={data ?? []}
-      handlers={handlers}
-      onComplete={() => completeSetup()}
-      isCompleting={isCompleting}
-    />
+    <div className="space-y-6">
+      <ActionBar title="Manage Classes" back />
+
+      {isLoading ? (
+        <LoadingSpinner className="mx-auto" />
+      ) : (
+        <CurriculumLevels levels={data ?? []} handlers={handlers} />
+      )}
+    </div>
   )
 }
 
-export default ClassesAndSubjects
+export default ManageClasses

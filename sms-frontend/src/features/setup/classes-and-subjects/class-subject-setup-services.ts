@@ -1,6 +1,14 @@
 import api from "@/app/api/api";
-import type { AddClassPayload, AddStreamPayload, AddSubjectGroupResponse, AddSubjectPayload, AddSubjectResponse } from "./class-subject-setup-types";
-import type { ClassForSetup, ClassSubjectForSetup, StreamForSetup } from "./types";
+import type {
+  AddClassPayload,
+  AddStreamPayload,
+  AddSubjectGroupResponse,
+  AddSubjectPayload,
+  AddSubjectResponse,
+  ClassForSetup,
+  ClassSubjectForSetup,
+  StreamForSetup,
+} from "@/components/curriculum";
 
 const basePath = '/schools/setup/classes-and-subjects/'
 

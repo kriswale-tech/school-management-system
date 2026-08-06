@@ -14,13 +14,13 @@ import {
   StreamsDropdown,
   type ConfirmState,
 } from './class-subject-card-components'
-import type { ClassForSetup, SubjectForSetup, SubjectScope } from '../types'
-import type { ClassSubjectSetupHandlers } from '../class-subject-setup-handlers'
-import type { AddStreamPayload } from '../class-subject-setup-types'
+import type { ClassForSetup, SubjectForSetup, SubjectScope } from './types'
+import type { CurriculumHandlers } from './handlers'
+import type { AddStreamPayload } from './payload-types'
 
 type ClassSubjectCardProps = {
   levelId: string
-  handlers: ClassSubjectSetupHandlers
+  handlers: CurriculumHandlers
   subject_scope: SubjectScope
   levelClasses?: ClassForSetup[]
   levelSubjects?: SubjectForSetup[]

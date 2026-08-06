@@ -1,6 +1,6 @@
 import { Icon } from '@iconify/react'
 import Button from '@/components/ui/Button'
-import type { ClassSubjectForSetup } from '../../types'
+import type { ClassSubjectForSetup } from '../types'
 import IconActionButton from './IconActionButton'
 import { useAnchoredDropdown } from './dropdown-utils'
 

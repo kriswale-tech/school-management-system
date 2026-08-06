@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Button, CheckboxField, FormLabel, InputField, Modal } from '@/components/ui'
-import type { ClassForSetup, SubjectScope } from '../types'
+import type { ClassForSetup, SubjectScope } from './types'
 
 export interface SubjectFormValues {
   name: string

@@ -4,8 +4,8 @@ import ClassSubjectCard from './ClassSubjectCard'
 import CustomClassModal, { type ClassFormValues } from './CustomClassModal'
 import CustomSubjectModal, { type SubjectFormValues } from './CustomSubjectModal'
 import Button from '@/components/ui/Button'
-import type { LevelForSetup } from '../types'
-import type { ClassSubjectSetupHandlers } from '../class-subject-setup-handlers'
+import type { LevelForSetup } from './types'
+import type { CurriculumHandlers } from './handlers'
 import { mergeClasses } from '@/utils'
 
 type AccordionOpenChangeHandler = (_open: boolean) => void
@@ -22,7 +22,7 @@ type SubjectModalState =
 
 interface LevelClassSubjectAccordionProps {
   level: LevelForSetup
-  handlers: ClassSubjectSetupHandlers
+  handlers: CurriculumHandlers
   open?: boolean
   defaultOpen?: boolean
   onOpenChange?: AccordionOpenChangeHandler
