@@ -32,7 +32,7 @@ class GhanaCurriculumTemplateTests(TestCase):
 
         creche_class = CurriculumClassLevel.objects.get(
             level__name='Pre-School',
-            name='Crèche / Daycare (Ages 0-2)',
+            name='Crèche / Daycare',
         )
         nursery_1 = CurriculumClassLevel.objects.get(
             level__name='Pre-School',
@@ -83,7 +83,7 @@ class GhanaCurriculumTemplateTests(TestCase):
         school = create_school()
         provision_school_curriculum(school)
 
-        creche = school.class_levels.get(name='Crèche / Daycare (Ages 0-2)')
+        creche = school.class_levels.get(name='Crèche / Daycare')
         nursery_1 = school.class_levels.get(name='Nursery 1')
 
         creche_subjects = set(creche.class_subjects.values_list('subject__name', flat=True))

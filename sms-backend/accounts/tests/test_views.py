@@ -47,7 +47,7 @@ class AdminSignupViewTests(AccountsAPITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('phone_number', response.data)
+        self.assertIn('phone_number', response.data['raw_detail'])
 
     def test_signup_rejects_duplicate_school_name_for_active_user(self):
         create_user(is_active=True)
@@ -213,7 +213,7 @@ class ResendOtpViewTests(AccountsAPITestCase):
         }, format='json')
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('phone_number', response.data)
+        self.assertIn('phone_number', response.data['raw_detail'])
 
     def test_resend_then_verify_with_new_otp(self):
         create_user(is_active=False)

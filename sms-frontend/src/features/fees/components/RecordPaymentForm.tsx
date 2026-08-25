@@ -50,16 +50,12 @@ const RecordPaymentForm = ({
   const [studentId, setStudentId] = useState(preselectedStudentId ?? '')
   const [searchValue, setSearchValue] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [amount, setAmount] = useState('')
+  const [amountEdited, setAmountEdited] = useState(false)
+  const [amountDraft, setAmountDraft] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('')
   const [paidAt, setPaidAt] = useState(dayjs().format('YYYY-MM-DD'))
 
   const isPreselected = Boolean(preselectedStudentId)
-
-  useEffect(() => {
-    if (!preselectedStudentId) return
-    setStudentId(preselectedStudentId)
-  }, [preselectedStudentId])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -99,13 +95,16 @@ const RecordPaymentForm = ({
     enabled: Boolean(studentId),
   })
 
-  useEffect(() => {
-    if (!paymentTarget?.has_outstanding) {
-      setAmount('')
-      return
-    }
-    setAmount(paymentTarget.outstanding_balance)
-  }, [paymentTarget?.has_outstanding, paymentTarget?.outstanding_balance, studentId])
+  const suggestedAmount = paymentTarget?.has_outstanding
+    ? paymentTarget.outstanding_balance
+    : ''
+  const amount = amountEdited ? amountDraft : suggestedAmount
+
+  const handleStudentChange = (nextStudentId: string) => {
+    setStudentId(nextStudentId)
+    setAmountEdited(false)
+    setAmountDraft('')
+  }
 
   const { mutate: submitPayment, isPending } = useMutation({
     mutationFn: recordPayment,
@@ -160,7 +159,7 @@ const RecordPaymentForm = ({
             <FormLabel label="Select Student" required />
             <SearchAndSelect
               value={studentId}
-              onChange={setStudentId}
+              onChange={handleStudentChange}
               searchValue={searchValue}
               onSearchChange={setSearchValue}
               options={studentOptions}
@@ -200,7 +199,10 @@ const RecordPaymentForm = ({
               min="0"
               step="0.01"
               value={amount}
-              onChange={(event) => setAmount(event.target.value)}
+              onChange={(event) => {
+                setAmountEdited(true)
+                setAmountDraft(event.target.value)
+              }}
               disabled={!paymentTarget?.has_outstanding}
               wrapperClassName="min-w-0 flex-1"
               className="rounded-none border-none bg-white py-3"

@@ -37,13 +37,13 @@ class FlexiblePreschoolLevelTests(TestCase):
         self.assertEqual(
             list(pre_school.class_levels.order_by('order').values_list('name', flat=True)),
             [
-                'Crèche / Daycare (Ages 0-2)',
+                'Crèche / Daycare',
                 'Nursery 1',
                 'Nursery 2',
             ],
         )
 
-        creche = pre_school.class_levels.get(name='Crèche / Daycare (Ages 0-2)')
+        creche = pre_school.class_levels.get(name='Crèche / Daycare')
         creche_subjects = set(creche.class_subjects.values_list('subject__name', flat=True))
         self.assertIn('Sensory Stimulation (colors, sounds, textures)', creche_subjects)
 

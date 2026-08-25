@@ -3,10 +3,10 @@ from datetime import date
 from django.test import TestCase
 
 from academics.models import StudentSubjectGroup, SubjectGroup
+from academics.services.curriculum import provision_school_curriculum, seed_ghana_curriculum
 from accounts.tests.factories import create_school
 from schools.models import AcademicYear
-from academics.services.curriculum import provision_school_curriculum, seed_ghana_curriculum
-from students.models import Student
+from students.tests.factories import create_student
 
 
 class SubjectGroupTests(TestCase):
@@ -45,7 +45,7 @@ class SubjectGroupTests(TestCase):
             class_subject=self.class_subject,
             name='Twi',
         )
-        student = Student.objects.create()
+        student = create_student(school=self.school, student_id='SG-0001')
 
         assignment = StudentSubjectGroup.objects.create(
             student=student,
@@ -61,7 +61,7 @@ class SubjectGroupTests(TestCase):
             class_subject=self.class_subject,
             name='Twi',
         )
-        student = Student.objects.create()
+        student = create_student(school=self.school, student_id='SG-0002')
 
         assignment = StudentSubjectGroup.objects.create(
             student=student,
