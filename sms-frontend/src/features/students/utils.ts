@@ -51,3 +51,4 @@ export const getFeePaymentStatusClass = (status: FeePaymentStatus | string) => {
 export const STUDENT_DETAIL_QUERY_KEY = 'student-detail' as const
 export const STUDENT_FEES_QUERY_KEY = 'student-fees' as const
 export const STUDENT_FEE_HISTORY_QUERY_KEY = 'student-fee-history' as const
+export const STUDENT_PAYMENTS_QUERY_KEY = 'student-payments' as const

@@ -9,16 +9,14 @@ from schools.models import Term
 
 
 def _previous_term(term):
-    terms = list(
+    return (
         Term.objects.filter(
-            academic_year=term.academic_year,
             school=term.school,
-        ).order_by('start_date'),
+            start_date__lt=term.start_date,
+        )
+        .order_by('-start_date')
+        .first()
     )
-    index = next((idx for idx, item in enumerate(terms) if item.id == term.id), None)
-    if index is None or index == 0:
-        return None
-    return terms[index - 1]
 
 
 def _student_matches_fee_item(enrollment, fee_item):
@@ -113,6 +111,24 @@ def publish_fee_structure(fee_structure):
     return fee_structure
 
 
+def _student_fee_rows_for_enrollment(enrollment, fee_structure, fee_items):
+    rows = []
+    for fee_item in fee_items:
+        if not _student_matches_fee_item(enrollment, fee_item):
+            continue
+        rows.append(
+            StudentFee(
+                student=enrollment.student,
+                term=fee_structure.term,
+                fee_structure=fee_structure,
+                fee_item=fee_item,
+                name=fee_item.name,
+                amount=fee_item.amount,
+            ),
+        )
+    return rows
+
+
 @transaction.atomic
 def apply_fee_structure(fee_structure):
     if fee_structure.is_locked:
@@ -136,28 +152,71 @@ def apply_fee_structure(fee_structure):
 
     fee_items = list(fee_structure.fee_items.all())
     student_fees = []
-
     for enrollment in enrollments:
-        for fee_item in fee_items:
-            if not _student_matches_fee_item(enrollment, fee_item):
-                continue
-            student_fees.append(
-                StudentFee(
-                    student=enrollment.student,
-                    term=fee_structure.term,
-                    fee_structure=fee_structure,
-                    fee_item=fee_item,
-                    name=fee_item.name,
-                    amount=fee_item.amount,
-                ),
-            )
+        student_fees.extend(
+            _student_fee_rows_for_enrollment(enrollment, fee_structure, fee_items),
+        )
 
     StudentFee.objects.bulk_create(student_fees, ignore_conflicts=True)
+
+    from fees.services.credits import apply_available_credits_for_term
+
+    apply_available_credits_for_term(
+        school=fee_structure.school,
+        term=fee_structure.term,
+        recorded_by=fee_structure.created_by,
+    )
 
     fee_structure.status = FeeStructure.Status.APPLIED
     fee_structure.applied_at = timezone.now()
     fee_structure.save(update_fields=['status', 'applied_at', 'updated_at'])
     return fee_structure
+
+
+@transaction.atomic
+def ensure_enrollment_fees(enrollment):
+    """
+    Stamp matching StudentFee rows for a newly enrolled student when that
+    term's fee structure is already applied. No-op if the catalog is not live.
+    """
+    from students.models import ClassEnrollment
+
+    enrollment = (
+        ClassEnrollment.objects.select_related(
+            'student',
+            'term',
+            'class_level',
+            'class_level__level',
+        ).get(pk=enrollment.pk)
+    )
+    fee_structure = (
+        FeeStructure.objects.filter(
+            school=enrollment.student.school,
+            term=enrollment.term,
+            status=FeeStructure.Status.APPLIED,
+        )
+        .prefetch_related('fee_items')
+        .first()
+    )
+    if fee_structure is None:
+        return []
+
+    fee_items = list(fee_structure.fee_items.all())
+    rows = _student_fee_rows_for_enrollment(enrollment, fee_structure, fee_items)
+    if not rows:
+        return []
+
+    StudentFee.objects.bulk_create(rows, ignore_conflicts=True)
+
+    from fees.services.credits import apply_available_credits_for_student
+
+    apply_available_credits_for_student(
+        student=enrollment.student,
+        term=enrollment.term,
+        recorded_by=fee_structure.created_by,
+        school=fee_structure.school,
+    )
+    return rows
 
 
 def get_student_term_balance(*, student, term):
@@ -290,6 +349,95 @@ def get_student_current_year_fees(*, school, student):
         student=student,
         academic_year=active_term.academic_year,
     )
+
+
+def get_student_fees(*, school, student, academic_year_id=None, term_id=None):
+    """
+    Fee breakdown for a student, optionally scoped to an academic year and/or term.
+    Defaults to the active academic year when neither filter is provided.
+    """
+    from rest_framework.exceptions import ValidationError
+    from schools.models import AcademicYear
+    from students.services import get_active_term, resolve_term
+
+    if term_id:
+        term = resolve_term(school, term_id)
+        year_fees = get_student_academic_year_fees(
+            student=student,
+            academic_year=term.academic_year,
+        )
+        term_blocks = [block for block in year_fees['terms'] if block['term_id'] == term.id]
+        total_billed = sum((block['total_billed'] for block in term_blocks), Decimal('0.00'))
+        total_paid = sum((block['total_paid'] for block in term_blocks), Decimal('0.00'))
+        return {
+            **year_fees,
+            'total_billed': total_billed,
+            'total_paid': total_paid,
+            'balance': total_billed - total_paid,
+            'payment_status': _aggregate_payment_status(
+                total_billed=total_billed,
+                total_paid=total_paid,
+            ),
+            'terms': term_blocks,
+        }
+
+    if academic_year_id:
+        academic_year = AcademicYear.objects.filter(school=school, id=academic_year_id).first()
+        if academic_year is None:
+            raise ValidationError({'academic_year': 'Academic year not found in this school.'})
+        return get_student_academic_year_fees(student=student, academic_year=academic_year)
+
+    return get_student_current_year_fees(school=school, student=student)
+
+
+def list_student_payments(*, school, student, academic_year_id=None, term_id=None):
+    """Payment ledger rows for a student, optionally filtered by year or term."""
+    from rest_framework.exceptions import ValidationError
+    from fees.models import Receipt
+    from schools.models import AcademicYear
+
+    queryset = (
+        Payment.objects.filter(student=student, term__school=school)
+        .select_related('term', 'term__academic_year', 'receipt')
+        .order_by('-paid_at')
+    )
+
+    if term_id:
+        queryset = queryset.filter(term_id=term_id)
+    elif academic_year_id:
+        academic_year = AcademicYear.objects.filter(school=school, id=academic_year_id).first()
+        if academic_year is None:
+            raise ValidationError({'academic_year': 'Academic year not found in this school.'})
+        queryset = queryset.filter(term__academic_year=academic_year)
+
+    rows = []
+    for payment in queryset:
+        try:
+            receipt = payment.receipt
+        except Receipt.DoesNotExist:
+            receipt = None
+        rows.append({
+            'id': payment.id,
+            'term_id': payment.term_id,
+            'term': payment.term.term,
+            'term_name': payment.term.get_term_display(),
+            'academic_year_id': payment.term.academic_year_id,
+            'academic_year': payment.term.academic_year.academic_year,
+            'amount': payment.amount,
+            'payment_method': payment.payment_method,
+            'payment_method_display': payment.get_payment_method_display(),
+            'paid_at': payment.paid_at,
+            'payment_reference': payment.payment_reference,
+            'receipt': (
+                {
+                    'id': receipt.id,
+                    'receipt_number': receipt.receipt_number,
+                }
+                if receipt is not None
+                else None
+            ),
+        })
+    return rows
 
 
 def get_student_fee_history(*, school, student, academic_year_id=None):

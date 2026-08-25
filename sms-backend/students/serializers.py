@@ -262,3 +262,23 @@ class StudentYearFeesSerializer(serializers.Serializer):
 class StudentFeeHistorySerializer(serializers.Serializer):
     student_id = serializers.UUIDField()
     years = StudentYearFeesSerializer(many=True)
+
+
+class StudentPaymentReceiptSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    receipt_number = serializers.CharField()
+
+
+class StudentPaymentSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    term_id = serializers.UUIDField()
+    term = serializers.CharField()
+    term_name = serializers.CharField()
+    academic_year_id = serializers.UUIDField()
+    academic_year = serializers.CharField()
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    payment_method = serializers.CharField()
+    payment_method_display = serializers.CharField()
+    paid_at = serializers.DateTimeField()
+    payment_reference = serializers.CharField(allow_blank=True)
+    receipt = StudentPaymentReceiptSerializer(allow_null=True)

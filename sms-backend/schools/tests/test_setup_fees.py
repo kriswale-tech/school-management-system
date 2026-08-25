@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.urls import reverse
@@ -16,19 +17,20 @@ class SetupFeesViewTests(APITestCase):
         self.user = create_user(is_active=True)
         set_client_auth_cookies(self.client, self.user)
         self.school = user_school(self.user)
+        today = date.today()
         self.academic_year = AcademicYear.objects.create(
             school=self.school,
             academic_year='2025/2026',
-            start_date='2025-09-01',
-            end_date='2026-07-31',
+            start_date=today - timedelta(days=30),
+            end_date=today + timedelta(days=300),
             is_active=True,
         )
         self.term = Term.objects.create(
             school=self.school,
             academic_year=self.academic_year,
             term=Term.TermChoices.FIRST_TERM,
-            start_date='2025-09-01',
-            end_date='2025-12-15',
+            start_date=today - timedelta(days=20),
+            end_date=today + timedelta(days=80),
             is_active=True,
         )
         create_school_setup(

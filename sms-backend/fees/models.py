@@ -213,6 +213,7 @@ class Payment(BaseModel):
         CHEQUE = 'cheque', 'Cheque'
         BANK_TRANSFER = 'bank_transfer', 'Bank Transfer'
         MOBILE_MONEY = 'mobile_money', 'Mobile Money'
+        ADVANCE_CREDIT = 'advance_credit', 'Advance Credit'
         OTHER = 'other', 'Other'
 
     student = models.ForeignKey(
@@ -268,3 +269,90 @@ class Receipt(BaseModel):
 
     def __str__(self):
         return self.receipt_number
+
+
+class StudentFeeCredit(BaseModel):
+    """Advance/excess payment held for a student until applied to a later term."""
+
+    class Status(models.TextChoices):
+        AVAILABLE = 'available', 'Available'
+        APPLIED = 'applied', 'Applied'
+        REFUNDED = 'refunded', 'Refunded'
+
+    student = models.ForeignKey(
+        'students.Student',
+        on_delete=models.CASCADE,
+        related_name='fee_credits',
+    )
+    school = models.ForeignKey(
+        'schools.School',
+        on_delete=models.CASCADE,
+        related_name='fee_credits',
+    )
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text='Original advance amount created from an excess payment.',
+    )
+    remaining_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text='How much of this advance is still unused.',
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.AVAILABLE,
+    )
+    source_payment = models.ForeignKey(
+        Payment,
+        on_delete=models.PROTECT,
+        related_name='created_credits',
+        null=True,
+        blank=True,
+    )
+    notes = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['created_at']
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(amount__gt=0),
+                name='fee_credit_amount_positive',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(remaining_amount__gte=0),
+                name='fee_credit_remaining_non_negative',
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.amount is not None and self.amount <= 0:
+            errors['amount'] = 'Amount must be greater than zero.'
+        if self.remaining_amount is not None and self.remaining_amount < 0:
+            errors['remaining_amount'] = 'Remaining amount cannot be negative.'
+        if (
+            self.amount is not None
+            and self.remaining_amount is not None
+            and self.remaining_amount > self.amount
+        ):
+            errors['remaining_amount'] = 'Remaining cannot exceed original amount.'
+        if self.student_id and self.school_id and self.student.school_id != self.school_id:
+            errors['school'] = 'School must match the student school.'
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        if self.student_id and not self.school_id:
+            self.school_id = self.student.school_id
+        if self.remaining_amount is None and self.amount is not None:
+            self.remaining_amount = self.amount
+        if self.remaining_amount == 0 and self.status == self.Status.AVAILABLE:
+            self.status = self.Status.APPLIED
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.student} credit {self.remaining_amount}/{self.amount}'

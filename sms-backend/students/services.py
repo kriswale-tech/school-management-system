@@ -7,8 +7,9 @@ from django.db.models import (
     CharField,
     DecimalField,
     F,
+    OuterRef,
     Prefetch,
-    Q,
+    Subquery,
     Sum,
     Value,
     When,
@@ -17,6 +18,7 @@ from django.db.models.functions import Coalesce
 from rest_framework.exceptions import NotFound, ValidationError
 
 from academics.models import ClassStream
+from fees.models import Payment, StudentFee
 from schools.models import Term
 from shared.helpers import format_phone_number
 from students.models import ClassEnrollment, Parent, Student, StudentParent
@@ -71,22 +73,30 @@ def generate_student_id(*, school) -> str:
 
 
 def _annotate_payment_totals(queryset, *, term):
+    """Annotate billed/paid via subqueries to avoid join multiplication."""
+    decimal_field = DecimalField(max_digits=12, decimal_places=2)
+    billed_sq = (
+        StudentFee.objects.filter(student_id=OuterRef('student_id'), term=term)
+        .values('student_id')
+        .annotate(total=Sum('amount'))
+        .values('total')[:1]
+    )
+    paid_sq = (
+        Payment.objects.filter(student_id=OuterRef('student_id'), term=term)
+        .values('student_id')
+        .annotate(total=Sum('amount'))
+        .values('total')[:1]
+    )
     return queryset.annotate(
         total_billed=Coalesce(
-            Sum(
-                'student__student_fees__amount',
-                filter=Q(student__student_fees__term=term),
-            ),
+            Subquery(billed_sq, output_field=decimal_field),
             Value(Decimal('0.00')),
-            output_field=DecimalField(max_digits=12, decimal_places=2),
+            output_field=decimal_field,
         ),
         total_paid=Coalesce(
-            Sum(
-                'student__payments__amount',
-                filter=Q(student__payments__term=term),
-            ),
+            Subquery(paid_sq, output_field=decimal_field),
             Value(Decimal('0.00')),
-            output_field=DecimalField(max_digits=12, decimal_places=2),
+            output_field=decimal_field,
         ),
     )
 
@@ -261,14 +271,26 @@ def onboard_student(
             is_primary=(index == 0),
         )
 
-    ClassEnrollment.objects.create(
+    create_class_enrollment(
         student=student,
         term=term,
         stream=stream,
         is_new_student=is_new_student,
     )
-
     return get_enrollment_for_student(school=school, term=term, student=student)
+
+
+def create_class_enrollment(*, student, term, stream, is_new_student=False):
+    enrollment = ClassEnrollment.objects.create(
+        student=student,
+        term=term,
+        stream=stream,
+        is_new_student=is_new_student,
+    )
+    from fees.services.fees import ensure_enrollment_fees
+
+    ensure_enrollment_fees(enrollment)
+    return enrollment
 
 
 def get_student(*, school, student_id):

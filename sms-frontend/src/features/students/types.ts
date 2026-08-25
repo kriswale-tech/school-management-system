@@ -220,3 +220,28 @@ export type StudentFeeHistory = {
   student_id: string
   years: StudentYearFees[]
 }
+
+export type StudentPaymentReceipt = {
+  id: string
+  receipt_number: string
+}
+
+export type StudentPayment = {
+  id: string
+  term_id: string
+  term: string
+  term_name: string
+  academic_year_id: string
+  academic_year: string
+  amount: string
+  payment_method: string
+  payment_method_display: string
+  paid_at: string
+  payment_reference: string
+  receipt: StudentPaymentReceipt | null
+}
+
+export type StudentFeesQueryParams = {
+  academic_year?: string
+  term?: string
+}

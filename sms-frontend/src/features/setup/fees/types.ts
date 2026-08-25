@@ -11,9 +11,12 @@ export interface FeeStructure {
     status_display: string;
     is_editable: boolean;
     is_locked: boolean;
+    can_apply?: boolean;
+    item_count?: number;
     term_id: string;
     term_name: string;
     academic_year: string;
+    applied_at?: string | null;
   }
   
   export interface FeeItem {
@@ -23,10 +26,13 @@ export interface FeeStructure {
     description: string;
     applies_to_type: AppliesToType;
     applies_to_type_display: string;
-    applies_to_id: string;
+    applies_to_id: string | null;
     applies_to_name: string;
     student_type: StudentType;
     student_type_display: string;
+    term_id?: string;
+    term_name?: string;
+    academic_year?: string;
   }
   
   export interface FeeStructureResponse {

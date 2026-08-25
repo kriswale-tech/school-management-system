@@ -10,8 +10,10 @@ import type {
   StudentBioUpdatePayload,
   StudentDetail,
   StudentFeeHistory,
+  StudentFeesQueryParams,
   StudentGuardian,
   StudentOnboardPayload,
+  StudentPayment,
   StudentQueryParams,
   StudentStats,
   StudentYearFees,
@@ -80,8 +82,12 @@ export const deleteStudentGuardian = async (studentId: string, linkId: string): 
   await api.delete(`/students/${studentId}/guardians/${linkId}/`)
 }
 
-export const getStudentCurrentYearFees = async (studentId: string): Promise<StudentYearFees> => {
-  const response = await api.get<StudentYearFees>(`/students/${studentId}/fees/`)
+export const getStudentCurrentYearFees = async (
+  studentId: string,
+  params: StudentFeesQueryParams = {},
+): Promise<StudentYearFees> => {
+  const url = getQueryUrl(`/students/${studentId}/fees/`, params)
+  const response = await api.get<StudentYearFees>(url)
   return response.data
 }
 
@@ -93,5 +99,14 @@ export const getStudentFeeHistory = async (
     academic_year: academicYearId,
   })
   const response = await api.get<StudentFeeHistory>(url)
+  return response.data
+}
+
+export const getStudentPayments = async (
+  studentId: string,
+  params: StudentFeesQueryParams = {},
+): Promise<StudentPayment[]> => {
+  const url = getQueryUrl(`/students/${studentId}/payments/`, params)
+  const response = await api.get<StudentPayment[]>(url)
   return response.data
 }

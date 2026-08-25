@@ -1,7 +1,7 @@
 from datetime import date
 
 from academics.models import ClassStream
-from students.models import ClassEnrollment, Student
+from students.models import Student
 
 
 def create_student(
@@ -53,7 +53,9 @@ def enroll_student(
             raise ValueError('Provide stream or class_level.')
         stream = ensure_default_stream(class_level)
 
-    return ClassEnrollment.objects.create(
+    from students.services import create_class_enrollment
+
+    return create_class_enrollment(
         student=student,
         term=term,
         stream=stream,

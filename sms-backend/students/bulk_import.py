@@ -20,9 +20,10 @@ from students.bulk_template import (
     IMPORT_HEADERS,
     build_student_failure_xlsx,
 )
-from students.models import ClassEnrollment, Student, StudentParent
+from students.models import Student, StudentParent
 from students.services import (
     _get_or_create_parent,
+    create_class_enrollment,
     generate_student_id,
     get_active_term,
 )
@@ -390,7 +391,7 @@ def _create_student_from_row(*, school, term, context, row: ParsedStudentBulkRow
         )
         summary.guardians_linked += 1
 
-    ClassEnrollment.objects.create(
+    create_class_enrollment(
         student=student,
         term=term,
         stream=stream,

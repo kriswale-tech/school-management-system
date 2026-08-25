@@ -149,3 +149,33 @@ class StudentFeesViewTests(APITestCase):
         self.assertEqual(filtered.status_code, status.HTTP_200_OK)
         self.assertEqual(len(filtered.data['years']), 1)
         self.assertEqual(filtered.data['years'][0]['academic_year'], '2024/2025')
+
+    def test_fees_accept_term_filter(self):
+        self._apply_tuition(term=self.first_term, amount=Decimal('500.00'))
+        self._apply_tuition(term=self.second_term, amount=Decimal('400.00'))
+
+        url = reverse('student-current-year-fees', kwargs={'student_id': self.student.id})
+        response = self.client.get(url, {'term': str(self.first_term.id)})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['terms']), 1)
+        self.assertEqual(response.data['terms'][0]['term'], 'first_term')
+        self.assertEqual(Decimal(response.data['total_billed']), Decimal('500.00'))
+
+    def test_payment_list_returns_ledger_rows(self):
+        self._apply_tuition(term=self.first_term, amount=Decimal('500.00'))
+        Payment.objects.create(
+            student=self.student,
+            term=self.first_term,
+            amount=Decimal('150.00'),
+            payment_method=Payment.PaymentMethod.MOBILE_MONEY,
+            recorded_by=self.user,
+        )
+
+        url = reverse('student-payment-list', kwargs={'student_id': self.student.id})
+        response = self.client.get(url, {'term': str(self.first_term.id)})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['payment_method'], 'mobile_money')
+        self.assertEqual(Decimal(response.data[0]['amount']), Decimal('150.00'))
+        self.assertEqual(response.data[0]['term_name'], 'First Term')
+        self.assertIsNone(response.data[0]['receipt'])

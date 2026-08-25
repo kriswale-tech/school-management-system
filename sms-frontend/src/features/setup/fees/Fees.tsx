@@ -9,7 +9,7 @@ import { handleSetupProgressResponse } from '@/features/setup/utils/handle-setup
 import { getApiErrorMessage } from '@/utils'
 import FeesSetupForm from './components/FeesSetupForm'
 import FeesSetupTable from './components/FeesSetupTable'
-import { completeFeeSetup, getFeeStructures } from './services'
+import { completeFeeSetup, createFeeItem, deleteFeeItem, getFeeStructures, updateFeeItem } from './services'
 
 const Fees = () => {
   const navigate = useNavigate()
@@ -53,11 +53,15 @@ const Fees = () => {
         </div>
       </div>
 
-      <FeesSetupForm />
+      <FeesSetupForm onCreate={createFeeItem} />
 
       <div>
         <h3 className="text-lg mb-2 text-slate-900">{data.fee_structure.name}</h3>
-        <FeesSetupTable feeItems={data.fee_items} />
+        <FeesSetupTable
+          feeItems={data.fee_items}
+          onUpdate={updateFeeItem}
+          onDelete={deleteFeeItem}
+        />
       </div>
 
       <Button type="button" variant="outline" onClick={() => completeSetup()} loading={isCompleting}>

@@ -4,8 +4,8 @@ import { useState, type FormEvent } from 'react'
 import { ChoicePillGroup } from '@/components/shared'
 import { Button, FormLabel, InputField, Modal } from '@/components/ui'
 import { getApiErrorMessage } from '@/utils'
-import { getClasses, getLevels, updateFeeItem } from '../services'
-import type { FeeItem } from '../types'
+import { getClasses, getLevels } from '../services'
+import type { FeeItem, FeeItemFormValues } from '../types'
 import {
   buildAppliesToGroupsOptions,
   buildFeeItemPayload,
@@ -18,10 +18,18 @@ import {
 type EditFeeItemProps = {
   open: boolean
   feeItem: FeeItem | null
+  queryKey?: unknown[]
   onClose: () => void
+  onUpdate: (id: string, payload: Partial<FeeItemFormValues>) => Promise<unknown>
 }
 
-const EditFeeItem = ({ open, feeItem, onClose }: EditFeeItemProps) => {
+const EditFeeItem = ({
+  open,
+  feeItem,
+  queryKey = ['feeStructures'],
+  onClose,
+  onUpdate,
+}: EditFeeItemProps) => {
   const queryClient = useQueryClient()
 
   const { data: levels = [] } = useQuery({
@@ -37,11 +45,10 @@ const EditFeeItem = ({ open, feeItem, onClose }: EditFeeItemProps) => {
   })
 
   const { mutate: saveFeeItem, isPending } = useMutation({
-    mutationFn: (payload: Parameters<typeof updateFeeItem>[1]) =>
-      updateFeeItem(feeItem!.id, payload),
+    mutationFn: (payload: Parameters<typeof onUpdate>[1]) => onUpdate(feeItem!.id, payload),
     onSuccess: () => {
       toast.success('Fee item updated')
-      void queryClient.invalidateQueries({ queryKey: ['feeStructures'] })
+      void queryClient.invalidateQueries({ queryKey })
       onClose()
     },
     onError: (error) => {
@@ -70,7 +77,7 @@ type EditFeeItemFormProps = {
   appliesToOptions: ReturnType<typeof buildAppliesToGroupsOptions>
   isSaving: boolean
   onClose: () => void
-  onSubmit: (payload: Parameters<typeof updateFeeItem>[1]) => void
+  onSubmit: (payload: Partial<FeeItemFormValues>) => void
 }
 
 const EditFeeItemForm = ({

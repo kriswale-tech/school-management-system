@@ -177,3 +177,25 @@ class FeeStructureTests(TestCase):
 
         self.assertEqual(StudentFee.objects.filter(student=self.student).count(), 1)
         self.assertEqual(StudentFee.objects.filter(student=continuing_student).count(), 0)
+
+    def test_late_enrollment_receives_applied_fees(self):
+        structure = self._create_structure_with_item(amount=Decimal('500.00'))
+        publish_fee_structure(structure)
+        apply_fee_structure(structure)
+
+        late_student = create_student(
+            school=self.school,
+            student_id='STU-102',
+            first_name='Akosua',
+            last_name='Owusu',
+        )
+        enroll_student(
+            student=late_student,
+            term=self.first_term,
+            class_level=self.class_level,
+            is_new_student=True,
+        )
+
+        fee = StudentFee.objects.get(student=late_student)
+        self.assertEqual(fee.amount, Decimal('500.00'))
+        self.assertEqual(fee.name, 'Tuition Fee')

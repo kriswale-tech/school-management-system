@@ -4,7 +4,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from core.pagination import StandardResultsSetPagination, paginated_schema
-from fees.services import get_student_current_year_fees, get_student_fee_history
+from fees.services import get_student_fee_history, get_student_fees, list_student_payments
 from shared.views import SchoolScopedAPIView
 from students.filters import ParentFilter, StudentEnrollmentFilter
 from students.serializers import (
@@ -16,6 +16,7 @@ from students.serializers import (
     StudentGuardianSerializer,
     StudentListSerializer,
     StudentOnboardSerializer,
+    StudentPaymentSerializer,
     StudentStatsSerializer,
     StudentUpdateSerializer,
     StudentYearFeesSerializer,
@@ -276,17 +277,67 @@ class StudentGuardianDetailView(SchoolScopedAPIView):
 class StudentCurrentYearFeesView(SchoolScopedAPIView):
     @extend_schema(
         tags=['Students'],
-        summary='Current academic year fees',
+        summary='Student fee breakdown',
         description=(
-            'Returns fee breakdown for the active academic year: year paid/total, '
-            'per-term paid/total, and billed fee items for each term.'
+            'Returns fee breakdown for an academic year (defaults to the active year). '
+            'Optional term filter scopes totals and term rows to that term.'
         ),
+        parameters=[
+            OpenApiParameter(
+                name='academic_year',
+                type=str,
+                description='Optional academic year UUID.',
+            ),
+            OpenApiParameter(
+                name='term',
+                type=str,
+                description='Optional term UUID. When set, only that term is included.',
+            ),
+        ],
         responses={200: StudentYearFeesSerializer},
     )
     def get(self, request, student_id):
         student = get_student(school=self.school, student_id=student_id)
-        data = get_student_current_year_fees(school=self.school, student=student)
+        data = get_student_fees(
+            school=self.school,
+            student=student,
+            academic_year_id=request.query_params.get('academic_year'),
+            term_id=request.query_params.get('term'),
+        )
         return Response(StudentYearFeesSerializer(data).data)
+
+
+class StudentPaymentListView(SchoolScopedAPIView):
+    @extend_schema(
+        tags=['Students'],
+        summary='Student payment history',
+        description=(
+            'Returns payment ledger rows for a student. '
+            'Filter by academic year or term when provided.'
+        ),
+        parameters=[
+            OpenApiParameter(
+                name='academic_year',
+                type=str,
+                description='Optional academic year UUID.',
+            ),
+            OpenApiParameter(
+                name='term',
+                type=str,
+                description='Optional term UUID.',
+            ),
+        ],
+        responses={200: StudentPaymentSerializer(many=True)},
+    )
+    def get(self, request, student_id):
+        student = get_student(school=self.school, student_id=student_id)
+        rows = list_student_payments(
+            school=self.school,
+            student=student,
+            academic_year_id=request.query_params.get('academic_year'),
+            term_id=request.query_params.get('term'),
+        )
+        return Response(StudentPaymentSerializer(rows, many=True).data)
 
 
 class StudentFeeHistoryView(SchoolScopedAPIView):

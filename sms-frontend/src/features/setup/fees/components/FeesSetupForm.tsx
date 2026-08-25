@@ -7,7 +7,8 @@ import Button from '@/components/ui/Button'
 import FormLabel from '@/components/ui/FormLabel'
 import InputField from '@/components/ui/InputField'
 import { getApiErrorMessage } from '@/utils'
-import { createFeeItem, getClasses, getLevels } from '../services'
+import { getClasses, getLevels } from '../services'
+import type { FeeItemFormValues } from '../types'
 import {
   buildAppliesToGroupsOptions,
   buildFeeItemPayload,
@@ -16,7 +17,17 @@ import {
   validateFeeItemForm,
 } from '../utils'
 
-const FeesSetupForm = () => {
+type FeesSetupFormProps = {
+  disabled?: boolean
+  queryKey?: unknown[]
+  onCreate: (payload: FeeItemFormValues) => Promise<unknown>
+}
+
+const FeesSetupForm = ({
+  disabled = false,
+  queryKey = ['feeStructures'],
+  onCreate,
+}: FeesSetupFormProps) => {
   const queryClient = useQueryClient()
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
@@ -34,10 +45,10 @@ const FeesSetupForm = () => {
   })
 
   const { mutate: addFeeItem, isPending } = useMutation({
-    mutationFn: createFeeItem,
+    mutationFn: onCreate,
     onSuccess: () => {
       toast.success('Fee item added')
-      void queryClient.invalidateQueries({ queryKey: ['feeStructures'] })
+      void queryClient.invalidateQueries({ queryKey })
       setName('')
       setAmount('')
       setAppliesToGroups(ENTIRE_SCHOOL_VALUE)
@@ -67,7 +78,7 @@ const FeesSetupForm = () => {
   const appliesToOptions = buildAppliesToGroupsOptions(levels, classes)
 
   return (
-    <div className="form-field-wrapper space-y-6">
+    <div className={`form-field-wrapper space-y-6 ${disabled ? 'pointer-events-none opacity-60' : ''}`}>
       <div className="flex gap-4 items-center justify-between">
         <div className="w-1/2 space-y-2">
           <FormLabel label="Fee Name" required />
@@ -77,6 +88,7 @@ const FeesSetupForm = () => {
             value={name}
             onChange={(event) => setName(event.target.value)}
             className="rounded-none bg-white py-3"
+            disabled={disabled}
           />
         </div>
         <div className="w-1/2 space-y-2">
@@ -92,6 +104,7 @@ const FeesSetupForm = () => {
               onChange={(event) => setAmount(event.target.value)}
               wrapperClassName="min-w-0 flex-1"
               className="rounded-none bg-white py-3 border-none w-full"
+              disabled={disabled}
             />
           </div>
         </div>
@@ -118,7 +131,13 @@ const FeesSetupForm = () => {
       </div>
 
       <div className="flex justify-end pt-2">
-        <Button type="button" className="w-fit" onClick={handleSubmit} loading={isPending}>
+        <Button
+          type="button"
+          className="w-fit"
+          onClick={handleSubmit}
+          loading={isPending}
+          disabled={disabled}
+        >
           <Icon
             icon="hugeicons:plus-sign"
             className="size-4 bg-white text-black rounded-full p-0.5"

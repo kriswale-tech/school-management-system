@@ -7,6 +7,7 @@ import EmptyState from './EmptyState'
 import ImageUpload from './ImageUpload'
 import BulkUpload from './bulk-upload'
 import TabComponent from './TabComponent'
+import ButtonTabComponent from './ButtonTabComponent'
 import { Pagination, Table, TableSkeleton, TableWrapper } from './data-table'
 
 export {
@@ -19,6 +20,7 @@ export {
   ImageUpload,
   BulkUpload,
   TabComponent,
+  ButtonTabComponent,
   Pagination,
   Table,
   TableSkeleton,
