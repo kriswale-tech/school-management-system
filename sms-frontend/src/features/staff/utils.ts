@@ -1,4 +1,5 @@
-import type { StaffFormData, StaffGender, StaffProfile } from './types'
+import dayjs from '@/lib/dayjs'
+import type { StaffDeskRow, StaffFormData, StaffGender, StaffProfile } from './types'
 
 type BuildStaffFormDataOptions = {
   role: string
@@ -6,6 +7,8 @@ type BuildStaffFormDataOptions = {
 }
 
 export const DEFAULT_PROFILE_IMAGE = '/images/default_profile.webp'
+
+export const STAFF_DESK_QUERY_KEY = 'staff-desk' as const
 
 const STAFF_FORM_FIELDS: (keyof StaffFormData)[] = [
   'first_name',
@@ -77,6 +80,9 @@ export const hasStaffUpdateChanges = (
 export const getStaffProfileImage = (staff: { profile: Pick<StaffProfile, 'profile_picture'> }) =>
   staff.profile.profile_picture ?? DEFAULT_PROFILE_IMAGE
 
+export const getStaffDeskProfileImage = (row: Pick<StaffDeskRow, 'profile_picture'>) =>
+  row.profile_picture ?? DEFAULT_PROFILE_IMAGE
+
 export const mapStaffToFormData = (staff: {
   first_name: string
   last_name: string
@@ -103,3 +109,35 @@ export const formatStaffRole = (role: string) =>
     .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ')
+
+/** Role line under the staff name — includes teacher subtype labels when present. */
+export const formatStaffRoleSubtitle = (
+  row: Pick<StaffDeskRow, 'role' | 'is_class_teacher' | 'is_subject_teacher'>,
+) => {
+  const roleLabel = formatStaffRole(row.role)
+
+  if (row.role !== 'teacher') {
+    return roleLabel
+  }
+
+  const subtypes: string[] = []
+  if (row.is_class_teacher) subtypes.push('Class teacher')
+  if (row.is_subject_teacher) subtypes.push('Subject teacher')
+
+  if (subtypes.length === 0) {
+    return roleLabel
+  }
+
+  return `${roleLabel} · ${subtypes.join(' · ')}`
+}
+
+export const formatStaffDate = (value: string | null | undefined) => {
+  if (!value) return '—'
+  const date = dayjs(value)
+  return date.isValid() ? date.format('DD MMM YYYY') : '—'
+}
+
+export const formatStaffGenderLabel = (gender: string | null | undefined) => {
+  if (!gender) return '—'
+  return gender.charAt(0).toUpperCase() + gender.slice(1)
+}

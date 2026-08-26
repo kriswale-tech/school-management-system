@@ -185,6 +185,45 @@ class ClassDetailEndpointsTests(APITestCase):
             ).exists(),
         )
 
+    def test_assign_class_teacher_replaces_whole_class_assignment(self):
+        ClassTeacher.objects.create(
+            teacher=self.teacher,
+            class_level=self.class_level,
+            stream=None,
+            term=self.term,
+        )
+
+        response = self.client.put(
+            self.class_teacher_url,
+            {'teacher_id': str(self.teacher.id)},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            ClassTeacher.objects.filter(
+                teacher=self.teacher,
+                class_level=self.class_level,
+                term=self.term,
+            ).count(),
+            1,
+        )
+        self.assertTrue(
+            ClassTeacher.objects.filter(
+                teacher=self.teacher,
+                stream=self.stream,
+                term=self.term,
+            ).exists(),
+        )
+        self.assertFalse(
+            ClassTeacher.objects.filter(
+                teacher=self.teacher,
+                class_level=self.class_level,
+                stream__isnull=True,
+                term=self.term,
+            ).exists(),
+        )
+
     def test_assign_subject_teacher_for_group(self):
         response = self.client.put(
             self.subject_teacher_url,

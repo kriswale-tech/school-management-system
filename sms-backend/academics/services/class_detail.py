@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from django.db.models import Count, Prefetch
+from django.db.models import Count, Prefetch, Q
 from rest_framework.exceptions import NotFound, ValidationError
 
 from academics.models import ClassStream, ClassSubject, StudentSubjectGroup, SubjectGroup
@@ -422,13 +422,23 @@ def get_class_teacher_options(*, school, term=None, search=None):
 
 
 def assign_class_teacher(*, school, stream_id, teacher_id):
+    """Assign a class teacher to a stream for the active term.
+
+    Replaces any existing stream-specific assignment and any whole-class
+    (stream-null) assignment on the same class level, so setup-era whole-class
+    rows do not stack beside the new stream assignment.
+    """
     term = get_active_term(
         school,
         detail='Set an active term before assigning a class teacher.',
     )
     stream = get_stream_for_school(school=school, stream_id=stream_id)
 
-    ClassTeacher.objects.filter(term=term, stream=stream).delete()
+    ClassTeacher.objects.filter(
+        Q(stream=stream)
+        | Q(class_level_id=stream.class_level_id, stream__isnull=True),
+        term=term,
+    ).delete()
     create_class_teacher_assignment(
         school,
         teacher_id=teacher_id,
@@ -489,10 +499,12 @@ def assign_subject_teacher(
             subject_group_id=group.id,
         )
     else:
+        # Replace stream-specific and whole-class rows for this subject so
+        # setup-era stream-null assignments do not stack with the new one.
         TeachingAssignment.objects.filter(
+            Q(stream_id=stream.id) | Q(stream__isnull=True),
             term=term,
             class_subject_id=class_subject.id,
-            stream_id=stream.id,
             subject_group__isnull=True,
         ).delete()
         create_teaching_assignment(

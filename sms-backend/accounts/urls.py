@@ -12,6 +12,9 @@ from accounts.views import (
     ResendLoginOtpView,
     ResendOtpView,
     SelectSchoolView,
+    StaffDeskDetailView,
+    StaffDeskListView,
+    StaffDeskStatsView,
     UserDetailView,
     UserListCreateView,
 )
@@ -30,4 +33,8 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='logout'),
     path('users/', UserListCreateView.as_view(), name='user-list'),
     path('users/<uuid:pk>/', UserDetailView.as_view(), name='user-detail'),
+    # Staff directory (separate from /users/ so existing user-management stays unchanged)
+    path('staff/', StaffDeskListView.as_view(), name='staff-desk-list'),
+    path('staff/stats/', StaffDeskStatsView.as_view(), name='staff-desk-stats'),
+    path('staff/<uuid:pk>/', StaffDeskDetailView.as_view(), name='staff-desk-detail'),
 ]

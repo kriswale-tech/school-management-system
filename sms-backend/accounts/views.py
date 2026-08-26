@@ -33,6 +33,18 @@ from accounts.serializers import (
     UpdateUserSerializer,
     UserSerializer,
 )
+from accounts.staff_desk_serializers import (
+    StaffDeskDetailSerializer,
+    StaffDeskRowSerializer,
+    StaffDeskStatsSerializer,
+)
+from accounts.services.staff_desk import (
+    get_staff_desk_membership,
+    get_staff_desk_stats,
+    list_staff_desk_memberships,
+    serialize_staff_desk_detail,
+    serialize_staff_desk_row,
+)
 from accounts.services.memberships import (
     NO_SCHOOL_ACCESS_MESSAGE,
     active_memberships,
@@ -717,3 +729,137 @@ class UserDetailView(APIView):
             DeleteUserResponseSerializer(response_data).data,
             status=status.HTTP_200_OK,
         )
+
+
+def _filtered_staff_desk_queryset(request):
+    """Apply the same search/role filters to staff list and stats."""
+    queryset = list_staff_desk_memberships(request.membership)
+    filterset = SchoolMemberFilter(request.query_params, queryset=queryset)
+    if not filterset.is_valid():
+        raise ValidationError(filterset.errors)
+    return filterset.qs
+
+
+class StaffDeskListView(APIView):
+    """Paginated staff directory for the school staff page."""
+
+    permission_classes = [HasActiveSchool, CanManageUser]
+    pagination_class = StandardResultsSetPagination
+
+    @extend_schema(
+        tags=['Accounts'],
+        summary='List staff directory',
+        description=(
+            'Paginated members of the selected school that the requester can '
+            'manage. Includes teacher subtype flags (class / subject) based on '
+            'assignments in the school active term. Does not replace '
+            '`/accounts/users/` — use this for the staff directory UI.'
+        ),
+        parameters=[
+            OpenApiParameter(
+                name='role',
+                type=str,
+                enum=[choice[0] for choice in User.RoleChoices.choices],
+                description='Filter by role in this school (admin, teacher, accountant, staff).',
+            ),
+            OpenApiParameter(
+                name='is_active',
+                type=bool,
+                description='Filter by active status in this school.',
+            ),
+            OpenApiParameter(
+                name='exclude',
+                type=str,
+                description='Exclude role(s), comma-separated (e.g. teacher,staff).',
+            ),
+            OpenApiParameter(
+                name='search',
+                type=str,
+                description='Search first name, last name, email, or phone number.',
+            ),
+            OpenApiParameter(name='page', type=int, description='Page number.'),
+            OpenApiParameter(name='page_size', type=int, description='Page size (max 100).'),
+        ],
+        responses={
+            200: paginated_schema(StaffDeskRowSerializer, name='PaginatedStaffDeskList'),
+        },
+    )
+    def get(self, request):
+        queryset = _filtered_staff_desk_queryset(request)
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(queryset, request)
+        data = [serialize_staff_desk_row(membership) for membership in page]
+        serializer = StaffDeskRowSerializer(data, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+
+class StaffDeskStatsView(APIView):
+    """Filter-aware staff counts for the directory stats cards."""
+
+    permission_classes = [HasActiveSchool, CanManageUser]
+
+    @extend_schema(
+        tags=['Accounts'],
+        summary='Staff directory statistics',
+        description=(
+            'Role breakdown for memberships matching the same filters as the '
+            'staff directory list (search, role, is_active, exclude).'
+        ),
+        parameters=[
+            OpenApiParameter(
+                name='role',
+                type=str,
+                enum=[choice[0] for choice in User.RoleChoices.choices],
+                description='Filter by role in this school.',
+            ),
+            OpenApiParameter(
+                name='is_active',
+                type=bool,
+                description='Filter by active status in this school.',
+            ),
+            OpenApiParameter(
+                name='exclude',
+                type=str,
+                description='Exclude role(s), comma-separated.',
+            ),
+            OpenApiParameter(
+                name='search',
+                type=str,
+                description='Search first name, last name, email, or phone number.',
+            ),
+        ],
+        responses={200: StaffDeskStatsSerializer},
+    )
+    def get(self, request):
+        queryset = _filtered_staff_desk_queryset(request)
+        stats = get_staff_desk_stats(queryset)
+        return Response(StaffDeskStatsSerializer(stats).data)
+
+
+class StaffDeskDetailView(APIView):
+    """Single staff member for the directory details page."""
+
+    permission_classes = [HasActiveSchool, CanManageUser]
+
+    def get_membership(self, request, pk):
+        membership = get_staff_desk_membership(request.membership, pk)
+        self.check_object_permissions(request, membership)
+        return membership
+
+    @extend_schema(
+        tags=['Accounts'],
+        summary='Get staff directory detail',
+        description=(
+            'Returns a manageable school member with profile and, for teachers, '
+            'active-term class-teacher and subject-teaching assignments.'
+        ),
+        responses={
+            200: StaffDeskDetailSerializer,
+            403: OpenApiResponse(description='Permission denied'),
+            404: OpenApiResponse(description='User not found'),
+        },
+    )
+    def get(self, request, pk):
+        membership = self.get_membership(request, pk)
+        payload = serialize_staff_desk_detail(membership)
+        return Response(StaffDeskDetailSerializer(payload).data)
