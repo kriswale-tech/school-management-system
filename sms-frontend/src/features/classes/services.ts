@@ -12,6 +12,8 @@ import type {
   ClassStudentListResponse,
   ClassSubjectListResponse,
   ClassTeacherOptionListResponse,
+  SubjectGroupCandidateList,
+  TeachingAssignmentDetail,
 } from './types'
 
 export const getClasses = async () => {
@@ -92,6 +94,58 @@ export const assignSubjectTeacher = async (
   const response = await api.put<ClassSubjectListResponse>(
     `/academics/classes/${streamId}/subject-teacher/`,
     payload,
+  )
+  return response.data
+}
+
+export const getTeachingAssignmentDetail = async (
+  assignmentId: string,
+): Promise<TeachingAssignmentDetail> => {
+  const response = await api.get<TeachingAssignmentDetail>(
+    `/academics/teaching-assignments/${assignmentId}/`,
+  )
+  return response.data
+}
+
+export const getTeachingAssignmentStudents = async (
+  assignmentId: string,
+  params: { search?: string } = {},
+): Promise<ClassStudentListResponse> => {
+  const url = getQueryUrl(`/academics/teaching-assignments/${assignmentId}/students/`, params)
+  const response = await api.get<ClassStudentListResponse>(url)
+  return response.data
+}
+
+export const getSubjectGroupCandidates = async (
+  assignmentId: string,
+  params: { search?: string } = {},
+): Promise<SubjectGroupCandidateList> => {
+  const url = getQueryUrl(
+    `/academics/teaching-assignments/${assignmentId}/group-candidates/`,
+    params,
+  )
+  const response = await api.get<SubjectGroupCandidateList>(url)
+  return response.data
+}
+
+export const assignSubjectGroupStudents = async (
+  assignmentId: string,
+  studentIds: string[],
+): Promise<TeachingAssignmentDetail> => {
+  const response = await api.post<TeachingAssignmentDetail>(
+    `/academics/teaching-assignments/${assignmentId}/assign-students/`,
+    { student_ids: studentIds },
+  )
+  return response.data
+}
+
+export const unassignSubjectGroupStudents = async (
+  assignmentId: string,
+  studentIds: string[],
+): Promise<TeachingAssignmentDetail> => {
+  const response = await api.post<TeachingAssignmentDetail>(
+    `/academics/teaching-assignments/${assignmentId}/unassign-students/`,
+    { student_ids: studentIds },
   )
   return response.data
 }

@@ -7,6 +7,7 @@ import type {
   StaffDeskRow,
   StaffDeskStats,
   StaffQueryParams,
+  MyTeaching,
   UpdateStaffResponse,
 } from './types'
 import { getQueryUrl } from '@/utils/get-query-url'
@@ -53,5 +54,11 @@ export const getStaffDeskStats = async (
 /** Staff directory detail — GET /accounts/staff/:id/ */
 export const getStaffDeskDetail = async (id: string): Promise<StaffDeskDetail> => {
   const response = await api.get<StaffDeskDetail>(`/accounts/staff/${id}/`)
+  return response.data
+}
+
+/** Signed-in teacher assignments — GET /accounts/me/teaching/ */
+export const getMyTeaching = async (): Promise<MyTeaching> => {
+  const response = await api.get<MyTeaching>('/accounts/me/teaching/')
   return response.data
 }

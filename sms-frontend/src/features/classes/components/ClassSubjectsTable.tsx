@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Table, TableWrapper } from '@/components/shared'
 import ActionButton from '@/components/ui/ActionButton'
+import { Capability } from '@/features/auth/capabilities'
+import { useCan } from '@/features/auth/hooks'
 import type { ClassSubjectRow } from '../types'
 import AssignSubjectTeacher from './AssignSubjectTeacher'
 
@@ -17,6 +19,7 @@ const ClassSubjectsTable = ({
   isLoading = false,
   onAssigned,
 }: ClassSubjectsTableProps) => {
+  const canManageClasses = useCan(Capability.CLASSES_MANAGE)
   const [selectedSubject, setSelectedSubject] = useState<ClassSubjectRow | null>(null)
 
   return (
@@ -29,7 +32,7 @@ const ClassSubjectsTable = ({
           description: 'Subjects for this class will appear here once configured.',
           icon: 'hugeicons:book-02',
         }}
-        skeletonColumns={4}
+        skeletonColumns={canManageClasses ? 4 : 3}
         variant="form-field"
       >
         <Table>
@@ -38,7 +41,7 @@ const ClassSubjectsTable = ({
               <Table.HeaderCell>Subject</Table.HeaderCell>
               <Table.HeaderCell>Number of Students</Table.HeaderCell>
               <Table.HeaderCell>Subject Teacher</Table.HeaderCell>
-              <Table.HeaderCell>Action</Table.HeaderCell>
+              {canManageClasses ? <Table.HeaderCell>Action</Table.HeaderCell> : null}
             </Table.Row>
           </Table.Head>
           <Table.Body>
@@ -47,29 +50,33 @@ const ClassSubjectsTable = ({
                 <Table.Cell variant="primary">{subject.name}</Table.Cell>
                 <Table.Cell>{subject.students_count}</Table.Cell>
                 <Table.Cell>{subject.teacher?.full_name ?? '-'}</Table.Cell>
-                <Table.Cell>
-                  <ActionButton
-                    icon="hugeicons:user-switch"
-                    label="Change Subject Teacher"
-                    onClick={() => setSelectedSubject(subject)}
-                  />
-                </Table.Cell>
+                {canManageClasses ? (
+                  <Table.Cell>
+                    <ActionButton
+                      icon="hugeicons:user-switch"
+                      label="Change Subject Teacher"
+                      onClick={() => setSelectedSubject(subject)}
+                    />
+                  </Table.Cell>
+                ) : null}
               </Table.Row>
             ))}
           </Table.Body>
         </Table>
       </TableWrapper>
 
-      <AssignSubjectTeacher
-        open={Boolean(selectedSubject)}
-        streamId={streamId}
-        subject={selectedSubject}
-        onClose={() => setSelectedSubject(null)}
-        onAssigned={() => {
-          setSelectedSubject(null)
-          onAssigned?.()
-        }}
-      />
+      {canManageClasses ? (
+        <AssignSubjectTeacher
+          open={Boolean(selectedSubject)}
+          streamId={streamId}
+          subject={selectedSubject}
+          onClose={() => setSelectedSubject(null)}
+          onAssigned={() => {
+            setSelectedSubject(null)
+            onAssigned?.()
+          }}
+        />
+      ) : null}
     </>
   )
 }

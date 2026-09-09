@@ -1,13 +1,29 @@
 import { Navigate, Outlet } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { AppToaster, AuthLoading } from '@/components/shared'
 import { useAuth } from '@/features/auth/hooks'
+import { getUser } from '@/features/auth/services'
+import { useAuthStore } from '@/features/auth/store'
 import NavBar from '@/components/shared/NavBar'
 import SideNav from '../shared/SideNav'
 
 const AppLayout = () => {
   const { isReady, isAuthenticated, user } = useAuth({ requireAuth: true })
+  const setUser = useAuthStore((state) => state.setUser)
 
-  if (!isReady || !isAuthenticated) {
+  const { data: me, isFetched } = useQuery({
+    queryKey: ['me', 'session'],
+    queryFn: getUser,
+    enabled: isReady && isAuthenticated,
+    staleTime: 60_000,
+  })
+
+  useEffect(() => {
+    if (me) setUser(me)
+  }, [me, setUser])
+
+  if (!isReady || !isAuthenticated || (isAuthenticated && !isFetched && !user?.capabilities)) {
     return (
       <>
         <AppToaster />

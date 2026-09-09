@@ -1,6 +1,7 @@
 from rest_framework.permissions import BasePermission
 
 from accounts.models import User
+from accounts.services.capabilities import membership_has_capability
 from accounts.services.memberships import NO_ACTIVE_SCHOOL_MESSAGE, get_active_role
 from accounts.services.users import can_manage_membership
 
@@ -14,6 +15,27 @@ class HasActiveSchool(BasePermission):
         return (
             request.user.is_authenticated
             and getattr(request, 'membership', None) is not None
+        )
+
+
+class HasCapability(BasePermission):
+    """Requires a capability resolved from the active membership.
+
+    Set `required_capability` on the view, or subclass and set `capability`.
+    """
+
+    message = 'You do not have permission to perform this action.'
+    capability = None
+
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        required = getattr(view, 'required_capability', None) or self.capability
+        if not required:
+            return False
+        return membership_has_capability(
+            getattr(request, 'membership', None),
+            required,
         )
 
 

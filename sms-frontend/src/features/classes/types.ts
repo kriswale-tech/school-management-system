@@ -137,3 +137,43 @@ export type AssignSubjectTeacherPayload = {
   class_subject_id: string
   subject_group_id?: string | null
 }
+
+export type TeachingAssignmentDetail = {
+  id: string
+  class_subject_id: string
+  class_level_id: string
+  class_level_name: string
+  subject_id: string
+  subject_name: string
+  subject_label: string
+  stream_id: string | null
+  stream_name: string | null
+  subject_group_id: string | null
+  subject_group_name: string | null
+  display_class_name: string
+  students_count: number
+  unassigned_students_count: number
+  is_grouped: boolean
+  view_stream_id: string | null
+  term_id: string
+}
+
+export type SubjectGroupCandidateStatus = 'unassigned' | 'this_group' | 'other_group'
+
+export type SubjectGroupCandidate = {
+  id: string
+  full_name: string
+  student_id: string
+  status: SubjectGroupCandidateStatus
+  current_group_id: string | null
+  current_group_name: string | null
+  selectable: boolean
+}
+
+export type SubjectGroupCandidateList = {
+  term_id: string
+  subject_group_id: string
+  subject_group_name: string
+  unassigned_students_count: number
+  results: SubjectGroupCandidate[]
+}

@@ -7,6 +7,8 @@ import StatsCard from '@/components/shared/StatsCard'
 import { Button } from '@/components/ui'
 import FilterComponent, { type FilterSelection } from '@/components/ui/FilterComponent'
 import SearchComponent from '@/components/ui/SearchComponent'
+import { Capability } from '@/features/auth/capabilities'
+import { useCan } from '@/features/auth/hooks/useCan'
 import AddStaffFromDeskModal from './components/AddStaffFromDeskModal'
 import StaffDeskTable from './components/StaffDeskTable'
 import { getStaffDeskList, getStaffDeskStats } from './services'
@@ -15,6 +17,7 @@ import { STAFF_DESK_QUERY_KEY } from './utils'
 
 const Staff = () => {
   const navigate = useNavigate()
+  const canManageStaff = useCan(Capability.STAFF_MANAGE)
   const [search, setSearch] = useState('')
   const [role, setRole] = useState<FilterSelection>('')
   const [page, setPage] = useState(1)
@@ -71,13 +74,15 @@ const Staff = () => {
             setPage(1)
           }}
         />
-        <Button type="button" className="py-2 text-sm max-w-fit" onClick={openAdd}>
-          <Icon
-            icon="hugeicons:plus-sign"
-            className="size-4 bg-white text-black rounded-full p-0.5"
-          />
-          Add Staff
-        </Button>
+        {canManageStaff ? (
+          <Button type="button" className="py-2 text-sm max-w-fit" onClick={openAdd}>
+            <Icon
+              icon="hugeicons:plus-sign"
+              className="size-4 bg-white text-black rounded-full p-0.5"
+            />
+            Add Staff
+          </Button>
+        ) : null}
       </ActionBar>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -92,13 +97,15 @@ const Staff = () => {
         isLoading={isLoading}
         pagination={data ?? null}
         onPageChange={setPage}
-        onAddStaff={openAdd}
+        onAddStaff={canManageStaff ? openAdd : undefined}
         onViewStaff={(row) => {
           navigate(`/staff/${row.id}`)
         }}
       />
 
-      <AddStaffFromDeskModal open={addOpen} onClose={() => setAddOpen(false)} />
+      {canManageStaff ? (
+        <AddStaffFromDeskModal open={addOpen} onClose={() => setAddOpen(false)} />
+      ) : null}
     </div>
   )
 }

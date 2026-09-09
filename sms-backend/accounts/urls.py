@@ -7,6 +7,7 @@ from accounts.views import (
     LoginVerifyOtpView,
     LoginView,
     LogoutView,
+    MeTeachingView,
     MeView,
     RefreshTokenView,
     ResendLoginOtpView,
@@ -21,6 +22,7 @@ from accounts.views import (
 
 urlpatterns = [
     path('me/', MeView.as_view(), name='me'),
+    path('me/teaching/', MeTeachingView.as_view(), name='me-teaching'),
     path('schools/', CreateSchoolView.as_view(), name='create-school'),
     path('select-school/', SelectSchoolView.as_view(), name='select-school'),
     path('signup/', AdminSignUpView.as_view(), name='admin-signup'),

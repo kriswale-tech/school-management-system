@@ -185,81 +185,146 @@ def _teaching_display_class_name(assignment) -> str:
     return class_level_name
 
 
+def _resolve_view_stream_id(*, class_level_id, stream_id):
+    """Stream id to open on the Classes detail page.
+
+    Explicit stream assignments use that stream. Whole-class assignments use the
+    first listed stream for the class (named streams if any, else the default).
+    """
+    if stream_id:
+        return stream_id
+
+    from academics.models import ClassStream
+
+    streams = list(
+        ClassStream.objects.filter(class_level_id=class_level_id, is_active=True)
+    )
+    named = sorted(
+        (s for s in streams if not s.is_default),
+        key=lambda item: item.name,
+    )
+    if named:
+        return named[0].id
+    default = next((s for s in streams if s.is_default), None)
+    return default.id if default is not None else None
+
+
+def serialize_teacher_assignments(*, user, school) -> dict:
+    """Active-term class-teacher and subject-teaching cards for one teacher."""
+    active_term = _active_term_for_school(school)
+    class_teacher_assignments = []
+    teaching_assignments = []
+
+    if active_term is None:
+        return {
+            'class_teacher_assignments': class_teacher_assignments,
+            'teaching_assignments': teaching_assignments,
+        }
+
+    for assignment in ClassTeacher.objects.filter(
+        teacher=user,
+        term=active_term,
+    ).select_related('class_level', 'stream'):
+        class_teacher_assignments.append({
+            'id': assignment.id,
+            'class_level_id': assignment.class_level_id,
+            'class_level_name': assignment.class_level.name,
+            'stream_id': assignment.stream_id,
+            'stream_name': _serialize_stream_name(assignment.stream),
+            'display_name': _class_teacher_display_name(assignment),
+            'students_count': _enrollment_count(
+                term=active_term,
+                class_level_id=assignment.class_level_id,
+                stream_id=assignment.stream_id,
+            ),
+            'view_stream_id': _resolve_view_stream_id(
+                class_level_id=assignment.class_level_id,
+                stream_id=assignment.stream_id,
+            ),
+        })
+
+    for assignment in TeachingAssignment.objects.filter(
+        teacher=user,
+        term=active_term,
+    ).select_related(
+        'class_subject__class_level',
+        'class_subject__subject',
+        'stream',
+        'subject_group',
+    ):
+        class_level_id = assignment.class_subject.class_level_id
+        if assignment.subject_group_id:
+            students_count = _subject_group_student_count(
+                term=active_term,
+                subject_group_id=assignment.subject_group_id,
+                class_level_id=class_level_id,
+                stream_id=assignment.stream_id,
+            )
+        else:
+            students_count = _enrollment_count(
+                term=active_term,
+                class_level_id=class_level_id,
+                stream_id=assignment.stream_id,
+            )
+
+        teaching_assignments.append({
+            'id': assignment.id,
+            'class_subject_id': assignment.class_subject_id,
+            'class_level_id': class_level_id,
+            'class_level_name': assignment.class_subject.class_level.name,
+            'subject_id': assignment.class_subject.subject_id,
+            'subject_name': assignment.class_subject.subject.name,
+            'stream_id': assignment.stream_id,
+            'stream_name': _serialize_stream_name(assignment.stream),
+            'subject_group_id': assignment.subject_group_id,
+            'subject_group_name': (
+                assignment.subject_group.name if assignment.subject_group_id else None
+            ),
+            'display_class_name': _teaching_display_class_name(assignment),
+            'students_count': students_count,
+            'view_stream_id': _resolve_view_stream_id(
+                class_level_id=class_level_id,
+                stream_id=assignment.stream_id,
+            ),
+        })
+
+    return {
+        'class_teacher_assignments': class_teacher_assignments,
+        'teaching_assignments': teaching_assignments,
+    }
+
+
+def serialize_my_teaching(membership) -> dict:
+    """Payload for the signed-in teacher's Classes workspace."""
+    assignments = serialize_teacher_assignments(
+        user=membership.user,
+        school=membership.school,
+    )
+    return {
+        'is_class_teacher': bool(assignments['class_teacher_assignments']),
+        'is_subject_teacher': bool(assignments['teaching_assignments']),
+        **assignments,
+    }
+
+
 def serialize_staff_desk_detail(membership) -> dict:
     """Full staff member payload for the details page."""
     user = membership.user
     school = membership.school
     row = serialize_staff_desk_row(membership)
-    active_term = _active_term_for_school(school)
 
-    class_teacher_assignments = []
-    teaching_assignments = []
-
-    if membership.role == User.RoleChoices.TEACHER and active_term is not None:
-        for assignment in ClassTeacher.objects.filter(
-            teacher=user,
-            term=active_term,
-        ).select_related('class_level', 'stream'):
-            class_teacher_assignments.append({
-                'id': assignment.id,
-                'class_level_id': assignment.class_level_id,
-                'class_level_name': assignment.class_level.name,
-                'stream_id': assignment.stream_id,
-                'stream_name': _serialize_stream_name(assignment.stream),
-                'display_name': _class_teacher_display_name(assignment),
-                'students_count': _enrollment_count(
-                    term=active_term,
-                    class_level_id=assignment.class_level_id,
-                    stream_id=assignment.stream_id,
-                ),
-            })
-
-        for assignment in TeachingAssignment.objects.filter(
-            teacher=user,
-            term=active_term,
-        ).select_related(
-            'class_subject__class_level',
-            'class_subject__subject',
-            'stream',
-            'subject_group',
-        ):
-            class_level_id = assignment.class_subject.class_level_id
-            if assignment.subject_group_id:
-                students_count = _subject_group_student_count(
-                    term=active_term,
-                    subject_group_id=assignment.subject_group_id,
-                    class_level_id=class_level_id,
-                    stream_id=assignment.stream_id,
-                )
-            else:
-                students_count = _enrollment_count(
-                    term=active_term,
-                    class_level_id=class_level_id,
-                    stream_id=assignment.stream_id,
-                )
-
-            teaching_assignments.append({
-                'id': assignment.id,
-                'class_subject_id': assignment.class_subject_id,
-                'class_level_id': class_level_id,
-                'class_level_name': assignment.class_subject.class_level.name,
-                'subject_id': assignment.class_subject.subject_id,
-                'subject_name': assignment.class_subject.subject.name,
-                'stream_id': assignment.stream_id,
-                'stream_name': _serialize_stream_name(assignment.stream),
-                'subject_group_id': assignment.subject_group_id,
-                'subject_group_name': (
-                    assignment.subject_group.name if assignment.subject_group_id else None
-                ),
-                'display_class_name': _teaching_display_class_name(assignment),
-                'students_count': students_count,
-            })
+    if membership.role == User.RoleChoices.TEACHER:
+        assignments = serialize_teacher_assignments(user=user, school=school)
+    else:
+        assignments = {
+            'class_teacher_assignments': [],
+            'teaching_assignments': [],
+        }
 
     return {
         **row,
         'profile': _serialize_profile(user),
         'school_id': school.id,
         'school_setup_completed': school.setup_completed,
-        'class_teacher_assignments': class_teacher_assignments,
-        'teaching_assignments': teaching_assignments,
+        **assignments,
     }

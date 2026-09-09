@@ -1,6 +1,8 @@
 import ActionBar from '@/components/shared/ActionBar'
 import TabComponent from '@/components/shared/TabComponent'
 import { DotComponent } from '@/components/ui'
+import { Capability } from '@/features/auth/capabilities'
+import { useCan } from '@/features/auth/hooks'
 import { getApiErrorMessage } from '@/utils'
 import { Icon } from '@iconify/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -17,6 +19,7 @@ const TAB_SUBJECTS = 'Subjects'
 const ClassDetail = () => {
   const { id: streamId } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
+  const canManageClasses = useCan(Capability.CLASSES_MANAGE)
   const [activeTab, setActiveTab] = useState(TAB_STUDENTS)
   const [assignClassTeacherOpen, setAssignClassTeacherOpen] = useState(false)
 
@@ -87,15 +90,21 @@ const ClassDetail = () => {
               </span>
               <DotComponent />
               {classDetail.class_teacher ? (
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-slate-700 cursor-pointer"
-                  onClick={() => setAssignClassTeacherOpen(true)}
-                >
-                  {classDetail.class_teacher.full_name} (Class Teacher)
-                  <Icon icon="hugeicons:pencil-edit-02" className="size-4" />
-                </button>
-              ) : (
+                canManageClasses ? (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-slate-700 cursor-pointer"
+                    onClick={() => setAssignClassTeacherOpen(true)}
+                  >
+                    {classDetail.class_teacher.full_name} (Class Teacher)
+                    <Icon icon="hugeicons:pencil-edit-02" className="size-4" />
+                  </button>
+                ) : (
+                  <span className="text-sm text-gray-500">
+                    {classDetail.class_teacher.full_name} (Class Teacher)
+                  </span>
+                )
+              ) : canManageClasses ? (
                 <button
                   type="button"
                   className="text-sm text-red-600 cursor-pointer"
@@ -103,6 +112,8 @@ const ClassDetail = () => {
                 >
                   Assign Class Teacher
                 </button>
+              ) : (
+                <span className="text-sm text-slate-500">No class teacher assigned</span>
               )}
             </div>
 
@@ -130,7 +141,7 @@ const ClassDetail = () => {
         )}
       </div>
 
-      {streamId && classDetail ? (
+      {canManageClasses && streamId && classDetail ? (
         <AssignClassTeacher
           open={assignClassTeacherOpen}
           streamId={streamId}

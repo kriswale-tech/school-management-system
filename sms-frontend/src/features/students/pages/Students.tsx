@@ -7,6 +7,8 @@ import { Button } from '@/components/ui'
 import FilterComponent, { type FilterSelection } from '@/components/ui/FilterComponent'
 import SearchComponent from '@/components/ui/SearchComponent'
 import { getClasses } from '@/features/classes/services'
+import { Capability } from '@/features/auth/capabilities'
+import { useCan } from '@/features/auth/hooks/useCan'
 import StudentsTable from '../components/StudentsTable'
 import { getStudentStats, getStudents } from '../services'
 import type { StudentQueryParams } from '../types'
@@ -20,6 +22,7 @@ const Students = () => {
   const [page, setPage] = useState(1)
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
+  const canCreateStudent = useCan(Capability.STUDENTS_CREATE)
   const queryParams: StudentQueryParams = {
     page,
     search: search || undefined,
@@ -66,13 +69,15 @@ const Students = () => {
             setPage(1)
           }}
         />
-        <Button className="py-2 text-sm max-w-fit" onClick={() => setOpen(true)}>
-          <Icon
-            icon="hugeicons:plus-sign"
-            className="size-4 bg-white text-black rounded-full p-0.5"
-          />
-          Add Student
-        </Button>
+        {canCreateStudent ? (
+          <Button className="py-2 text-sm max-w-fit" onClick={() => setOpen(true)}>
+            <Icon
+              icon="hugeicons:plus-sign"
+              className="size-4 bg-white text-black rounded-full p-0.5"
+            />
+            Add Student
+          </Button>
+        ) : null}
       </ActionBar>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -92,9 +97,11 @@ const Students = () => {
         }}
       />
 
-      <SideSlider open={open} title="Student Onboarding" onClose={() => setOpen(false)}>
-        <StudentOnboarding />
-      </SideSlider>
+      {canCreateStudent ? (
+        <SideSlider open={open} title="Student Onboarding" onClose={() => setOpen(false)}>
+          <StudentOnboarding />
+        </SideSlider>
+      ) : null}
     </div>
   )
 }

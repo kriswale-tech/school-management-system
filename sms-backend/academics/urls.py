@@ -12,6 +12,11 @@ from academics.views import (
     ClassSubjectsView,
     ClassTeacherAssignView,
     ClassTeacherOptionsView,
+    SubjectGroupAssignStudentsView,
+    SubjectGroupCandidatesView,
+    SubjectGroupUnassignStudentsView,
+    TeachingAssignmentDetailView,
+    TeachingAssignmentStudentsView,
 )
 
 urlpatterns = [
@@ -33,6 +38,31 @@ urlpatterns = [
         name='academics-classes-teachers',
     ),
     path('classes/', ClassListView.as_view(), name='academics-classes'),
+    path(
+        'teaching-assignments/<uuid:assignment_id>/',
+        TeachingAssignmentDetailView.as_view(),
+        name='academics-teaching-assignment-detail',
+    ),
+    path(
+        'teaching-assignments/<uuid:assignment_id>/students/',
+        TeachingAssignmentStudentsView.as_view(),
+        name='academics-teaching-assignment-students',
+    ),
+    path(
+        'teaching-assignments/<uuid:assignment_id>/group-candidates/',
+        SubjectGroupCandidatesView.as_view(),
+        name='academics-subject-group-candidates',
+    ),
+    path(
+        'teaching-assignments/<uuid:assignment_id>/assign-students/',
+        SubjectGroupAssignStudentsView.as_view(),
+        name='academics-subject-group-assign-students',
+    ),
+    path(
+        'teaching-assignments/<uuid:assignment_id>/unassign-students/',
+        SubjectGroupUnassignStudentsView.as_view(),
+        name='academics-subject-group-unassign-students',
+    ),
     path(
         'classes/<uuid:stream_id>/',
         ClassDetailView.as_view(),

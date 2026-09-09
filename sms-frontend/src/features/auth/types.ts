@@ -53,6 +53,15 @@ export interface User {
   school_id: string | null
   schools: SchoolMembership[]
   requires_school_selection: boolean
+  /** Capability codes for the active school session (empty when unscoped). */
+  capabilities?: string[]
+  access?: AccessInfo
+}
+
+export interface AccessInfo {
+  mode: 'school' | 'scoped'
+  is_class_teacher: boolean
+  is_subject_teacher: boolean
 }
 
 /** Login / OTP / select-school response body (cookies carry the tokens). */

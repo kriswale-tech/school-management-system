@@ -10,6 +10,7 @@ from accounts.tests.factories import (
     user_school,
 )
 from schools.models import AcademicYear, Term
+from students.tests.factories import ensure_default_stream
 from teachers.models import ClassTeacher
 
 
@@ -66,6 +67,7 @@ class StaffDeskAPITests(APITestCase):
             name='Basic 1',
             order=1,
         )
+        self.default_stream = ensure_default_stream(self.class_level)
         ClassTeacher.objects.create(
             teacher=self.teacher,
             class_level=self.class_level,
@@ -131,4 +133,24 @@ class StaffDeskAPITests(APITestCase):
             response.data['class_teacher_assignments'][0]['students_count'],
             0,
         )
+        self.assertIsNotNone(
+            response.data['class_teacher_assignments'][0]['view_stream_id'],
+        )
         self.assertEqual(response.data['teaching_assignments'], [])
+
+    def test_me_teaching_returns_own_assignments_for_teacher(self):
+        set_client_auth_cookies(self.client, self.teacher)
+        url = reverse('me-teaching')
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['is_class_teacher'])
+        self.assertFalse(response.data['is_subject_teacher'])
+        self.assertEqual(len(response.data['class_teacher_assignments']), 1)
+        self.assertEqual(
+            response.data['class_teacher_assignments'][0]['display_name'],
+            'Basic 1',
+        )
+        self.assertIsNotNone(
+            response.data['class_teacher_assignments'][0]['view_stream_id'],
+        )

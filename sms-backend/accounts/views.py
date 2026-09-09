@@ -34,6 +34,7 @@ from accounts.serializers import (
     UserSerializer,
 )
 from accounts.staff_desk_serializers import (
+    MyTeachingSerializer,
     StaffDeskDetailSerializer,
     StaffDeskRowSerializer,
     StaffDeskStatsSerializer,
@@ -42,6 +43,7 @@ from accounts.services.staff_desk import (
     get_staff_desk_membership,
     get_staff_desk_stats,
     list_staff_desk_memberships,
+    serialize_my_teaching,
     serialize_staff_desk_detail,
     serialize_staff_desk_row,
 )
@@ -189,6 +191,26 @@ class MeView(APIView):
             },
         )
         return Response(serializer.data)
+
+
+class MeTeachingView(APIView):
+    """Active-term teaching assignments for the signed-in teacher."""
+
+    permission_classes = [HasActiveSchool]
+
+    @extend_schema(
+        tags=['Accounts'],
+        summary='Get my teaching assignments',
+        description=(
+            'Returns class-teacher and subject-teaching assignments for the '
+            'authenticated membership in the school active term. Used by the '
+            'teacher Classes workspace.'
+        ),
+        responses={200: MyTeachingSerializer},
+    )
+    def get(self, request):
+        payload = serialize_my_teaching(request.membership)
+        return Response(MyTeachingSerializer(payload).data)
 
 
 @method_decorator(csrf_exempt, name='dispatch')

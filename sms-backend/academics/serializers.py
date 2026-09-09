@@ -128,3 +128,50 @@ class AssignSubjectTeacherSerializer(serializers.Serializer):
     teacher_id = serializers.UUIDField()
     class_subject_id = serializers.UUIDField()
     subject_group_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class TeachingAssignmentDetailSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    class_subject_id = serializers.UUIDField()
+    class_level_id = serializers.UUIDField()
+    class_level_name = serializers.CharField()
+    subject_id = serializers.UUIDField()
+    subject_name = serializers.CharField()
+    subject_label = serializers.CharField()
+    stream_id = serializers.UUIDField(allow_null=True)
+    stream_name = serializers.CharField(allow_null=True)
+    subject_group_id = serializers.UUIDField(allow_null=True)
+    subject_group_name = serializers.CharField(allow_null=True)
+    display_class_name = serializers.CharField()
+    students_count = serializers.IntegerField()
+    unassigned_students_count = serializers.IntegerField()
+    is_grouped = serializers.BooleanField()
+    view_stream_id = serializers.UUIDField(allow_null=True)
+    term_id = serializers.UUIDField()
+
+
+class SubjectGroupCandidateSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    full_name = serializers.CharField()
+    student_id = serializers.CharField()
+    status = serializers.ChoiceField(
+        choices=['unassigned', 'this_group', 'other_group'],
+    )
+    current_group_id = serializers.UUIDField(allow_null=True)
+    current_group_name = serializers.CharField(allow_null=True)
+    selectable = serializers.BooleanField()
+
+
+class SubjectGroupCandidateListSerializer(serializers.Serializer):
+    term_id = serializers.UUIDField()
+    subject_group_id = serializers.UUIDField()
+    subject_group_name = serializers.CharField()
+    unassigned_students_count = serializers.IntegerField()
+    results = SubjectGroupCandidateSerializer(many=True)
+
+
+class SubjectGroupStudentIdsSerializer(serializers.Serializer):
+    student_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        allow_empty=False,
+    )

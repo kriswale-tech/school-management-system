@@ -107,6 +107,8 @@ export interface StaffDeskClassTeacherAssignment {
   stream_name: string | null
   display_name: string
   students_count: number
+  /** Stream to open on `/classes/:id` (resolved when assignment is whole-class). */
+  view_stream_id: string | null
 }
 
 export interface StaffDeskTeachingAssignment {
@@ -122,6 +124,15 @@ export interface StaffDeskTeachingAssignment {
   subject_group_name: string | null
   display_class_name: string
   students_count: number
+  view_stream_id: string | null
+}
+
+/** Response from GET /accounts/me/teaching/ */
+export interface MyTeaching {
+  is_class_teacher: boolean
+  is_subject_teacher: boolean
+  class_teacher_assignments: StaffDeskClassTeacherAssignment[]
+  teaching_assignments: StaffDeskTeachingAssignment[]
 }
 
 /** Response from GET /accounts/staff/:id/ */

@@ -8,6 +8,7 @@ import type { ClassStudent } from '../types'
 type ClassStudentsTableProps = {
   students?: ClassStudent[]
   isLoading?: boolean
+  onUnassignStudent?: (_student: ClassStudent) => void
 }
 
 const formatAdmissionDate = (value: string) => {
@@ -15,16 +16,23 @@ const formatAdmissionDate = (value: string) => {
   return date.isValid() ? date.format('DD MMM YYYY') : '-'
 }
 
-const ClassStudentsTable = ({ students = [], isLoading = false }: ClassStudentsTableProps) => {
+const ClassStudentsTable = ({
+  students = [],
+  isLoading = false,
+  onUnassignStudent,
+}: ClassStudentsTableProps) => {
   const navigate = useNavigate()
+  const showUnassign = Boolean(onUnassignStudent)
 
   return (
     <TableWrapper
       isLoading={isLoading}
       isEmpty={!isLoading && students.length === 0}
       emptyState={{
-        title: 'No students in this class',
-        description: 'Students enrolled in this class will appear here.',
+        title: showUnassign ? 'No students in this group' : 'No students in this class',
+        description: showUnassign
+          ? 'Assign students to this subject group to see them here.'
+          : 'Students enrolled in this class will appear here.',
         icon: 'hugeicons:student',
       }}
       skeletonColumns={3}
@@ -52,11 +60,20 @@ const ClassStudentsTable = ({ students = [], isLoading = false }: ClassStudentsT
               </Table.Cell>
               <Table.Cell>{formatAdmissionDate(student.admission_date)}</Table.Cell>
               <Table.Cell>
-                <ActionButton
-                  icon="hugeicons:view"
-                  label={`View ${student.full_name}`}
-                  onClick={() => navigate(`/students/${student.id}`)}
-                />
+                <div className="flex items-center gap-2">
+                  <ActionButton
+                    icon="hugeicons:view"
+                    label={`View ${student.full_name}`}
+                    onClick={() => navigate(`/students/${student.id}`)}
+                  />
+                  {showUnassign ? (
+                    <ActionButton
+                      icon="hugeicons:user-minus-02"
+                      label={`Unassign ${student.full_name}`}
+                      onClick={() => onUnassignStudent?.(student)}
+                    />
+                  ) : null}
+                </div>
               </Table.Cell>
             </Table.Row>
           ))}

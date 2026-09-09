@@ -78,6 +78,10 @@ class StaffDeskClassTeacherAssignmentSerializer(serializers.Serializer):
     students_count = serializers.IntegerField(
         help_text='Enrolled students in this managed class for the active term.',
     )
+    view_stream_id = serializers.UUIDField(
+        allow_null=True,
+        help_text='Stream id to open on the Classes detail page.',
+    )
 
 
 class StaffDeskTeachingAssignmentSerializer(serializers.Serializer):
@@ -97,6 +101,19 @@ class StaffDeskTeachingAssignmentSerializer(serializers.Serializer):
     students_count = serializers.IntegerField(
         help_text='Students covered by this teaching assignment in the active term.',
     )
+    view_stream_id = serializers.UUIDField(
+        allow_null=True,
+        help_text='Stream id to open on the Classes detail page.',
+    )
+
+
+class MyTeachingSerializer(serializers.Serializer):
+    """Signed-in teacher's active-term assignments for the Classes workspace."""
+
+    is_class_teacher = serializers.BooleanField()
+    is_subject_teacher = serializers.BooleanField()
+    class_teacher_assignments = StaffDeskClassTeacherAssignmentSerializer(many=True)
+    teaching_assignments = StaffDeskTeachingAssignmentSerializer(many=True)
 
 
 class StaffDeskProfileSerializer(serializers.Serializer):

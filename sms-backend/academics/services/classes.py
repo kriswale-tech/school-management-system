@@ -174,14 +174,19 @@ def _resolve_class_teacher(stream, *, by_stream, by_class_level):
     return by_stream.get(stream.id) or by_class_level.get(stream.class_level_id)
 
 
-def get_class_list(*, school, term=None, search=None):
+def get_class_list(*, school, term=None, search=None, scope=None):
     """Flat list of class streams for the Classes page table.
 
     Each item is a stream: named streams become separate rows; classes with
     only a default stream appear as a single row using the class display name.
     Level refers to the department (Level), not ClassLevel.
     needs_attention is true when any subject/group lacks a teacher assignment.
+
+    When ``scope`` is assignment-scoped (teachers), only assigned streams are
+    returned.
     """
+    from accounts.services.access_scope import filter_class_list_results
+
     term = term or get_active_term(
         school,
         detail='Set an active term before viewing classes.',
@@ -234,19 +239,22 @@ def get_class_list(*, school, term=None, search=None):
             'capacity': stream.capacity,
         })
 
+    if scope is not None:
+        results = filter_class_list_results(results, scope)
+
     return {
         'term_id': term.id,
         'results': results,
     }
 
 
-def get_class_stats(*, school, term=None):
+def get_class_stats(*, school, term=None, scope=None):
     """Aggregate stats over the same stream rows shown in the class list."""
     term = term or get_active_term(
         school,
         detail='Set an active term before viewing class stats.',
     )
-    payload = get_class_list(school=school, term=term)
+    payload = get_class_list(school=school, term=term, scope=scope)
     results = payload['results']
 
     assigned_teacher_ids = {

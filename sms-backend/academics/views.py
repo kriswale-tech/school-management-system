@@ -12,6 +12,9 @@ from academics.serializers import (
     ClassStudentListSerializer,
     ClassSubjectListSerializer,
     ClassTeacherOptionListSerializer,
+    SubjectGroupCandidateListSerializer,
+    SubjectGroupStudentIdsSerializer,
+    TeachingAssignmentDetailSerializer,
 )
 from academics.services.all_classes import get_all_classes
 from academics.services.class_detail import (
@@ -23,6 +26,16 @@ from academics.services.class_detail import (
     get_class_teacher_options,
 )
 from academics.services.classes import get_class_list, get_class_stats
+from academics.services.teaching_assignments import (
+    assign_students_to_subject_group,
+    get_teaching_assignment_detail,
+    get_teaching_assignment_students,
+    list_subject_group_candidates,
+    unassign_students_from_subject_group,
+)
+from accounts.capabilities import Capability
+from accounts.permissions import HasActiveSchool, HasCapability
+from accounts.services.access_scope import resolve_access_scope
 from shared.views import SchoolScopedAPIView
 from students.services import resolve_term
 
@@ -171,6 +184,7 @@ class ClassListView(SchoolScopedAPIView):
             school=self.school,
             term=term,
             search=request.query_params.get('search'),
+            scope=resolve_access_scope(self.membership),
         )
         return Response(ClassListSerializer(payload).data)
 
@@ -198,7 +212,11 @@ class ClassStatsView(SchoolScopedAPIView):
             self.school,
             request.query_params.get('term'),
         )
-        stats = get_class_stats(school=self.school, term=term)
+        stats = get_class_stats(
+            school=self.school,
+            term=term,
+            scope=resolve_access_scope(self.membership),
+        )
         return Response(ClassStatsSerializer(stats).data)
 
 
@@ -341,6 +359,9 @@ class ClassSubjectsView(SchoolScopedAPIView):
     responses={200: ClassDetailSerializer},
 )
 class ClassTeacherAssignView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.CLASSES_MANAGE
+
     def put(self, request, stream_id):
         serializer = AssignClassTeacherSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -364,6 +385,9 @@ class ClassTeacherAssignView(SchoolScopedAPIView):
     responses={200: ClassSubjectListSerializer},
 )
 class ClassSubjectTeacherAssignView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.CLASSES_MANAGE
+
     def put(self, request, stream_id):
         serializer = AssignSubjectTeacherSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -373,3 +397,121 @@ class ClassSubjectTeacherAssignView(SchoolScopedAPIView):
             **serializer.validated_data,
         )
         return Response(ClassSubjectListSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Academics'],
+    summary='Teaching assignment detail',
+    description=(
+        'Returns subject teaching assignment details for the subject workspace. '
+        'Teachers may only view their own assignments.'
+    ),
+    responses={200: TeachingAssignmentDetailSerializer},
+)
+class TeachingAssignmentDetailView(SchoolScopedAPIView):
+    def get(self, request, assignment_id):
+        payload = get_teaching_assignment_detail(
+            school=self.school,
+            membership=self.membership,
+            assignment_id=assignment_id,
+        )
+        return Response(TeachingAssignmentDetailSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Academics'],
+    summary='Students for a teaching assignment',
+    description=(
+        'Lists students covered by a subject teaching assignment in the active term.'
+    ),
+    parameters=[
+        OpenApiParameter(
+            name='search',
+            type=str,
+            description='Optional search against student name or student ID.',
+        ),
+    ],
+    responses={200: ClassStudentListSerializer},
+)
+class TeachingAssignmentStudentsView(SchoolScopedAPIView):
+    def get(self, request, assignment_id):
+        payload = get_teaching_assignment_students(
+            school=self.school,
+            membership=self.membership,
+            assignment_id=assignment_id,
+            search=request.query_params.get('search'),
+        )
+        return Response(ClassStudentListSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Academics'],
+    summary='Subject group placement candidates',
+    description=(
+        'Lists class roster students with placement status for a grouped '
+        'teaching assignment. Only unassigned students are selectable.'
+    ),
+    parameters=[
+        OpenApiParameter(
+            name='search',
+            type=str,
+            description='Optional search against student name or student ID.',
+        ),
+    ],
+    responses={200: SubjectGroupCandidateListSerializer},
+)
+class SubjectGroupCandidatesView(SchoolScopedAPIView):
+    def get(self, request, assignment_id):
+        payload = list_subject_group_candidates(
+            school=self.school,
+            membership=self.membership,
+            assignment_id=assignment_id,
+            search=request.query_params.get('search'),
+        )
+        return Response(SubjectGroupCandidateListSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Academics'],
+    summary='Assign students to subject group',
+    description=(
+        'Adds unassigned roster students to this teaching assignment\'s group. '
+        'Students already in another group are rejected.'
+    ),
+    request=SubjectGroupStudentIdsSerializer,
+    responses={200: TeachingAssignmentDetailSerializer},
+)
+class SubjectGroupAssignStudentsView(SchoolScopedAPIView):
+    def post(self, request, assignment_id):
+        serializer = SubjectGroupStudentIdsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = assign_students_to_subject_group(
+            school=self.school,
+            membership=self.membership,
+            assignment_id=assignment_id,
+            student_ids=serializer.validated_data['student_ids'],
+        )
+        return Response(TeachingAssignmentDetailSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Academics'],
+    summary='Unassign students from subject group',
+    description=(
+        'Removes students from this teaching assignment\'s group only. '
+        'They become unassigned for the class-subject.'
+    ),
+    request=SubjectGroupStudentIdsSerializer,
+    responses={200: TeachingAssignmentDetailSerializer},
+)
+class SubjectGroupUnassignStudentsView(SchoolScopedAPIView):
+    def post(self, request, assignment_id):
+        serializer = SubjectGroupStudentIdsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = unassign_students_from_subject_group(
+            school=self.school,
+            membership=self.membership,
+            assignment_id=assignment_id,
+            student_ids=serializer.validated_data['student_ids'],
+        )
+        return Response(TeachingAssignmentDetailSerializer(payload).data)

@@ -6,12 +6,16 @@ import { useState } from 'react'
 import { Button } from '@/components/ui'
 import StatsCard from '@/components/shared/StatsCard'
 import ClassTable from '../components/ClassTable'
+import TeacherClassesWorkspace from '../components/TeacherClassesWorkspace'
 import { getClassList, getClassStats } from '../services'
 import { useNavigate } from 'react-router-dom'
+import { Capability } from '@/features/auth/capabilities'
+import { useAccess, useCan } from '@/features/auth/hooks'
 
-const Classes = () => {
+const AdminClassesPage = () => {
   const [search, setSearch] = useState('')
   const navigate = useNavigate()
+  const canManageClasses = useCan(Capability.CLASSES_MANAGE)
   const { data, isLoading } = useQuery({
     queryKey: ['classes', 'list', { search }],
     queryFn: () => getClassList({ search: search || undefined }),
@@ -26,13 +30,15 @@ const Classes = () => {
     <div className="space-y-6">
       <ActionBar title="Classes">
         <SearchComponent value={search} onChange={setSearch} />
-        <Button
-          className="py-2 text-sm max-w-fit"
-          onClick={() => navigate('/classes/manage')}
-        >
-          <Icon icon="hugeicons:settings-02" className="size-4" />
-          Manage Classes
-        </Button>
+        {canManageClasses ? (
+          <Button
+            className="py-2 text-sm max-w-fit"
+            onClick={() => navigate('/classes/manage')}
+          >
+            <Icon icon="hugeicons:settings-02" className="size-4" />
+            Manage Classes
+          </Button>
+        ) : null}
       </ActionBar>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -54,6 +60,24 @@ const Classes = () => {
       />
     </div>
   )
+}
+
+const Classes = () => {
+  const access = useAccess()
+  const isTeacherWorkspace = access.mode === 'scoped'
+
+  if (isTeacherWorkspace) {
+    return (
+      <div className="space-y-6">
+        <ActionBar title="Classes" />
+        <div className="bg-white p-4 custom-shadow-md">
+          <TeacherClassesWorkspace />
+        </div>
+      </div>
+    )
+  }
+
+  return <AdminClassesPage />
 }
 
 export default Classes

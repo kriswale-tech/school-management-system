@@ -139,6 +139,12 @@ class SchoolMembershipSerializer(serializers.ModelSerializer):
         ]
 
 
+class AccessInfoSerializer(serializers.Serializer):
+    mode = serializers.ChoiceField(choices=['school', 'scoped'])
+    is_class_teacher = serializers.BooleanField()
+    is_subject_teacher = serializers.BooleanField()
+
+
 class UserSerializer(serializers.ModelSerializer):
     """The authenticated identity plus the school the request is scoped to."""
 
@@ -149,6 +155,8 @@ class UserSerializer(serializers.ModelSerializer):
     school_setup_completed = serializers.SerializerMethodField()
     schools = serializers.SerializerMethodField()
     requires_school_selection = serializers.SerializerMethodField()
+    capabilities = serializers.SerializerMethodField()
+    access = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -157,11 +165,23 @@ class UserSerializer(serializers.ModelSerializer):
             'phone_number', 'email', 'role', 'is_active', 'profile',
             'school_setup_completed', 'school_id',
             'schools', 'requires_school_selection',
+            'capabilities', 'access',
         ]
 
     @property
     def _membership(self) -> SchoolMembership | None:
         return self.context.get('membership')
+
+    @property
+    def _session_access(self):
+        cached = self.context.get('_session_access')
+        if cached is not None:
+            return cached
+        from accounts.services.capabilities import resolve_session_access
+
+        session = resolve_session_access(self._membership)
+        self.context['_session_access'] = session
+        return session
 
     def get_full_name(self, obj):
         return obj.get_full_name()
@@ -195,6 +215,19 @@ class UserSerializer(serializers.ModelSerializer):
     @extend_schema_field(ProfileSerializer(allow_null=True))
     def get_profile(self, obj):
         return _profile_data(obj)
+
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
+    def get_capabilities(self, obj):
+        return sorted(self._session_access.capabilities)
+
+    @extend_schema_field(AccessInfoSerializer)
+    def get_access(self, obj):
+        scope = self._session_access.scope
+        return {
+            'mode': scope.mode,
+            'is_class_teacher': scope.is_class_teacher,
+            'is_subject_teacher': scope.is_subject_teacher,
+        }
 
 
 class SchoolMemberSerializer(serializers.Serializer):

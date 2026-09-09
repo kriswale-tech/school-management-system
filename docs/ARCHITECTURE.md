@@ -64,7 +64,8 @@ Shared UI lives in `src/components/` (layout, curriculum accordion, data-table, 
 
 - OTP is generated and stored on `PhoneOtp`; in `DEBUG`, OTP is printed to the server console.
 - An Arkesel SMS helper lives at `shared/services/arkesel_sms.py` but is **not called** from the OTP flow yet.
-- Role permissions: coarse `IsAdmin` / `IsTeacher` / etc. Fine-grained `Permission` + `RolePermission` tables are unused.
+- Access uses **capabilities** on `/me` (`accounts.capabilities` + `accounts.services.capabilities`), derived from membership role and teacher assignments. UI uses `useCan`; teachers get assignment-scoped class lists via `accounts.services.access_scope`.
+- Fine-grained `Permission` + `RolePermission` tables remain unused.
 
 ## Infra not yet enabled
 
