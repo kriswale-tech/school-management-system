@@ -128,10 +128,12 @@ Grouped subjects (e.g. Ghanaian Language → Twi / Ga) do **not** auto-enroll th
 
 **Placement rules (product):**
 
-- On a subject-group Subject Detail page, the subject teacher can **Assign students**.
+- On a subject-group Subject Detail page, **Assign students** lives on the **Students** tab (not Workspace / ActionBar).
 - They may only add students who are currently **unassigned** for that class-subject.
 - If a student is already in another group, this teacher **cannot** pull them over. The other group’s teacher must **unassign** them first; then they can be assigned.
 - Teachers can unassign students from **their own** group (so the student becomes unassigned again).
+
+**Markbook (Subject Detail Workspace):** see [subject-assessment-workspace.md](./subject-assessment-workspace.md) (UI + scoring rules; runtime not built yet). Grouped subjects (e.g. Twi / Ga) each have their **own** CA items for the term.
 
 **Later (not built yet):**
 
@@ -205,7 +207,9 @@ Deeper detail: [fees.md](./fees.md).
 ### Assessments
 
 - Configured during setup (weights, grade bands)  
-- Scoring, results, and report cards are **not fully built yet** (placeholder pages/models)
+- Subject markbook on Subject Detail; class-teacher `/assessments` overview  
+- Status model + publish / unpublish (v1) / approve: [subject-assessment-workspace.md](./subject-assessment-workspace.md)  
+- Publish APIs, class approve, and admin finalize are **not fully built yet**
 
 ### Dashboard
 

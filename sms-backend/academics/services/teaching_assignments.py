@@ -71,7 +71,7 @@ def get_teaching_assignment(*, school, assignment_id) -> TeachingAssignment:
             class_subject__school=school,
         )
         .select_related(
-            'class_subject__class_level',
+            'class_subject__class_level__level',
             'class_subject__subject',
             'stream',
             'subject_group',

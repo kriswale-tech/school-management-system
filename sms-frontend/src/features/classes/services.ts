@@ -15,6 +15,14 @@ import type {
   SubjectGroupCandidateList,
   TeachingAssignmentDetail,
 } from './types'
+import type {
+  AssessmentWorkspace,
+  CaItem,
+  CaItemWritePayload,
+  ClassTeacherAssessmentDetail,
+  ClassTeacherAssessmentOverview,
+  SaveMarksPayload,
+} from './assessment/types'
 
 export const getClasses = async () => {
   const response = await api.get<{ name: string; id: string }[]>('/academics/class-levels/')
@@ -146,6 +154,106 @@ export const unassignSubjectGroupStudents = async (
   const response = await api.post<TeachingAssignmentDetail>(
     `/academics/teaching-assignments/${assignmentId}/unassign-students/`,
     { student_ids: studentIds },
+  )
+  return response.data
+}
+
+export const getTeachingAssignmentWorkspace = async (
+  assignmentId: string,
+): Promise<AssessmentWorkspace> => {
+  const response = await api.get<AssessmentWorkspace>(
+    `/academics/teaching-assignments/${assignmentId}/workspace/`,
+  )
+  return response.data
+}
+
+export const createTeachingAssignmentCaItem = async (
+  assignmentId: string,
+  payload: CaItemWritePayload,
+): Promise<CaItem> => {
+  const response = await api.post<CaItem>(
+    `/academics/teaching-assignments/${assignmentId}/ca-items/`,
+    payload,
+  )
+  return response.data
+}
+
+export const updateTeachingAssignmentCaItem = async (
+  assignmentId: string,
+  itemId: string,
+  payload: CaItemWritePayload,
+): Promise<CaItem> => {
+  const response = await api.patch<CaItem>(
+    `/academics/teaching-assignments/${assignmentId}/ca-items/${itemId}/`,
+    payload,
+  )
+  return response.data
+}
+
+export const deleteTeachingAssignmentCaItem = async (
+  assignmentId: string,
+  itemId: string,
+): Promise<void> => {
+  await api.delete(`/academics/teaching-assignments/${assignmentId}/ca-items/${itemId}/`)
+}
+
+export const saveTeachingAssignmentMarks = async (
+  assignmentId: string,
+  payload: SaveMarksPayload,
+): Promise<AssessmentWorkspace> => {
+  const response = await api.put<AssessmentWorkspace>(
+    `/academics/teaching-assignments/${assignmentId}/marks/`,
+    payload,
+  )
+  return response.data
+}
+
+export const publishTeachingAssignmentStudents = async (
+  assignmentId: string,
+  studentIds: string[],
+): Promise<AssessmentWorkspace> => {
+  const response = await api.post<AssessmentWorkspace>(
+    `/academics/teaching-assignments/${assignmentId}/publish/`,
+    { student_ids: studentIds },
+  )
+  return response.data
+}
+
+export const unpublishTeachingAssignmentStudents = async (
+  assignmentId: string,
+  studentIds: string[],
+): Promise<AssessmentWorkspace> => {
+  const response = await api.post<AssessmentWorkspace>(
+    `/academics/teaching-assignments/${assignmentId}/unpublish/`,
+    { student_ids: studentIds },
+  )
+  return response.data
+}
+
+export const getClassTeacherAssessmentOverview =
+  async (): Promise<ClassTeacherAssessmentOverview> => {
+    const response = await api.get<ClassTeacherAssessmentOverview>(
+      '/academics/assessments/my-classes/',
+    )
+    return response.data
+  }
+
+export const getClassTeacherAssessmentDetail = async (
+  classTeacherId: string,
+): Promise<ClassTeacherAssessmentDetail> => {
+  const response = await api.get<ClassTeacherAssessmentDetail>(
+    `/academics/assessments/class-teachers/${classTeacherId}/`,
+  )
+  return response.data
+}
+
+export const approveClassTeacherStudents = async (
+  classTeacherId: string,
+  payload: { student_ids: string[]; remarks?: string },
+): Promise<ClassTeacherAssessmentDetail> => {
+  const response = await api.post<ClassTeacherAssessmentDetail>(
+    `/academics/assessments/class-teachers/${classTeacherId}/approve/`,
+    payload,
   )
   return response.data
 }

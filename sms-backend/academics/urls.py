@@ -18,6 +18,17 @@ from academics.views import (
     TeachingAssignmentDetailView,
     TeachingAssignmentStudentsView,
 )
+from assessments.views import (
+    ClassTeacherApproveStudentsView,
+    ClassTeacherAssessmentDetailView,
+    ClassTeacherAssessmentOverviewView,
+    TeachingAssignmentCaItemDetailView,
+    TeachingAssignmentCaItemListView,
+    TeachingAssignmentMarksView,
+    TeachingAssignmentPublishView,
+    TeachingAssignmentUnpublishView,
+    TeachingAssignmentWorkspaceView,
+)
 
 urlpatterns = [
     path('levels/', ActiveLevelListView.as_view(), name='academics-levels'),
@@ -47,6 +58,51 @@ urlpatterns = [
         'teaching-assignments/<uuid:assignment_id>/students/',
         TeachingAssignmentStudentsView.as_view(),
         name='academics-teaching-assignment-students',
+    ),
+    path(
+        'teaching-assignments/<uuid:assignment_id>/workspace/',
+        TeachingAssignmentWorkspaceView.as_view(),
+        name='academics-teaching-assignment-workspace',
+    ),
+    path(
+        'teaching-assignments/<uuid:assignment_id>/ca-items/',
+        TeachingAssignmentCaItemListView.as_view(),
+        name='academics-teaching-assignment-ca-items',
+    ),
+    path(
+        'teaching-assignments/<uuid:assignment_id>/ca-items/<uuid:item_id>/',
+        TeachingAssignmentCaItemDetailView.as_view(),
+        name='academics-teaching-assignment-ca-item-detail',
+    ),
+    path(
+        'teaching-assignments/<uuid:assignment_id>/marks/',
+        TeachingAssignmentMarksView.as_view(),
+        name='academics-teaching-assignment-marks',
+    ),
+    path(
+        'teaching-assignments/<uuid:assignment_id>/publish/',
+        TeachingAssignmentPublishView.as_view(),
+        name='academics-teaching-assignment-publish',
+    ),
+    path(
+        'teaching-assignments/<uuid:assignment_id>/unpublish/',
+        TeachingAssignmentUnpublishView.as_view(),
+        name='academics-teaching-assignment-unpublish',
+    ),
+    path(
+        'assessments/my-classes/',
+        ClassTeacherAssessmentOverviewView.as_view(),
+        name='academics-assessments-my-classes',
+    ),
+    path(
+        'assessments/class-teachers/<uuid:class_teacher_id>/',
+        ClassTeacherAssessmentDetailView.as_view(),
+        name='academics-assessments-class-teacher-detail',
+    ),
+    path(
+        'assessments/class-teachers/<uuid:class_teacher_id>/approve/',
+        ClassTeacherApproveStudentsView.as_view(),
+        name='academics-assessments-class-teacher-approve',
     ),
     path(
         'teaching-assignments/<uuid:assignment_id>/group-candidates/',

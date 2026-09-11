@@ -4,6 +4,7 @@ import { RequireCapability } from '@/features/auth/components/RequireCapability'
 import { Capability } from '@/features/auth/capabilities'
 
 const AssessmentsPage = lazy(() => import('./Assessments'))
+const AssessmentDetailPage = lazy(() => import('./AssessmentDetail'))
 
 export const assessmentsRoutes = (
   <>
@@ -12,6 +13,14 @@ export const assessmentsRoutes = (
       element={
         <RequireCapability capability={Capability.NAV_ASSESSMENTS}>
           <AssessmentsPage />
+        </RequireCapability>
+      }
+    />
+    <Route
+      path="assessments/:classTeacherId"
+      element={
+        <RequireCapability capability={Capability.NAV_ASSESSMENTS}>
+          <AssessmentDetailPage />
         </RequireCapability>
       }
     />

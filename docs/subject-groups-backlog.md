@@ -10,7 +10,7 @@ Deferred work around student placement in subject groups (e.g. Ghanaian Language
 
 ## To build (UI + API)
 
-- [x] Subject Detail CTA **Assign students** (grouped subjects only)
+- [x] Subject Detail CTA **Assign students** (grouped subjects only; intended on **Students** tab, not Workspace)
 - [x] Candidate list: class/stream roster with group status (unassigned / this group / other group)
 - [x] Banner: count of students with **no** group for this class-subject
 - [x] Assign selected unassigned students to this group

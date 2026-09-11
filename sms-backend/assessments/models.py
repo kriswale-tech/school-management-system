@@ -21,6 +21,10 @@ class AssessmentConfig(BaseModel):
         ResultType.GRADE,
         ResultType.GRADE_AND_POSITION,
     })
+    POSITION_RESULT_TYPES = frozenset({
+        ResultType.POSITION,
+        ResultType.GRADE_AND_POSITION,
+    })
 
     level = models.OneToOneField(
         'academics.Level',
@@ -66,6 +70,9 @@ class AssessmentConfig(BaseModel):
 
     def uses_grades(self):
         return self.result_type in self.GRADE_RESULT_TYPES
+
+    def uses_position(self):
+        return self.result_type in self.POSITION_RESULT_TYPES
 
     def clean(self):
         super().clean()
@@ -154,19 +161,210 @@ class GradeBand(BaseModel):
 
 
 class AssessmentItem(BaseModel):
-    pass
+    """A continuous-assessment column for one teaching assignment / term."""
+
+    teaching_assignment = models.ForeignKey(
+        'teachers.TeachingAssignment',
+        on_delete=models.CASCADE,
+        related_name='assessment_items',
+    )
+    name = models.CharField(max_length=100)
+    max_marks = models.DecimalField(max_digits=7, decimal_places=2)
+    order = models.PositiveSmallIntegerField(default=1)
+
+    class Meta:
+        ordering = ['order', 'created_at', 'name']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['teaching_assignment', 'name'],
+                name='unique_assessment_item_name_per_assignment',
+            ),
+            models.CheckConstraint(
+                condition=Q(max_marks__gt=0),
+                name='assessment_item_max_marks_positive',
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.max_marks is not None and self.max_marks <= 0:
+            raise ValidationError({'max_marks': 'Max marks must be greater than 0.'})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.name} ({self.max_marks})'
 
 
 class AssessmentItemScore(BaseModel):
-    pass
+    assessment_item = models.ForeignKey(
+        AssessmentItem,
+        on_delete=models.CASCADE,
+        related_name='scores',
+    )
+    student = models.ForeignKey(
+        'students.Student',
+        on_delete=models.CASCADE,
+        related_name='assessment_item_scores',
+    )
+    mark = models.DecimalField(max_digits=7, decimal_places=2)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['assessment_item', 'student'],
+                name='unique_score_per_student_assessment_item',
+            ),
+            models.CheckConstraint(
+                condition=Q(mark__gte=0),
+                name='assessment_item_score_mark_non_negative',
+            ),
+        ]
 
-class StudentResult(BaseModel):
-    pass
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.mark is not None and self.mark < 0:
+            errors['mark'] = 'Mark cannot be negative.'
+        if (
+            self.assessment_item_id
+            and self.mark is not None
+            and self.assessment_item.max_marks is not None
+            and self.mark > self.assessment_item.max_marks
+        ):
+            errors['mark'] = (
+                f'Mark cannot exceed max marks ({self.assessment_item.max_marks}).'
+            )
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.student_id} — {self.assessment_item_id}: {self.mark}'
 
 
 class SubjectScore(BaseModel):
-    pass
+    """Per-student exam + publish state for a teaching assignment."""
+
+    teaching_assignment = models.ForeignKey(
+        'teachers.TeachingAssignment',
+        on_delete=models.CASCADE,
+        related_name='subject_scores',
+    )
+    student = models.ForeignKey(
+        'students.Student',
+        on_delete=models.CASCADE,
+        related_name='subject_scores',
+    )
+    exam_mark = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Exam mark out of 100. Null until the exam is recorded.',
+    )
+    is_published = models.BooleanField(
+        default=False,
+        help_text='True when the subject teacher has released this result to the class teacher.',
+    )
+    published_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['teaching_assignment', 'student'],
+                name='unique_subject_score_per_student_assignment',
+            ),
+            models.CheckConstraint(
+                condition=Q(exam_mark__isnull=True)
+                | (Q(exam_mark__gte=0) & Q(exam_mark__lte=100)),
+                name='subject_score_exam_mark_0_to_100',
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.exam_mark is not None:
+            if self.exam_mark < 0 or self.exam_mark > 100:
+                raise ValidationError({'exam_mark': 'Exam mark must be between 0 and 100.'})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.student_id} exam={self.exam_mark} published={self.is_published}'
+
+
+class StudentResult(BaseModel):
+    """Class-teacher approval state for a student in a class/stream for a term."""
+
+    class Status(models.TextChoices):
+        AWAITING_APPROVAL = 'awaiting_approval', 'Awaiting approval'
+        APPROVED = 'approved', 'Approved'
+
+    student = models.ForeignKey(
+        'students.Student',
+        on_delete=models.CASCADE,
+        related_name='assessment_results',
+    )
+    term = models.ForeignKey(
+        'schools.Term',
+        on_delete=models.CASCADE,
+        related_name='student_assessment_results',
+    )
+    class_level = models.ForeignKey(
+        'academics.ClassLevel',
+        on_delete=models.CASCADE,
+        related_name='student_assessment_results',
+    )
+    stream = models.ForeignKey(
+        'academics.ClassStream',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='student_assessment_results',
+    )
+    status = models.CharField(
+        max_length=32,
+        choices=Status.choices,
+        default=Status.AWAITING_APPROVAL,
+    )
+    remarks = models.TextField(blank=True, default='')
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='approved_student_results',
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['student', 'term', 'class_level'],
+                condition=Q(stream__isnull=True),
+                name='unique_student_result_whole_class_term',
+            ),
+            models.UniqueConstraint(
+                fields=['student', 'term', 'class_level', 'stream'],
+                condition=Q(stream__isnull=False),
+                name='unique_student_result_stream_term',
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.student_id} {self.status}'
 
 
 class Report(BaseModel):
