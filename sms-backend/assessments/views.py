@@ -5,6 +5,9 @@ from rest_framework.response import Response
 from accounts.capabilities import Capability
 from accounts.permissions import HasActiveSchool, HasCapability
 from assessments.serializers import (
+    AdminAssessmentDetailSerializer,
+    AdminAssessmentFilterOptionsSerializer,
+    AdminAssessmentOverviewSerializer,
     ApproveClassStudentsSerializer,
     AssessmentWorkspaceSerializer,
     CaItemSerializer,
@@ -13,6 +16,12 @@ from assessments.serializers import (
     ClassTeacherAssessmentOverviewSerializer,
     PublishStudentsSerializer,
     SaveMarksSerializer,
+)
+from assessments.services.admin_overview import (
+    get_admin_assessment_detail,
+    get_admin_assessment_filter_options,
+    list_admin_assessment_overview,
+    release_admin_students,
 )
 from assessments.services.class_overview import (
     approve_class_students,
@@ -175,6 +184,79 @@ class TeachingAssignmentUnpublishView(SchoolScopedAPIView):
             student_ids=serializer.validated_data['student_ids'],
         )
         return Response(AssessmentWorkspaceSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Assessments'],
+    summary='Admin assessment year and term filters',
+    responses={200: AdminAssessmentFilterOptionsSerializer},
+)
+class AdminAssessmentFilterOptionsView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.ASSESSMENTS_RELEASE
+
+    def get(self, request):
+        payload = get_admin_assessment_filter_options(school=self.school)
+        return Response(AdminAssessmentFilterOptionsSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Assessments'],
+    summary='Admin assessment overview by class',
+    responses={200: AdminAssessmentOverviewSerializer},
+)
+class AdminAssessmentOverviewView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.ASSESSMENTS_RELEASE
+
+    def get(self, request):
+        payload = list_admin_assessment_overview(
+            school=self.school,
+            term_id=request.query_params.get('term_id') or None,
+        )
+        return Response(AdminAssessmentOverviewSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Assessments'],
+    summary='Admin assessment detail for a class',
+    responses={200: AdminAssessmentDetailSerializer},
+)
+class AdminAssessmentDetailView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.ASSESSMENTS_RELEASE
+
+    def get(self, request, stream_id):
+        payload = get_admin_assessment_detail(
+            school=self.school,
+            stream_id=stream_id,
+            term_id=request.query_params.get('term_id') or None,
+        )
+        return Response(AdminAssessmentDetailSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Assessments'],
+    summary='Release approved students in a class',
+    request=ApproveClassStudentsSerializer,
+    responses={200: AdminAssessmentDetailSerializer},
+)
+class AdminAssessmentReleaseView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.ASSESSMENTS_RELEASE
+
+    def post(self, request, stream_id):
+        serializer = ApproveClassStudentsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = release_admin_students(
+            school=self.school,
+            membership=self.membership,
+            stream_id=stream_id,
+            student_ids=serializer.validated_data['student_ids'],
+            remarks=serializer.validated_data.get('remarks', ''),
+            term_id=request.query_params.get('term_id') or None,
+        )
+        return Response(AdminAssessmentDetailSerializer(payload).data)
 
 
 @extend_schema(

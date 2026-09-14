@@ -142,11 +142,15 @@ Two lenses on the same student — **do not reuse the same label for both**.
 | **Awaiting approval** | Every required subject is **Published**; class teacher has not approved yet. |
 | **Approved** | Class teacher reviewed (remarks optional) and sent the student to **admin**. |
 
-### Admin (later)
+### Admin (school-wide, per student in a class)
 
 | Status | Meaning |
 | --- | --- |
-| **Finalized / released** | Admin final review / release (report cards, etc.). |
+| **With class teacher** | Not yet approved by the class teacher (Pending or Awaiting approval). Admin cannot release yet. |
+| **Ready for you** | Class teacher **Approved** this student. Admin can release (one student or the whole class). |
+| **Released** | Admin released the result. Corrections later. |
+
+Headline stats count **students**. A class is fully ready only when every student in it is Ready for you. Admin list: `/assessments` when the user has `assessments.release` (school operators). Class teachers keep the existing My classes list.
 
 **Required subjects** = active class subjects for that student in the active term, including the subject group they are placed in when the subject is grouped. Ideal: every such subject has an assigned teacher.
 
@@ -155,7 +159,7 @@ Subject: Incomplete → Complete → Published (lock)
                 ↓ all required subjects Published
 Class:   Pending → Awaiting approval → Approved
                 ↓
-Admin:   Finalized / released (later)
+Admin:   With class teacher → Ready for you → Released
 ```
 
 ---
@@ -167,7 +171,7 @@ Admin:   Finalized / released (later)
 1. Subject teacher records marks → **Complete** → **Publish** (per student or batch — product UI TBD).
 2. When all of a student’s required subjects are Published → class status **Awaiting approval**.
 3. Class teacher may **approve selected students** who are Awaiting approval (partial approve is allowed). Others stay Pending until ready.
-4. **Approved** → admin queue (later).
+4. **Approved** → admin queue (**Ready for you**). Admin **Release** is one student or the whole class (detail later).
 
 ### Lock (v1)
 
@@ -216,7 +220,8 @@ Do **not** hard-block enrollment/timetable solely because a teacher is missing m
 - [ ] Soft (then hard) teacher-assignment blockers
 - [x] Position ranking on class assessment detail
 - [ ] Correction request after Approved (later)
-- [ ] Admin finalized / released (later)
+- [x] Admin assessments list (stats include unfinished students; table is ready/released classes only, with a class completeness badge)
+- [x] Admin assessment detail (release one or all ready; head teacher remarks; report button placeholder)
 - [x] Class-teacher Assessments nav page UI (My classes table; live counts)
 
 ---
@@ -250,3 +255,14 @@ Split layout:
 - Bulk approve modal: shared remarks + approve all awaiting students.
 
 API: `GET /academics/assessments/class-teachers/:id/`, `POST …/approve/`.
+
+Class teacher name sits on the **right** of the remarks field.
+
+### Admin assessment detail (`/assessments/classes/:streamId`)
+
+Same split layout, admin statuses:
+
+- **Left:** class name, **Release all ready**, pills (All / Ready for you / Released). Students still with the class teacher are a count only — they are not listed, so the admin never sees incomplete dashes.
+- **Right:** same subject table. Class teacher remarks are read-only (name on the right). Head teacher remarks can be typed when the student is Ready for you (label on the right is **Head teacher** until a head-teacher person exists). **Release** saves those remarks. After release, **Generate report** sits in that same spot (PDF later; no reject in this version).
+
+API: `GET /academics/assessments/admin/classes/:streamId/?term_id=`, `POST …/release/`.

@@ -5,8 +5,11 @@ import { useNavigate } from 'react-router-dom'
 import ActionBar from '@/components/shared/ActionBar'
 import StatsCard from '@/components/shared/StatsCard'
 import SearchComponent from '@/components/ui/SearchComponent'
+import { Capability } from '@/features/auth/capabilities'
+import { useCan } from '@/features/auth/hooks'
 import { getClassTeacherAssessmentOverview } from '@/features/classes/services'
 import { getApiErrorMessage } from '@/utils'
+import AdminAssessments from './AdminAssessments'
 import ClassTeacherAssessmentsTable, {
   type ClassTeacherAssessmentRow,
 } from './components/ClassTeacherAssessmentsTable'
@@ -14,12 +17,14 @@ import ClassTeacherAssessmentsTable, {
 const OVERVIEW_QUERY_KEY = ['assessments', 'my-classes'] as const
 
 const Assessments = () => {
+  const canRelease = useCan(Capability.ASSESSMENTS_RELEASE)
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: OVERVIEW_QUERY_KEY,
     queryFn: getClassTeacherAssessmentOverview,
+    enabled: !canRelease,
   })
 
   const rows: ClassTeacherAssessmentRow[] = useMemo(() => {
@@ -44,6 +49,10 @@ const Assessments = () => {
 
   const classCount = rows.length
   const studentCount = rows.reduce((total, row) => total + row.students_count, 0)
+
+  if (canRelease) {
+    return <AdminAssessments />
+  }
 
   return (
     <div className="space-y-6">

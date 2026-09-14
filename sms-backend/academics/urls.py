@@ -19,6 +19,10 @@ from academics.views import (
     TeachingAssignmentStudentsView,
 )
 from assessments.views import (
+    AdminAssessmentDetailView,
+    AdminAssessmentFilterOptionsView,
+    AdminAssessmentOverviewView,
+    AdminAssessmentReleaseView,
     ClassTeacherApproveStudentsView,
     ClassTeacherAssessmentDetailView,
     ClassTeacherAssessmentOverviewView,
@@ -88,6 +92,26 @@ urlpatterns = [
         'teaching-assignments/<uuid:assignment_id>/unpublish/',
         TeachingAssignmentUnpublishView.as_view(),
         name='academics-teaching-assignment-unpublish',
+    ),
+    path(
+        'assessments/admin/filter-options/',
+        AdminAssessmentFilterOptionsView.as_view(),
+        name='academics-assessments-admin-filter-options',
+    ),
+    path(
+        'assessments/admin/classes/',
+        AdminAssessmentOverviewView.as_view(),
+        name='academics-assessments-admin-classes',
+    ),
+    path(
+        'assessments/admin/classes/<uuid:stream_id>/',
+        AdminAssessmentDetailView.as_view(),
+        name='academics-assessments-admin-class-detail',
+    ),
+    path(
+        'assessments/admin/classes/<uuid:stream_id>/release/',
+        AdminAssessmentReleaseView.as_view(),
+        name='academics-assessments-admin-class-release',
     ),
     path(
         'assessments/my-classes/',

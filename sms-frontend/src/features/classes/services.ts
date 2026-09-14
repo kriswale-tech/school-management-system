@@ -16,6 +16,9 @@ import type {
   TeachingAssignmentDetail,
 } from './types'
 import type {
+  AdminAssessmentDetail,
+  AdminAssessmentFilterOptions,
+  AdminAssessmentOverview,
   AssessmentWorkspace,
   CaItem,
   CaItemWritePayload,
@@ -226,6 +229,48 @@ export const unpublishTeachingAssignmentStudents = async (
   const response = await api.post<AssessmentWorkspace>(
     `/academics/teaching-assignments/${assignmentId}/unpublish/`,
     { student_ids: studentIds },
+  )
+  return response.data
+}
+
+export const getAdminAssessmentFilterOptions =
+  async (): Promise<AdminAssessmentFilterOptions> => {
+    const response = await api.get<AdminAssessmentFilterOptions>(
+      '/academics/assessments/admin/filter-options/',
+    )
+    return response.data
+  }
+
+export const getAdminAssessmentOverview = async (
+  termId?: string,
+): Promise<AdminAssessmentOverview> => {
+  const response = await api.get<AdminAssessmentOverview>(
+    '/academics/assessments/admin/classes/',
+    { params: termId ? { term_id: termId } : undefined },
+  )
+  return response.data
+}
+
+export const getAdminAssessmentDetail = async (
+  streamId: string,
+  termId?: string,
+): Promise<AdminAssessmentDetail> => {
+  const response = await api.get<AdminAssessmentDetail>(
+    `/academics/assessments/admin/classes/${streamId}/`,
+    { params: termId ? { term_id: termId } : undefined },
+  )
+  return response.data
+}
+
+export const releaseAdminAssessmentStudents = async (
+  streamId: string,
+  payload: { student_ids: string[]; remarks?: string },
+  termId?: string,
+): Promise<AdminAssessmentDetail> => {
+  const response = await api.post<AdminAssessmentDetail>(
+    `/academics/assessments/admin/classes/${streamId}/release/`,
+    payload,
+    { params: termId ? { term_id: termId } : undefined },
   )
   return response.data
 }

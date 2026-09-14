@@ -16,6 +16,7 @@ export const Capability = {
 
   ASSESSMENTS_RECORD: 'assessments.record',
   ASSESSMENTS_APPROVE: 'assessments.approve',
+  ASSESSMENTS_RELEASE: 'assessments.release',
 
   FEES_VIEW: 'fees.view',
   FEES_RECORD_PAYMENT: 'fees.record_payment',

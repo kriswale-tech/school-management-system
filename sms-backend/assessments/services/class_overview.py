@@ -172,7 +172,10 @@ def _class_bucket_for_student(*, student_id, class_teacher: ClassTeacher, term) 
         student_id=student_id,
         term_id=term.id,
         class_level_id=class_teacher.class_level_id,
-        status=StudentResult.Status.APPROVED,
+        status__in=(
+            StudentResult.Status.APPROVED,
+            StudentResult.Status.RELEASED,
+        ),
     )
     if class_teacher.stream_id:
         if approved.filter(stream_id=class_teacher.stream_id).exists():
@@ -487,7 +490,12 @@ def _apply_positions(*, students: list[dict], uses_position: bool) -> None:
     overall_entries: list[tuple[str, Decimal]] = []
     averages: dict[str, Decimal] = {}
     for student in students:
-        if student['status'] not in (CLASS_STATUS_AWAITING, CLASS_STATUS_APPROVED):
+        if student['status'] not in (
+            CLASS_STATUS_AWAITING,
+            CLASS_STATUS_APPROVED,
+            'ready_for_you',
+            'released',
+        ):
             continue
         published_totals = [
             Decimal(str(subject['total']))

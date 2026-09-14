@@ -131,6 +131,79 @@ export type ClassAssessmentDetailStudent = {
   subjects: ClassAssessmentSubjectRow[]
 }
 
+export type AdminAssessmentTermOption = {
+  id: string
+  label: string
+  is_active: boolean
+  academic_year_id: string
+  academic_year: string
+}
+
+export type AdminAssessmentFilterOptions = {
+  terms: AdminAssessmentTermOption[]
+  active_term_id: string | null
+}
+
+export type AdminAssessmentClassRow = {
+  id: string
+  class_level_id: string
+  stream_id: string
+  display_name: string
+  class_teacher_id: string | null
+  class_teacher_name: string | null
+  students_count: number
+  with_class_teacher_count: number
+  ready_for_you_count: number
+  released_count: number
+}
+
+export type AdminAssessmentStudentStatus =
+  | 'with_class_teacher'
+  | 'ready_for_you'
+  | 'released'
+
+export type AdminAssessmentDetailStudent = {
+  id: string
+  full_name: string
+  student_id: string
+  status: AdminAssessmentStudentStatus
+  subjects_published_count: number
+  subjects_required_count: number
+  class_teacher_remarks: string
+  head_teacher_remarks: string
+  overall_position: number | null
+  overall_average: number | null
+  overall_cohort_size: number | null
+  subjects: ClassAssessmentSubjectRow[]
+}
+
+export type AdminAssessmentDetail = {
+  id: string
+  term_id: string
+  term_label: string
+  display_name: string
+  class_teacher_name: string | null
+  with_class_teacher_count: number
+  ready_for_you_count: number
+  released_count: number
+  students_count: number
+  weights: AssessmentWeights
+  result_type: string
+  uses_grades: boolean
+  uses_position: boolean
+  students: AdminAssessmentDetailStudent[]
+}
+
+export type AdminAssessmentOverview = {
+  term_id: string
+  term_label: string
+  with_class_teacher_count: number
+  ready_for_you_count: number
+  released_count: number
+  classes_fully_ready_count: number
+  results: AdminAssessmentClassRow[]
+}
+
 export type ClassTeacherAssessmentDetail = {
   id: string
   term_id: string

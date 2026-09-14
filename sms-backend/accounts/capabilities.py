@@ -20,6 +20,7 @@ class Capability:
 
     ASSESSMENTS_RECORD = 'assessments.record'
     ASSESSMENTS_APPROVE = 'assessments.approve'
+    ASSESSMENTS_RELEASE = 'assessments.release'
 
     FEES_VIEW = 'fees.view'
     FEES_RECORD_PAYMENT = 'fees.record_payment'
@@ -44,6 +45,7 @@ SCHOOL_WIDE_CAPABILITIES = frozenset({
     Capability.STUDENTS_CREATE,
     Capability.ASSESSMENTS_RECORD,
     Capability.ASSESSMENTS_APPROVE,
+    Capability.ASSESSMENTS_RELEASE,
     Capability.FEES_VIEW,
     Capability.FEES_RECORD_PAYMENT,
     Capability.FEES_MANAGE_SETTINGS,

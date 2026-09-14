@@ -307,6 +307,7 @@ class StudentResult(BaseModel):
     class Status(models.TextChoices):
         AWAITING_APPROVAL = 'awaiting_approval', 'Awaiting approval'
         APPROVED = 'approved', 'Approved'
+        RELEASED = 'released', 'Released'
 
     student = models.ForeignKey(
         'students.Student',
@@ -336,6 +337,7 @@ class StudentResult(BaseModel):
         default=Status.AWAITING_APPROVAL,
     )
     remarks = models.TextField(blank=True, default='')
+    head_teacher_remarks = models.TextField(blank=True, default='')
     approved_at = models.DateTimeField(null=True, blank=True)
     approved_by = models.ForeignKey(
         'accounts.User',
@@ -343,6 +345,14 @@ class StudentResult(BaseModel):
         null=True,
         blank=True,
         related_name='approved_student_results',
+    )
+    released_at = models.DateTimeField(null=True, blank=True)
+    released_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='released_student_results',
     )
 
     class Meta:

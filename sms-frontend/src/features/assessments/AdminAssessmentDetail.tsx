@@ -1,37 +1,37 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import ActionBar from '@/components/shared/ActionBar'
 import { Table, TableWrapper } from '@/components/shared'
 import { Button } from '@/components/ui'
 import { Capability } from '@/features/auth/capabilities'
 import { useCan } from '@/features/auth/hooks'
 import {
-  approveClassTeacherStudents,
-  getClassTeacherAssessmentDetail,
+  getAdminAssessmentDetail,
+  releaseAdminAssessmentStudents,
 } from '@/features/classes/services'
 import type {
-  ClassAssessmentDetailStudent,
-  ClassAssessmentStudentStatus,
+  AdminAssessmentDetailStudent,
+  AdminAssessmentStudentStatus,
 } from '@/features/classes/assessment/types'
 import { getApiErrorMessage, mergeClasses } from '@/utils'
-import BulkApproveModal from './components/BulkApproveModal'
+import BulkReleaseModal from './components/BulkReleaseModal'
 
-type StatusFilter = 'all' | ClassAssessmentStudentStatus
+type StatusFilter = 'all' | 'ready_for_you' | 'released'
 
-const statusLabel = (status: ClassAssessmentStudentStatus) => {
-  if (status === 'awaiting_approval') return 'Awaiting approval'
-  if (status === 'approved') return 'Approved'
-  return 'Pending'
+const statusLabel = (status: AdminAssessmentStudentStatus) => {
+  if (status === 'ready_for_you') return 'Ready for you'
+  if (status === 'released') return 'Released'
+  return 'With class teacher'
 }
 
-const statusChipClass = (status: ClassAssessmentStudentStatus) =>
+const statusChipClass = (status: AdminAssessmentStudentStatus) =>
   mergeClasses(
     'inline-flex rounded-md px-2 py-0.5 text-xs font-medium',
-    status === 'approved' && 'bg-emerald-50 text-emerald-800',
-    status === 'awaiting_approval' && 'bg-blue-50 text-blue-800',
-    status === 'pending' && 'bg-amber-50 text-amber-800',
+    status === 'released' && 'bg-emerald-50 text-emerald-800',
+    status === 'ready_for_you' && 'bg-blue-50 text-blue-800',
+    status === 'with_class_teacher' && 'bg-amber-50 text-amber-800',
   )
 
 const formatScore = (value: number | null | undefined) => {
@@ -49,22 +49,28 @@ const formatOrdinal = (value: number) => {
   return `${value}th`
 }
 
-const DETAIL_QUERY_KEY = (id: string) => ['assessments', 'class-teacher', id] as const
+const remarksClassName =
+  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500'
 
-const AssessmentDetail = () => {
-  const { classTeacherId } = useParams<{ classTeacherId: string }>()
+const DETAIL_QUERY_KEY = (id: string, termId: string) =>
+  ['assessments', 'admin', 'detail', id, termId] as const
+
+const AdminAssessmentDetail = () => {
+  const { streamId } = useParams<{ streamId: string }>()
+  const [searchParams] = useSearchParams()
+  const termId = searchParams.get('term') ?? undefined
   const queryClient = useQueryClient()
-  const canApprove = useCan(Capability.ASSESSMENTS_APPROVE)
+  const canRelease = useCan(Capability.ASSESSMENTS_RELEASE)
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
-  const [remarks, setRemarks] = useState('')
+  const [headRemarks, setHeadRemarks] = useState('')
   const [bulkOpen, setBulkOpen] = useState(false)
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: DETAIL_QUERY_KEY(classTeacherId ?? ''),
-    queryFn: () => getClassTeacherAssessmentDetail(classTeacherId!),
-    enabled: Boolean(classTeacherId),
+    queryKey: DETAIL_QUERY_KEY(streamId ?? '', termId ?? ''),
+    queryFn: () => getAdminAssessmentDetail(streamId!, termId),
+    enabled: Boolean(streamId),
   })
 
   const filteredStudents = useMemo(() => {
@@ -78,57 +84,48 @@ const AssessmentDetail = () => {
       setSelectedStudentId(null)
       return
     }
-    if (
-      selectedStudentId &&
-      filteredStudents.some((student) => student.id === selectedStudentId)
-    ) {
+    if (selectedStudentId && filteredStudents.some((student) => student.id === selectedStudentId)) {
       return
     }
     const preferred =
-      filteredStudents.find((student) => student.status === 'awaiting_approval') ??
-      filteredStudents[0]
+      filteredStudents.find((student) => student.status === 'ready_for_you') ?? filteredStudents[0]
     setSelectedStudentId(preferred.id)
   }, [filteredStudents, selectedStudentId])
 
-  const selectedStudent: ClassAssessmentDetailStudent | null = useMemo(() => {
+  const selectedStudent: AdminAssessmentDetailStudent | null = useMemo(() => {
     if (!selectedStudentId) return null
     return data?.students.find((student) => student.id === selectedStudentId) ?? null
   }, [data?.students, selectedStudentId])
 
   useEffect(() => {
-    setRemarks(selectedStudent?.class_teacher_remarks ?? '')
-  }, [selectedStudent?.id, selectedStudent?.class_teacher_remarks])
+    setHeadRemarks(selectedStudent?.head_teacher_remarks ?? '')
+  }, [selectedStudent?.id, selectedStudent?.head_teacher_remarks])
 
-  const { mutate: approveStudents, isPending: isApproving } = useMutation({
+  const { mutate: releaseStudents, isPending: isReleasing } = useMutation({
     mutationFn: (payload: { student_ids: string[]; remarks?: string }) =>
-      approveClassTeacherStudents(classTeacherId!, payload),
+      releaseAdminAssessmentStudents(streamId!, payload, termId),
     onSuccess: (payload) => {
-      toast.success('Students approved')
-      queryClient.setQueryData(DETAIL_QUERY_KEY(classTeacherId!), payload)
-      void queryClient.invalidateQueries({ queryKey: ['assessments', 'my-classes'] })
+      toast.success('Students released')
+      queryClient.setQueryData(DETAIL_QUERY_KEY(streamId ?? '', termId ?? ''), payload)
+      void queryClient.invalidateQueries({ queryKey: ['assessments', 'admin', 'classes'] })
       setBulkOpen(false)
     },
-    onError: (err) => toast.error(getApiErrorMessage(err, 'Unable to approve students')),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Unable to release students')),
   })
 
-  const awaitingIds =
-    data?.students
-      .filter((student) => student.status === 'awaiting_approval')
-      .map((student) => student.id) ?? []
+  const readyIds =
+    data?.students.filter((student) => student.status === 'ready_for_you').map((student) => student.id) ??
+    []
 
   const pillTabs: Array<{ key: StatusFilter; label: string; count: number }> = [
     { key: 'all', label: 'All', count: data?.students_count ?? 0 },
-    { key: 'pending', label: 'Pending', count: data?.pending_count ?? 0 },
-    {
-      key: 'awaiting_approval',
-      label: 'Awaiting approval',
-      count: data?.awaiting_approval_count ?? 0,
-    },
-    { key: 'approved', label: 'Approved', count: data?.approved_count ?? 0 },
+    { key: 'ready_for_you', label: 'Ready for you', count: data?.ready_for_you_count ?? 0 },
+    { key: 'released', label: 'Released', count: data?.released_count ?? 0 },
   ]
 
   const weights = data?.weights
-  const canApproveSelected = selectedStudent?.status === 'awaiting_approval' && canApprove
+  const canReleaseSelected = selectedStudent?.status === 'ready_for_you' && canRelease
+  const canGenerateReport = selectedStudent?.status === 'released'
 
   return (
     <div className="space-y-6">
@@ -146,19 +143,25 @@ const AssessmentDetail = () => {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-medium text-slate-900">{data.display_name}</h2>
-                <p className="text-sm text-slate-500 mt-0.5">
-                  {data.students_count} student{data.students_count === 1 ? '' : 's'}
+                <p className="text-sm text-slate-500 mt-0.5">{data.term_label}</p>
+                <p className="text-sm text-slate-500">
+                  {data.students_count} ready to review
                 </p>
+                {data.with_class_teacher_count > 0 ? (
+                  <p className="text-xs text-slate-400 mt-1">
+                    {data.with_class_teacher_count} still with the class teacher — not shown
+                  </p>
+                ) : null}
               </div>
-              {canApprove ? (
+              {canRelease ? (
                 <Button
                   type="button"
                   variant="outline"
                   className="max-w-fit py-2 text-sm"
-                  disabled={awaitingIds.length === 0}
+                  disabled={readyIds.length === 0}
                   onClick={() => setBulkOpen(true)}
                 >
-                  Approve all awaiting
+                  Release all ready
                 </Button>
               ) : null}
             </div>
@@ -186,11 +189,11 @@ const AssessmentDetail = () => {
               })}
             </div>
 
-            <div className="border-t border-slate-200" />
-
-            <ul className="flex-1 space-y-2 overflow-y-auto min-h-0 pr-1">
+            <ul className="space-y-2 overflow-y-auto">
               {filteredStudents.length === 0 ? (
-                <li className="text-sm text-slate-500 py-4">No students in this filter.</li>
+                <li className="text-sm text-slate-500 py-6 text-center">
+                  No students are ready for review yet.
+                </li>
               ) : (
                 filteredStudents.map((student) => {
                   const selected = student.id === selectedStudentId
@@ -212,12 +215,6 @@ const AssessmentDetail = () => {
                               {student.full_name}
                             </p>
                             <p className="text-xs text-slate-500 mt-0.5">{student.student_id}</p>
-                            {student.status === 'pending' ? (
-                              <p className="text-xs text-slate-500 mt-1">
-                                {student.subjects_published_count}/
-                                {student.subjects_required_count} subjects published
-                              </p>
-                            ) : null}
                           </div>
                           <span className={statusChipClass(student.status)}>
                             {statusLabel(student.status)}
@@ -304,9 +301,7 @@ const AssessmentDetail = () => {
                             ) : null}
                             {data.uses_position ? (
                               <Table.Cell>
-                                {subject.position != null
-                                  ? formatOrdinal(subject.position)
-                                  : '—'}
+                                {subject.position != null ? formatOrdinal(subject.position) : '—'}
                               </Table.Cell>
                             ) : null}
                             <Table.Cell>{subject.band_remark ?? '—'}</Table.Cell>
@@ -339,12 +334,12 @@ const AssessmentDetail = () => {
                       </p>
                     ) : (
                       <p className="text-slate-600">
-                        Overall position appears once all subjects are published (Awaiting
-                        approval or Approved).
+                        Overall position appears once the class teacher has approved the student.
                       </p>
                     )}
                   </div>
                 ) : null}
+
                 <div className="space-y-2">
                   <label
                     htmlFor="class-teacher-remarks"
@@ -354,35 +349,66 @@ const AssessmentDetail = () => {
                   </label>
                   <textarea
                     id="class-teacher-remarks"
+                    rows={3}
+                    value={selectedStudent.class_teacher_remarks}
+                    readOnly
+                    disabled
+                    className={remarksClassName}
+                    placeholder="No class teacher remarks yet"
+                  />
+                  <div className="flex justify-end">
+                    <p className="text-xs text-slate-500">
+                      {data.class_teacher_name ?? 'No class teacher'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label
+                    htmlFor="head-teacher-remarks"
+                    className="block text-sm font-medium text-slate-700"
+                  >
+                    Head teacher remarks
+                  </label>
+                  <textarea
+                    id="head-teacher-remarks"
                     rows={4}
-                    value={remarks}
-                    onChange={(event) => setRemarks(event.target.value)}
-                    disabled={!canApproveSelected}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
+                    value={headRemarks}
+                    onChange={(event) => setHeadRemarks(event.target.value)}
+                    disabled={!canReleaseSelected}
+                    className={remarksClassName}
                     placeholder={
-                      canApproveSelected
-                        ? 'Add remarks for this student before approving'
-                        : 'Remarks are available when the student is awaiting approval'
+                      canReleaseSelected
+                        ? 'Add head teacher remarks before releasing'
+                        : 'Remarks can be added when the student is ready for you'
                     }
                   />
                   <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
-                    {data.class_teacher_name ? (
-                      <p className="text-xs text-slate-500">{data.class_teacher_name}</p>
-                    ) : null}
-                    {canApproveSelected ? (
+                    <p className="text-xs text-slate-500">Head teacher</p>
+                    {canReleaseSelected ? (
                       <Button
                         type="button"
                         className="max-w-fit py-2 text-sm"
-                        loading={isApproving}
-                        loadingText="Approving"
+                        loading={isReleasing}
+                        loadingText="Releasing"
                         onClick={() =>
-                          approveStudents({
+                          releaseStudents({
                             student_ids: [selectedStudent.id],
-                            remarks: remarks.trim(),
+                            remarks: headRemarks.trim(),
                           })
                         }
                       >
-                        Approve
+                        Release
+                      </Button>
+                    ) : null}
+                    {canGenerateReport ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="max-w-fit py-2 text-sm"
+                        onClick={() => toast('Report generation comes next.')}
+                      >
+                        Generate report
                       </Button>
                     ) : null}
                   </div>
@@ -393,20 +419,15 @@ const AssessmentDetail = () => {
         </div>
       )}
 
-      <BulkApproveModal
+      <BulkReleaseModal
         open={bulkOpen}
-        awaitingCount={awaitingIds.length}
-        isSubmitting={isApproving}
+        readyCount={readyIds.length}
+        isSubmitting={isReleasing}
         onClose={() => setBulkOpen(false)}
-        onConfirm={(sharedRemarks) =>
-          approveStudents({
-            student_ids: awaitingIds,
-            remarks: sharedRemarks,
-          })
-        }
+        onConfirm={(remarks) => releaseStudents({ student_ids: readyIds, remarks })}
       />
     </div>
   )
 }
 
-export default AssessmentDetail
+export default AdminAssessmentDetail

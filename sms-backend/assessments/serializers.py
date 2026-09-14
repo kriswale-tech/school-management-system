@@ -101,6 +101,42 @@ class ClassTeacherAssessmentRowSerializer(serializers.Serializer):
     approved_count = serializers.IntegerField()
 
 
+class AdminAssessmentTermOptionSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    label = serializers.CharField()
+    is_active = serializers.BooleanField()
+    academic_year_id = serializers.UUIDField()
+    academic_year = serializers.CharField()
+
+
+class AdminAssessmentFilterOptionsSerializer(serializers.Serializer):
+    terms = AdminAssessmentTermOptionSerializer(many=True)
+    active_term_id = serializers.UUIDField(allow_null=True)
+
+
+class AdminAssessmentClassRowSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    class_level_id = serializers.UUIDField()
+    stream_id = serializers.UUIDField()
+    display_name = serializers.CharField()
+    class_teacher_id = serializers.UUIDField(allow_null=True)
+    class_teacher_name = serializers.CharField(allow_null=True)
+    students_count = serializers.IntegerField()
+    with_class_teacher_count = serializers.IntegerField()
+    ready_for_you_count = serializers.IntegerField()
+    released_count = serializers.IntegerField()
+
+
+class AdminAssessmentOverviewSerializer(serializers.Serializer):
+    term_id = serializers.UUIDField()
+    term_label = serializers.CharField()
+    with_class_teacher_count = serializers.IntegerField()
+    ready_for_you_count = serializers.IntegerField()
+    released_count = serializers.IntegerField()
+    classes_fully_ready_count = serializers.IntegerField()
+    results = AdminAssessmentClassRowSerializer(many=True)
+
+
 class ClassTeacherAssessmentOverviewSerializer(serializers.Serializer):
     term_id = serializers.UUIDField()
     pending_count = serializers.IntegerField()
@@ -131,6 +167,38 @@ class AssessmentSubjectRowSerializer(serializers.Serializer):
     band_remark = serializers.CharField(allow_null=True)
     position = serializers.IntegerField(allow_null=True)
     position_cohort_size = serializers.IntegerField(allow_null=True, required=False)
+
+
+class AdminAssessmentDetailStudentSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    full_name = serializers.CharField()
+    student_id = serializers.CharField()
+    status = serializers.CharField()
+    subjects_published_count = serializers.IntegerField()
+    subjects_required_count = serializers.IntegerField()
+    class_teacher_remarks = serializers.CharField(allow_blank=True)
+    head_teacher_remarks = serializers.CharField(allow_blank=True)
+    overall_position = serializers.IntegerField(allow_null=True)
+    overall_average = serializers.FloatField(allow_null=True)
+    overall_cohort_size = serializers.IntegerField(allow_null=True)
+    subjects = AssessmentSubjectRowSerializer(many=True)
+
+
+class AdminAssessmentDetailSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    term_id = serializers.UUIDField()
+    term_label = serializers.CharField()
+    display_name = serializers.CharField()
+    class_teacher_name = serializers.CharField(allow_null=True, allow_blank=True)
+    with_class_teacher_count = serializers.IntegerField()
+    ready_for_you_count = serializers.IntegerField()
+    released_count = serializers.IntegerField()
+    students_count = serializers.IntegerField()
+    weights = AssessmentWeightsSerializer()
+    result_type = serializers.CharField()
+    uses_grades = serializers.BooleanField()
+    uses_position = serializers.BooleanField()
+    students = AdminAssessmentDetailStudentSerializer(many=True)
 
 
 class ClassAssessmentDetailStudentSerializer(serializers.Serializer):

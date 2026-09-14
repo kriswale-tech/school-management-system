@@ -155,6 +155,7 @@ class TeacherAccessCapabilitiesTests(APITestCase):
         session = resolve_session_access(self.teacher_membership)
         self.assertTrue(session.has(Capability.NAV_ASSESSMENTS))
         self.assertTrue(session.has(Capability.ASSESSMENTS_APPROVE))
+        self.assertFalse(session.has(Capability.ASSESSMENTS_RELEASE))
         self.assertTrue(session.has(Capability.FEES_VIEW))
         self.assertFalse(session.has(Capability.ASSESSMENTS_RECORD))
 
