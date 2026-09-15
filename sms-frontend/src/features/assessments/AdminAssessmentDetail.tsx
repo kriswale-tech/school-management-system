@@ -140,13 +140,13 @@ const AdminAssessmentDetail = () => {
       ) : (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12 min-h-[70vh]">
           <aside className="xl:col-span-4 bg-white p-4 custom-shadow-md flex flex-col gap-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
                 <h2 className="text-lg font-medium text-slate-900">{data.display_name}</h2>
-                <p className="text-sm text-slate-500 mt-0.5">{data.term_label}</p>
-                <p className="text-sm text-slate-500">
-                  {data.students_count} ready to review
+                <p className="text-sm text-slate-500 mt-0.5">
+                  {data.class_teacher_name ?? 'No class teacher'}
                 </p>
+                <p className="text-sm text-slate-500 mt-0.5">{data.term_label}</p>
                 {data.with_class_teacher_count > 0 ? (
                   <p className="text-xs text-slate-400 mt-1">
                     {data.with_class_teacher_count} still with the class teacher — not shown
@@ -157,7 +157,7 @@ const AdminAssessmentDetail = () => {
                 <Button
                   type="button"
                   variant="outline"
-                  className="max-w-fit py-2 text-sm"
+                  className="max-w-fit shrink-0 py-2 text-sm"
                   disabled={readyIds.length === 0}
                   onClick={() => setBulkOpen(true)}
                 >

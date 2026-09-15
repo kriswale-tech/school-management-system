@@ -45,8 +45,9 @@ Columns:
 
 Save rules:
 
-- No empty **CA** cells in a save payload (cannot save blank class assessments).
-- **Exam may be empty** until the exam is taken; teachers save CA marks per assessment as they go.
+- Save is **per student**. Only students with every **CA** cell filled are saved; empty rows are left alone.
+- A student with some CA marks filled and others blank is skipped until that row is complete.
+- **Exam may be empty** until the exam is taken.
 - When exam is entered, mark must be `0 … 100`. CA marks must be `0 … max` for that item.
 
 ---

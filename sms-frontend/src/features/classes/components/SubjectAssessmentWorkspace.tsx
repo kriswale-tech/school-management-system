@@ -10,7 +10,7 @@ import {
   DEFAULT_ASSESSMENT_WEIGHTS,
   DEFAULT_GRADE_BANDS,
   EXAM_MAX,
-  areCaMarksComplete,
+  isStudentCaComplete,
   computeStudentResult,
   formatScore,
 } from '../assessment/scoring'
@@ -217,47 +217,71 @@ const SubjectAssessmentWorkspace = ({
       toast.error('All students are published. Unpublish to edit marks.')
       return
     }
-    for (const row of editableDraft) {
-      for (const item of caItems) {
+
+    const hasAnyCaMark = (row: (typeof editableDraft)[number]) =>
+      caItems.some((item) => {
         const mark = row.ca[item.id]
-        if (mark === null || mark === undefined) {
-          toast.error(
-            'Fill every class assessment mark before saving. Exam can wait until it is taken.',
-          )
-          return
+        return mark !== null && mark !== undefined
+      }) || row.exam !== null
+
+    const completeRows: typeof editableDraft = []
+    let skippedPartial = 0
+    for (const row of editableDraft) {
+      if (isStudentCaComplete(row, caItems)) {
+        for (const item of caItems) {
+          const mark = row.ca[item.id] as number
+          if (mark < 0 || mark > item.max_marks) {
+            toast.error(`Marks must be between 0 and ${item.max_marks} for ${item.name}.`)
+            return
+          }
         }
-        if (mark < 0 || mark > item.max_marks) {
-          toast.error(`Marks must be between 0 and ${item.max_marks} for ${item.name}.`)
-          return
+        if (row.exam !== null && row.exam !== undefined) {
+          if (row.exam < 0 || row.exam > EXAM_MAX) {
+            toast.error(`Exam marks must be between 0 and ${EXAM_MAX}.`)
+            return
+          }
         }
+        completeRows.push(row)
+        continue
       }
-      if (row.exam !== null && row.exam !== undefined) {
-        if (row.exam < 0 || row.exam > EXAM_MAX) {
-          toast.error(`Exam marks must be between 0 and ${EXAM_MAX}.`)
-          return
-        }
+      if (hasAnyCaMark(row)) {
+        skippedPartial += 1
       }
     }
-    if (!areCaMarksComplete(editableDraft, caItems)) {
+
+    if (completeRows.length === 0) {
       toast.error(
-        'Fill every class assessment mark before saving. Exam can wait until it is taken.',
+        skippedPartial > 0
+          ? 'Fill every class assessment mark for a student before saving that row. Exam can wait.'
+          : 'Fill every class assessment mark for at least one student before saving. Exam can wait.',
       )
       return
     }
 
-    saveMarks({
-      students: editableDraft.map((row) => {
-        const ca: Record<string, number> = {}
-        for (const item of caItems) {
-          ca[item.id] = row.ca[item.id] as number
-        }
-        return {
-          student_id: row.student_id,
-          ca,
-          exam: row.exam,
-        }
-      }),
-    })
+    saveMarks(
+      {
+        students: completeRows.map((row) => {
+          const ca: Record<string, number> = {}
+          for (const item of caItems) {
+            ca[item.id] = row.ca[item.id] as number
+          }
+          return {
+            student_id: row.student_id,
+            ca,
+            exam: row.exam,
+          }
+        }),
+      },
+      {
+        onSuccess: () => {
+          if (skippedPartial > 0) {
+            toast(
+              `${skippedPartial} student${skippedPartial === 1 ? '' : 's'} skipped — complete all class assessment marks first.`,
+            )
+          }
+        },
+      },
+    )
   }
 
   if (isError) {

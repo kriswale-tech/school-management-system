@@ -322,6 +322,14 @@ def save_marks(*, school, membership, assignment_id, students: list[dict]) -> di
             continue
         by_id[_as_uuid(sid)] = row
 
+    if not by_id:
+        raise ValidationError({
+            'detail': (
+                'Fill every class assessment mark for at least one student before saving. '
+                'Exam can wait until it is taken.'
+            ),
+        })
+
     published_ids = set(
         SubjectScore.objects.filter(
             teaching_assignment=assignment,
@@ -330,14 +338,14 @@ def save_marks(*, school, membership, assignment_id, students: list[dict]) -> di
         ).values_list('student_id', flat=True)
     )
 
-    for student_id in roster_ids:
+    for student_id, row in by_id.items():
+        if student_id not in roster_ids:
+            raise ValidationError({'detail': 'One or more students are not on this roster.'})
         if student_id in published_ids:
-            continue
+            raise ValidationError({
+                'detail': PUBLISHED_LOCK_MESSAGE,
+            })
 
-        if student_id not in by_id:
-            raise ValidationError({'detail': CA_MARKS_REQUIRED_MESSAGE})
-
-        row = by_id[student_id]
         ca = row.get('ca') or {}
         for item in items:
             raw = ca.get(str(item.id))

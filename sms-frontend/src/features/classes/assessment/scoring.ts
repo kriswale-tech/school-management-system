@@ -126,18 +126,25 @@ export function caItemHasAnyMarks(
   })
 }
 
-/** True if every student has every CA item filled (exam may be empty). */
+/** True if this student has every CA item filled (exam may be empty). */
+export function isStudentCaComplete(
+  row: StudentAssessmentMarks,
+  items: CaItem[],
+): boolean {
+  if (items.length === 0) return false
+  return items.every((item) => {
+    const mark = row.ca[item.id]
+    return mark !== null && mark !== undefined
+  })
+}
+
+/** True if every row has every CA item filled (exam may be empty). */
 export function areCaMarksComplete(
   rows: StudentAssessmentMarks[],
   items: CaItem[],
 ): boolean {
   if (rows.length === 0 || items.length === 0) return false
-  return rows.every((row) =>
-    items.every((item) => {
-      const mark = row.ca[item.id]
-      return mark !== null && mark !== undefined
-    }),
-  )
+  return rows.every((row) => isStudentCaComplete(row, items))
 }
 
 export function emptyMarksForStudents(
