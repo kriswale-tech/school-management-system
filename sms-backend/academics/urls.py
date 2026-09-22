@@ -23,6 +23,9 @@ from assessments.views import (
     AdminAssessmentFilterOptionsView,
     AdminAssessmentOverviewView,
     AdminAssessmentReleaseView,
+    AdminStudentReportPreviewView,
+    AdminStudentReportView,
+    AdminStudentReportGenerateView,
     ClassTeacherApproveStudentsView,
     ClassTeacherAssessmentDetailView,
     ClassTeacherAssessmentOverviewView,
@@ -112,6 +115,21 @@ urlpatterns = [
         'assessments/admin/classes/<uuid:stream_id>/release/',
         AdminAssessmentReleaseView.as_view(),
         name='academics-assessments-admin-class-release',
+    ),
+    path(
+        'assessments/admin/classes/<uuid:stream_id>/students/<uuid:student_id>/report/',
+        AdminStudentReportView.as_view(),
+        name='academics-assessments-admin-student-report',
+    ),
+    path(
+        'assessments/admin/classes/<uuid:stream_id>/students/<uuid:student_id>/report/preview/',
+        AdminStudentReportPreviewView.as_view(),
+        name='academics-assessments-admin-student-report-preview',
+    ),
+    path(
+        'assessments/admin/classes/<uuid:stream_id>/students/<uuid:student_id>/report/generate/',
+        AdminStudentReportGenerateView.as_view(),
+        name='academics-assessments-admin-student-report-generate',
     ),
     path(
         'assessments/my-classes/',

@@ -6,6 +6,7 @@ import { Capability } from '@/features/auth/capabilities'
 const AssessmentsPage = lazy(() => import('./Assessments'))
 const AssessmentDetailPage = lazy(() => import('./AssessmentDetail'))
 const AdminAssessmentDetailPage = lazy(() => import('./AdminAssessmentDetail'))
+const StudentReportPreviewPage = lazy(() => import('./StudentReportPreview'))
 
 export const assessmentsRoutes = (
   <>
@@ -22,6 +23,14 @@ export const assessmentsRoutes = (
       element={
         <RequireCapability capability={Capability.ASSESSMENTS_RELEASE}>
           <AdminAssessmentDetailPage />
+        </RequireCapability>
+      }
+    />
+    <Route
+      path="assessments/classes/:streamId/report/:studentId"
+      element={
+        <RequireCapability capability={Capability.ASSESSMENTS_RELEASE}>
+          <StudentReportPreviewPage />
         </RequireCapability>
       }
     />

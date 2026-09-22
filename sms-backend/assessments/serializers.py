@@ -151,6 +151,9 @@ class ApproveClassStudentsSerializer(serializers.Serializer):
         allow_empty=False,
     )
     remarks = serializers.CharField(required=False, allow_blank=True, default='')
+    conduct = serializers.CharField(required=False, allow_blank=True, default='')
+    attitude = serializers.CharField(required=False, allow_blank=True, default='')
+    interest = serializers.CharField(required=False, allow_blank=True, default='')
 
 
 class AssessmentSubjectRowSerializer(serializers.Serializer):
@@ -177,6 +180,9 @@ class AdminAssessmentDetailStudentSerializer(serializers.Serializer):
     subjects_published_count = serializers.IntegerField()
     subjects_required_count = serializers.IntegerField()
     class_teacher_remarks = serializers.CharField(allow_blank=True)
+    conduct = serializers.CharField(allow_blank=True)
+    attitude = serializers.CharField(allow_blank=True)
+    interest = serializers.CharField(allow_blank=True)
     head_teacher_remarks = serializers.CharField(allow_blank=True)
     overall_position = serializers.IntegerField(allow_null=True)
     overall_average = serializers.FloatField(allow_null=True)
@@ -209,6 +215,9 @@ class ClassAssessmentDetailStudentSerializer(serializers.Serializer):
     subjects_published_count = serializers.IntegerField()
     subjects_required_count = serializers.IntegerField()
     class_teacher_remarks = serializers.CharField(allow_blank=True)
+    conduct = serializers.CharField(allow_blank=True)
+    attitude = serializers.CharField(allow_blank=True)
+    interest = serializers.CharField(allow_blank=True)
     overall_position = serializers.IntegerField(allow_null=True)
     overall_average = serializers.FloatField(allow_null=True)
     overall_cohort_size = serializers.IntegerField(allow_null=True)
@@ -231,3 +240,78 @@ class ClassTeacherAssessmentDetailSerializer(serializers.Serializer):
     uses_grades = serializers.BooleanField()
     uses_position = serializers.BooleanField()
     students = ClassAssessmentDetailStudentSerializer(many=True)
+
+
+class ReportSchoolSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    box_address = serializers.CharField(allow_blank=True)
+    address = serializers.CharField(allow_blank=True)
+    phone_number = serializers.CharField(allow_blank=True)
+    phone_number_alt = serializers.CharField(allow_blank=True)
+    email = serializers.CharField(allow_blank=True)
+    motto = serializers.CharField(allow_blank=True)
+    logo_url = serializers.CharField(allow_null=True)
+
+
+class ReportSubjectRowSerializer(serializers.Serializer):
+    subject_label = serializers.CharField()
+    class_score = serializers.FloatField()
+    exam_score = serializers.FloatField()
+    total = serializers.FloatField()
+    grade = serializers.CharField(allow_null=True)
+    remark = serializers.CharField(allow_null=True)
+
+
+class ReportTotalsSerializer(serializers.Serializer):
+    class_score = serializers.FloatField(allow_null=True)
+    exam_score = serializers.FloatField(allow_null=True)
+    total = serializers.FloatField(allow_null=True)
+    max_class_score = serializers.FloatField(allow_null=True)
+    max_exam_score = serializers.FloatField(allow_null=True)
+    max_total = serializers.FloatField(allow_null=True)
+
+
+class ReportGradeBandSerializer(serializers.Serializer):
+    grade = serializers.CharField()
+    min_score = serializers.IntegerField()
+    max_score = serializers.IntegerField()
+    remark = serializers.CharField()
+
+
+class StudentReportPreviewSerializer(serializers.Serializer):
+    student_id = serializers.UUIDField()
+    stream_id = serializers.UUIDField()
+    term_id = serializers.UUIDField()
+    school = ReportSchoolSerializer()
+    report_title = serializers.CharField()
+    student_name = serializers.CharField()
+    class_name = serializers.CharField()
+    academic_year = serializers.CharField()
+    term_label = serializers.CharField()
+    next_term_begins = serializers.CharField(allow_null=True)
+    students_on_roll = serializers.IntegerField()
+    position = serializers.IntegerField(allow_null=True)
+    position_label = serializers.CharField(allow_null=True)
+    uses_position = serializers.BooleanField()
+    uses_grades = serializers.BooleanField()
+    weights = AssessmentWeightsSerializer()
+    subjects = ReportSubjectRowSerializer(many=True)
+    totals = ReportTotalsSerializer()
+    conduct = serializers.CharField(allow_blank=True)
+    attitude = serializers.CharField(allow_blank=True)
+    interest = serializers.CharField(allow_blank=True)
+    class_teacher_remarks = serializers.CharField(allow_blank=True)
+    head_teacher_remarks = serializers.CharField(allow_blank=True)
+    class_teacher_name = serializers.CharField(allow_blank=True)
+    grade_bands = ReportGradeBandSerializer(many=True)
+
+
+class StoredStudentReportSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    student_id = serializers.UUIDField()
+    stream_id = serializers.UUIDField()
+    term_id = serializers.UUIDField()
+    generated_at = serializers.CharField(allow_null=True)
+    url = serializers.CharField(allow_null=True)
+    url_expires_in = serializers.IntegerField()
+    status = serializers.CharField()

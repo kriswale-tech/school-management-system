@@ -59,6 +59,9 @@ const AssessmentDetail = () => {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
   const [remarks, setRemarks] = useState('')
+  const [conduct, setConduct] = useState('')
+  const [attitude, setAttitude] = useState('')
+  const [interest, setInterest] = useState('')
   const [bulkOpen, setBulkOpen] = useState(false)
 
   const { data, isLoading, isError, error } = useQuery({
@@ -97,11 +100,25 @@ const AssessmentDetail = () => {
 
   useEffect(() => {
     setRemarks(selectedStudent?.class_teacher_remarks ?? '')
-  }, [selectedStudent?.id, selectedStudent?.class_teacher_remarks])
+    setConduct(selectedStudent?.conduct ?? '')
+    setAttitude(selectedStudent?.attitude ?? '')
+    setInterest(selectedStudent?.interest ?? '')
+  }, [
+    selectedStudent?.id,
+    selectedStudent?.class_teacher_remarks,
+    selectedStudent?.conduct,
+    selectedStudent?.attitude,
+    selectedStudent?.interest,
+  ])
 
   const { mutate: approveStudents, isPending: isApproving } = useMutation({
-    mutationFn: (payload: { student_ids: string[]; remarks?: string }) =>
-      approveClassTeacherStudents(classTeacherId!, payload),
+    mutationFn: (payload: {
+      student_ids: string[]
+      remarks?: string
+      conduct?: string
+      attitude?: string
+      interest?: string
+    }) => approveClassTeacherStudents(classTeacherId!, payload),
     onSuccess: (payload) => {
       toast.success('Students approved')
       queryClient.setQueryData(DETAIL_QUERY_KEY(classTeacherId!), payload)
@@ -345,46 +362,101 @@ const AssessmentDetail = () => {
                     )}
                   </div>
                 ) : null}
-                <div className="space-y-2">
-                  <label
-                    htmlFor="class-teacher-remarks"
-                    className="block text-sm font-medium text-slate-700"
-                  >
-                    Class teacher remarks
-                  </label>
-                  <textarea
-                    id="class-teacher-remarks"
-                    rows={4}
-                    value={remarks}
-                    onChange={(event) => setRemarks(event.target.value)}
-                    disabled={!canApproveSelected}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
-                    placeholder={
-                      canApproveSelected
-                        ? 'Add remarks for this student before approving'
-                        : 'Remarks are available when the student is awaiting approval'
-                    }
-                  />
-                  <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
-                    {data.class_teacher_name ? (
-                      <p className="text-xs text-slate-500">{data.class_teacher_name}</p>
-                    ) : null}
-                    {canApproveSelected ? (
-                      <Button
-                        type="button"
-                        className="max-w-fit py-2 text-sm"
-                        loading={isApproving}
-                        loadingText="Approving"
-                        onClick={() =>
-                          approveStudents({
-                            student_ids: [selectedStudent.id],
-                            remarks: remarks.trim(),
-                          })
-                        }
+                <div className="space-y-4">
+                  {(
+                    [
+                      {
+                        id: 'conduct',
+                        label: 'Conduct',
+                        value: conduct,
+                        onChange: setConduct,
+                        placeholder: canApproveSelected
+                          ? 'Optional'
+                          : 'Available when the student is awaiting approval',
+                      },
+                      {
+                        id: 'attitude',
+                        label: 'Attitude',
+                        value: attitude,
+                        onChange: setAttitude,
+                        placeholder: canApproveSelected
+                          ? 'Optional'
+                          : 'Available when the student is awaiting approval',
+                      },
+                      {
+                        id: 'interest',
+                        label: 'Interest',
+                        value: interest,
+                        onChange: setInterest,
+                        placeholder: canApproveSelected
+                          ? 'Optional'
+                          : 'Available when the student is awaiting approval',
+                      },
+                    ] as const
+                  ).map((field) => (
+                    <div key={field.id} className="space-y-2">
+                      <label
+                        htmlFor={field.id}
+                        className="block text-sm font-medium text-slate-700"
                       >
-                        Approve
-                      </Button>
-                    ) : null}
+                        {field.label}
+                      </label>
+                      <input
+                        id={field.id}
+                        type="text"
+                        value={field.value}
+                        onChange={(event) => field.onChange(event.target.value)}
+                        disabled={!canApproveSelected}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
+                        placeholder={field.placeholder}
+                      />
+                    </div>
+                  ))}
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="class-teacher-remarks"
+                      className="block text-sm font-medium text-slate-700"
+                    >
+                      Class teacher remarks
+                    </label>
+                    <textarea
+                      id="class-teacher-remarks"
+                      rows={4}
+                      value={remarks}
+                      onChange={(event) => setRemarks(event.target.value)}
+                      disabled={!canApproveSelected}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
+                      placeholder={
+                        canApproveSelected
+                          ? 'Add remarks for this student before approving'
+                          : 'Remarks are available when the student is awaiting approval'
+                      }
+                    />
+                    <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
+                      {data.class_teacher_name ? (
+                        <p className="text-xs text-slate-500">{data.class_teacher_name}</p>
+                      ) : null}
+                      {canApproveSelected ? (
+                        <Button
+                          type="button"
+                          className="max-w-fit py-2 text-sm"
+                          loading={isApproving}
+                          loadingText="Approving"
+                          onClick={() =>
+                            approveStudents({
+                              student_ids: [selectedStudent.id],
+                              remarks: remarks.trim(),
+                              conduct: conduct.trim(),
+                              attitude: attitude.trim(),
+                              interest: interest.trim(),
+                            })
+                          }
+                        >
+                          Approve
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </>

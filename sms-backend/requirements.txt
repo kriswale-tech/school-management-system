@@ -1,5 +1,6 @@
 asgiref==3.11.1
 attrs==26.1.0
+boto3==1.40.61
 certifi==2026.6.17
 charset-normalizer==3.4.7
 cloudinary==1.44.2
@@ -8,6 +9,7 @@ Django==5.2.14
 django-cloudinary-storage==0.3.0
 django-cors-headers==4.9.0
 django-filter==26.1
+django-storages==1.14.6
 djangorestframework==3.17.1
 djangorestframework_simplejwt==5.5.1
 drf-spectacular==0.29.0
@@ -28,3 +30,4 @@ sqlparse==0.5.5
 typing_extensions==4.15.0
 uritemplate==4.2.0
 urllib3==2.7.0
+weasyprint==67.0

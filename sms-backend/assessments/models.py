@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, Q
 
+from assessments.storage import report_storage, report_upload_to
 from shared.models import BaseModel
 
 
@@ -337,6 +338,9 @@ class StudentResult(BaseModel):
         default=Status.AWAITING_APPROVAL,
     )
     remarks = models.TextField(blank=True, default='')
+    conduct = models.TextField(blank=True, default='')
+    attitude = models.TextField(blank=True, default='')
+    interest = models.TextField(blank=True, default='')
     head_teacher_remarks = models.TextField(blank=True, default='')
     approved_at = models.DateTimeField(null=True, blank=True)
     approved_by = models.ForeignKey(
@@ -378,7 +382,53 @@ class StudentResult(BaseModel):
 
 
 class Report(BaseModel):
-    pass
+    """Stored PDF report card for a student in a stream/term."""
+
+    school = models.ForeignKey(
+        'schools.School',
+        on_delete=models.CASCADE,
+        related_name='assessment_reports',
+    )
+    student = models.ForeignKey(
+        'students.Student',
+        on_delete=models.CASCADE,
+        related_name='assessment_reports',
+    )
+    stream = models.ForeignKey(
+        'academics.ClassStream',
+        on_delete=models.CASCADE,
+        related_name='assessment_reports',
+    )
+    term = models.ForeignKey(
+        'schools.Term',
+        on_delete=models.CASCADE,
+        related_name='assessment_reports',
+    )
+    file = models.FileField(
+        storage=report_storage,
+        upload_to=report_upload_to,
+        blank=True,
+        max_length=500,
+    )
+    generated_at = models.DateTimeField(null=True, blank=True)
+    generated_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='generated_assessment_reports',
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['school', 'student', 'stream', 'term'],
+                name='unique_report_student_stream_term',
+            ),
+        ]
+
+    def __str__(self):
+        return f'report {self.student_id} {self.term_id}'
 
 
 # tentative

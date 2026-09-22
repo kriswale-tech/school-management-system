@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ report_title }}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 8mm;
+    }
+    body {
+      font-family: DejaVu Sans, sans-serif;
+      font-size: 13px;
+      color: #000;
+      line-height: 1.45;
+    }
+    .header {
+      position: relative;
+      min-height: 112px;
+      margin-bottom: 16px;
+    }
+    .logo {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 112px;
+      height: 112px;
+      object-fit: contain;
+    }
+    .school-meta {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 500;
+      padding-top: 28px;
+    }
+    .school-name {
+      font-size: 18px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin: 0 0 4px;
+    }
+    .school-meta p {
+      margin: 2px 0;
+    }
+    .report-title {
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      text-decoration: underline;
+      text-underline-offset: 4px;
+      margin: 0 0 18px;
+    }
+    .student-box {
+      border: 1px solid #000;
+      padding: 12px;
+      margin-bottom: 18px;
+    }
+    .student-grid {
+      width: 100%;
+    }
+    .student-grid td {
+      width: 50%;
+      vertical-align: top;
+      padding: 0 8px 6px 0;
+    }
+    .label {
+      font-weight: 500;
+    }
+    .dotted {
+      display: inline-block;
+      min-width: 100px;
+      border-bottom: 1px dotted #000;
+      padding-bottom: 1px;
+    }
+    .dotted.wide {
+      min-width: 240px;
+    }
+    .dotted.full {
+      display: inline-block;
+      width: 85%;
+      min-width: 0;
+    }
+    table.scores {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-bottom: 18px;
+    }
+    table.scores th,
+    table.scores td {
+      border: 1px solid #000;
+      padding: 6px 8px;
+    }
+    table.scores th {
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .center { text-align: center; }
+    .left { text-align: left; }
+    .capitalize { text-transform: capitalize; }
+    .fields p {
+      margin: 6px 0;
+    }
+    .attendance {
+      text-align: center;
+      font-weight: 500;
+      margin-bottom: 10px;
+    }
+    .grades-title {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 500;
+      font-style: italic;
+      text-decoration: underline;
+      text-underline-offset: 4px;
+      margin: 24px 0 8px;
+    }
+    .grades-box {
+      border: 1px solid #000;
+      padding: 10px;
+      font-size: 11px;
+    }
+    .grades-table {
+      width: 100%;
+    }
+    .grades-table td {
+      width: 33%;
+      vertical-align: top;
+      padding: 2px 6px;
+    }
+    .signatures {
+      width: 100%;
+      margin-top: 28px;
+    }
+    .signatures td {
+      width: 50%;
+      text-align: center;
+      vertical-align: top;
+      padding: 0 16px;
+    }
+    .sig-line {
+      border-bottom: 1px dotted #000;
+      height: 36px;
+      margin-bottom: 8px;
+    }
+    .sig-name {
+      font-size: 12px;
+      text-transform: capitalize;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    {% if school.logo_url %}
+      <img class="logo" src="{{ school.logo_url }}" alt="" />
+    {% endif %}
+    <div class="school-meta">
+      <h1 class="school-name">{{ school.name }}</h1>
+      {% if contact_line %}<p>{{ contact_line }}</p>{% endif %}
+      {% if school.email %}<p>{{ school.email }}</p>{% endif %}
+    </div>
+  </div>
+
+  <p class="report-title">{{ report_title }}</p>
+
+  <div class="student-box">
+    <table class="student-grid">
+      <tr>
+        <td>
+          <p><span class="label">Student's Name:</span> {{ student_name }}</p>
+          <p><span class="label">Class:</span> {{ class_name }}</p>
+          <p><span class="label">Academic Year:</span> {{ academic_year }}</p>
+          <p><span class="label">Term:</span> {{ term_label }}</p>
+        </td>
+        <td>
+          <p>
+            <span class="label">Next Term Begins:</span>
+            {% if next_term_begins %}{{ next_term_begins }}{% else %}<span class="dotted">&nbsp;</span>{% endif %}
+          </p>
+          <p><span class="label">No. On Roll:</span> {{ students_on_roll }}</p>
+          {% if uses_position %}
+          <p>
+            <span class="label">Position:</span>
+            {% if position_label %}{{ position_label }}{% else %}<span class="dotted">&nbsp;</span>{% endif %}
+          </p>
+          {% endif %}
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <table class="scores">
+    <thead>
+      <tr>
+        <th class="left">Subject</th>
+        <th class="center">Class Score ({{ weights.continuous_assessment_weight }})</th>
+        <th class="center">Exams Score ({{ weights.exam_weight }})</th>
+        <th class="center">Total Score</th>
+        {% if uses_grades %}<th class="center">Grade</th>{% endif %}
+        <th class="left">Remarks</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for subject in subjects %}
+      <tr>
+        <td class="capitalize"><strong>{{ subject.subject_label }}</strong></td>
+        <td class="center">{{ subject.class_score_display }}</td>
+        <td class="center">{{ subject.exam_score_display }}</td>
+        <td class="center">{{ subject.total_display }}</td>
+        {% if uses_grades %}<td class="center">{{ subject.grade|default:"" }}</td>{% endif %}
+        <td class="capitalize">{{ subject.remark|default:"" }}</td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td><strong>Total</strong></td>
+        <td class="center"><strong>{{ totals.class_score_display }}</strong></td>
+        <td class="center"><strong>{{ totals.exam_score_display }}</strong></td>
+        <td class="center"><strong>{{ totals.total_display }}</strong></td>
+        {% if uses_grades %}<td></td>{% endif %}
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="fields">
+    <p class="attendance">
+      Attendance:
+      <span class="dotted">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+      of
+      <span class="dotted">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+    </p>
+    <p>
+      <span class="label">Conduct:</span>
+      {% if conduct %}{{ conduct }}{% else %}<span class="dotted full">&nbsp;</span>{% endif %}
+    </p>
+    <p>
+      <span class="label">Attitude:</span>
+      {% if attitude %}{{ attitude }}{% else %}<span class="dotted full">&nbsp;</span>{% endif %}
+    </p>
+    <p>
+      <span class="label">Interest:</span>
+      {% if interest %}{{ interest }}{% else %}<span class="dotted full">&nbsp;</span>{% endif %}
+    </p>
+    <p>
+      <span class="label">Class Teacher's Remarks:</span>
+      {% if class_teacher_remarks %}{{ class_teacher_remarks }}{% else %}<span class="dotted wide">&nbsp;</span>{% endif %}
+    </p>
+    <p>
+      <span class="label">Headteacher's Remarks:</span>
+      {% if head_teacher_remarks %}{{ head_teacher_remarks }}{% else %}<span class="dotted wide">&nbsp;</span>{% endif %}
+    </p>
+  </div>
+
+  <table class="signatures">
+    <tr>
+      <td>
+        <div class="sig-line"></div>
+        <div class="label">(Class Teacher's Signature)</div>
+        {% if class_teacher_name %}<div class="sig-name">{{ class_teacher_name }}</div>{% endif %}
+      </td>
+      <td>
+        <div class="sig-line"></div>
+        <div class="label">(Headteacher's Signature)</div>
+      </td>
+    </tr>
+  </table>
+
+  {% if uses_grades and grade_columns %}
+  <p class="grades-title">Grades Interpretation</p>
+  <div class="grades-box">
+    <table class="grades-table">
+      <tr>
+        {% for column in grade_columns %}
+        <td>
+          {% for band in column %}
+          <p>
+            <span class="label">Grade {{ band.grade }}:</span>
+            {{ band.min_score }}-{{ band.max_score }} ({{ band.remark }})
+          </p>
+          {% endfor %}
+        </td>
+        {% endfor %}
+      </tr>
+    </table>
+  </div>
+  {% endif %}
+</body>
+</html>

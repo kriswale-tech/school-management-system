@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import ActionBar from '@/components/shared/ActionBar'
 import { Table, TableWrapper } from '@/components/shared'
 import { Button } from '@/components/ui'
@@ -57,6 +57,7 @@ const DETAIL_QUERY_KEY = (id: string, termId: string) =>
 
 const AdminAssessmentDetail = () => {
   const { streamId } = useParams<{ streamId: string }>()
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const termId = searchParams.get('term') ?? undefined
   const queryClient = useQueryClient()
@@ -340,77 +341,109 @@ const AdminAssessmentDetail = () => {
                   </div>
                 ) : null}
 
-                <div className="space-y-2">
-                  <label
-                    htmlFor="class-teacher-remarks"
-                    className="block text-sm font-medium text-slate-700"
-                  >
-                    Class teacher remarks
-                  </label>
-                  <textarea
-                    id="class-teacher-remarks"
-                    rows={3}
-                    value={selectedStudent.class_teacher_remarks}
-                    readOnly
-                    disabled
-                    className={remarksClassName}
-                    placeholder="No class teacher remarks yet"
-                  />
-                  <div className="flex justify-end">
-                    <p className="text-xs text-slate-500">
-                      {data.class_teacher_name ?? 'No class teacher'}
-                    </p>
-                  </div>
-                </div>
+                <div className="space-y-4">
+                  {(
+                    [
+                      { id: 'conduct', label: 'Conduct', value: selectedStudent.conduct },
+                      { id: 'attitude', label: 'Attitude', value: selectedStudent.attitude },
+                      { id: 'interest', label: 'Interest', value: selectedStudent.interest },
+                    ] as const
+                  ).map((field) => (
+                    <div key={field.id} className="space-y-2">
+                      <label
+                        htmlFor={`admin-${field.id}`}
+                        className="block text-sm font-medium text-slate-700"
+                      >
+                        {field.label}
+                      </label>
+                      <input
+                        id={`admin-${field.id}`}
+                        type="text"
+                        value={field.value || '—'}
+                        readOnly
+                        disabled
+                        className={remarksClassName}
+                      />
+                    </div>
+                  ))}
 
-                <div className="space-y-2">
-                  <label
-                    htmlFor="head-teacher-remarks"
-                    className="block text-sm font-medium text-slate-700"
-                  >
-                    Head teacher remarks
-                  </label>
-                  <textarea
-                    id="head-teacher-remarks"
-                    rows={4}
-                    value={headRemarks}
-                    onChange={(event) => setHeadRemarks(event.target.value)}
-                    disabled={!canReleaseSelected}
-                    className={remarksClassName}
-                    placeholder={
-                      canReleaseSelected
-                        ? 'Add head teacher remarks before releasing'
-                        : 'Remarks can be added when the student is ready for you'
-                    }
-                  />
-                  <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
-                    <p className="text-xs text-slate-500">Head teacher</p>
-                    {canReleaseSelected ? (
-                      <Button
-                        type="button"
-                        className="max-w-fit py-2 text-sm"
-                        loading={isReleasing}
-                        loadingText="Releasing"
-                        onClick={() =>
-                          releaseStudents({
-                            student_ids: [selectedStudent.id],
-                            remarks: headRemarks.trim(),
-                          })
-                        }
-                      >
-                        Release
-                      </Button>
-                    ) : null}
-                    {canGenerateReport ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="max-w-fit py-2 text-sm"
-                        onClick={() => toast('Report generation comes next.')}
-                      >
-                        Generate report
-                      </Button>
-                    ) : null}
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="class-teacher-remarks"
+                      className="block text-sm font-medium text-slate-700"
+                    >
+                      Class teacher remarks
+                    </label>
+                    <textarea
+                      id="class-teacher-remarks"
+                      rows={3}
+                      value={selectedStudent.class_teacher_remarks}
+                      readOnly
+                      disabled
+                      className={remarksClassName}
+                      placeholder="No class teacher remarks yet"
+                    />
+                    <div className="flex justify-end">
+                      <p className="text-xs text-slate-500">
+                        {data.class_teacher_name ?? 'No class teacher'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="head-teacher-remarks"
+                      className="block text-sm font-medium text-slate-700"
+                    >
+                      Head teacher remarks
+                    </label>
+                    <textarea
+                      id="head-teacher-remarks"
+                      rows={4}
+                      value={headRemarks}
+                      onChange={(event) => setHeadRemarks(event.target.value)}
+                      disabled={!canReleaseSelected}
+                      className={remarksClassName}
+                      placeholder={
+                        canReleaseSelected
+                          ? 'Add head teacher remarks before releasing'
+                          : 'Remarks can be added when the student is ready for you'
+                      }
+                    />
+                    <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
+                      <p className="text-xs text-slate-500">Head teacher</p>
+                      {canReleaseSelected ? (
+                        <Button
+                          type="button"
+                          className="max-w-fit py-2 text-sm"
+                          loading={isReleasing}
+                          loadingText="Releasing"
+                          onClick={() =>
+                            releaseStudents({
+                              student_ids: [selectedStudent.id],
+                              remarks: headRemarks.trim(),
+                            })
+                          }
+                        >
+                          Release
+                        </Button>
+                      ) : null}
+                      {canGenerateReport ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="max-w-fit py-2 text-sm"
+                          onClick={() => {
+                            const term = termId ? `?term=${termId}` : ''
+                            navigate(
+                              `/assessments/classes/${streamId}/report/${selectedStudent.id}${term}`,
+                            )
+                          }}
+                        >
+                          Generate report
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </>

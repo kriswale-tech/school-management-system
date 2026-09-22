@@ -125,6 +125,9 @@ export type ClassAssessmentDetailStudent = {
   subjects_published_count: number
   subjects_required_count: number
   class_teacher_remarks: string
+  conduct: string
+  attitude: string
+  interest: string
   overall_position: number | null
   overall_average: number | null
   overall_cohort_size: number | null
@@ -170,6 +173,9 @@ export type AdminAssessmentDetailStudent = {
   subjects_published_count: number
   subjects_required_count: number
   class_teacher_remarks: string
+  conduct: string
+  attitude: string
+  interest: string
   head_teacher_remarks: string
   overall_position: number | null
   overall_average: number | null
@@ -202,6 +208,68 @@ export type AdminAssessmentOverview = {
   released_count: number
   classes_fully_ready_count: number
   results: AdminAssessmentClassRow[]
+}
+
+export type StudentReportPreview = {
+  student_id: string
+  stream_id: string
+  term_id: string
+  school: {
+    name: string
+    box_address: string
+    address: string
+    phone_number: string
+    phone_number_alt: string
+    email: string
+    motto: string
+    logo_url: string | null
+  }
+  report_title: string
+  student_name: string
+  class_name: string
+  academic_year: string
+  term_label: string
+  next_term_begins: string | null
+  students_on_roll: number
+  position: number | null
+  position_label: string | null
+  uses_position: boolean
+  uses_grades: boolean
+  weights: AssessmentWeights
+  subjects: Array<{
+    subject_label: string
+    class_score: number
+    exam_score: number
+    total: number
+    grade: string | null
+    remark: string | null
+  }>
+  totals: {
+    class_score: number | null
+    exam_score: number | null
+    total: number | null
+    max_class_score: number | null
+    max_exam_score: number | null
+    max_total: number | null
+  }
+  conduct: string
+  attitude: string
+  interest: string
+  class_teacher_remarks: string
+  head_teacher_remarks: string
+  class_teacher_name: string
+  grade_bands: GradeBand[]
+}
+
+export type StoredStudentReport = {
+  id: string
+  student_id: string
+  stream_id: string
+  term_id: string
+  generated_at: string | null
+  url: string | null
+  url_expires_in: number
+  status: 'ready'
 }
 
 export type ClassTeacherAssessmentDetail = {

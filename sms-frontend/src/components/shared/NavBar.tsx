@@ -4,7 +4,7 @@ import ProfileComponent from './ProfileComponent'
 
 const NavBar = () => {
   return (
-    <nav className="app-shell-header flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4">
+    <nav className="app-shell-header flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 print:hidden">
       {/* logo */}
       <AppLogo widthPx={60} />
 

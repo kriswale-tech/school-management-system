@@ -5,7 +5,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# psycopg[binary] installs prebuilt wheels (libpq bundled). psycopg-binary alone is only the extension.
+# WeasyPrint needs Cairo/Pango; psycopg2-binary ships its own libpq.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libcairo2 \
+        libgdk-pixbuf-2.0-0 \
+        libffi8 \
+        libpango-1.0-0 \
+        libpangocairo-1.0-0 \
+        shared-mime-info \
+        fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \

@@ -278,6 +278,9 @@ def approve_class_students(
     class_teacher_id,
     student_ids: list,
     remarks: str = '',
+    conduct: str = '',
+    attitude: str = '',
+    interest: str = '',
 ) -> dict:
     term = get_active_term(school, detail='Set an active term before approving assessments.')
     class_teacher = (
@@ -326,6 +329,9 @@ def approve_class_students(
         defaults = {
             'status': StudentResult.Status.APPROVED,
             'remarks': (remarks or '').strip(),
+            'conduct': (conduct or '').strip(),
+            'attitude': (attitude or '').strip(),
+            'interest': (interest or '').strip(),
             'approved_at': now,
             'approved_by': membership.user,
         }
@@ -608,6 +614,9 @@ def get_class_teacher_assessment_detail(*, school, membership, class_teacher_id)
             'subjects_published_count': published_count,
             'subjects_required_count': required_count,
             'class_teacher_remarks': result_row.remarks if result_row else '',
+            'conduct': result_row.conduct if result_row else '',
+            'attitude': result_row.attitude if result_row else '',
+            'interest': result_row.interest if result_row else '',
             'subjects': subject_rows,
         })
 

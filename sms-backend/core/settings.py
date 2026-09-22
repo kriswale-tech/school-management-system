@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     'cloudinary',
     'cloudinary_storage',
     'django_filters',
+    'storages',
 
     # Local apps
     'schools',
@@ -279,11 +280,39 @@ cloudinary.config(
     secure=True,
 )
 
+R2_ACCOUNT_ID = os.getenv('R2_ACCOUNT_ID', '')
+R2_ACCESS_KEY_ID = os.getenv('R2_ACCESS_KEY_ID', '')
+R2_SECRET_ACCESS_KEY = os.getenv('R2_SECRET_ACCESS_KEY', '')
+R2_BUCKET_NAME = os.getenv('R2_BUCKET_NAME', '')
+R2_ENDPOINT_URL = os.getenv('R2_ENDPOINT_URL', '')
+R2_SIGNED_URL_EXPIRE_SECONDS = int(os.getenv('R2_SIGNED_URL_EXPIRE_SECONDS', '3600'))
+
 STORAGES = {
     'default': {
         'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
     },
     'staticfiles': {
         'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+    },
+    'reports': {
+        'BACKEND': 'storages.backends.s3.S3Storage',
+        'OPTIONS': {
+            'access_key': R2_ACCESS_KEY_ID,
+            'secret_key': R2_SECRET_ACCESS_KEY,
+            'bucket_name': R2_BUCKET_NAME,
+            'endpoint_url': R2_ENDPOINT_URL,
+            'region_name': 'auto',
+            'default_acl': None,
+            'querystring_auth': True,
+            'querystring_expire': R2_SIGNED_URL_EXPIRE_SECONDS,
+            'file_overwrite': True,
+            'signature_version': 's3v4',
+            'addressing_style': 'path',
+            'object_parameters': {
+                'CacheControl': 'private, max-age=3600',
+                'ContentType': 'application/pdf',
+                'ContentDisposition': 'inline',
+            },
+        },
     },
 }

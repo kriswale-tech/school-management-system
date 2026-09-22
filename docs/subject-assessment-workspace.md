@@ -252,8 +252,8 @@ Per-class cells = **number of students** in each bucket. Page stats sum those bu
 Split layout:
 
 - **Left:** class name, **Approve all awaiting**, pill filters with counts (All / Pending / Awaiting approval / Approved), student cards (name, status; Pending shows `n/m subjects published`).
-- **Right:** selected student subject table (subject + teacher, class score %, exam %, total 100%, grade + band remark when setup uses grades, **Pos** when setup uses position, subject status). Overall position (average of published totals; Awaiting/Approved only; ties share rank and skip). Class-teacher remarks + **Approve** when status is Awaiting approval.
-- Bulk approve modal: shared remarks + approve all awaiting students.
+- **Right:** selected student subject table … Overall position … Then optional **Conduct**, **Attitude**, **Interest**, then Class-teacher remarks + **Approve** when status is Awaiting approval.
+- Bulk approve modal: shared remarks only (conduct / attitude / interest stay empty unless set per student).
 
 API: `GET /academics/assessments/class-teachers/:id/`, `POST …/approve/`.
 
@@ -264,6 +264,14 @@ Class teacher name sits on the **right** of the remarks field.
 Same split layout, admin statuses:
 
 - **Left:** class name, **Release all ready**, pills (All / Ready for you / Released). Students still with the class teacher are a count only — they are not listed, so the admin never sees incomplete dashes.
-- **Right:** same subject table. Class teacher remarks are read-only (name on the right). Head teacher remarks can be typed when the student is Ready for you (label on the right is **Head teacher** until a head-teacher person exists). **Release** saves those remarks. After release, **Generate report** sits in that same spot (PDF later; no reject in this version).
+- **Right:** same subject table. Class teacher remarks are read-only (name on the right). Head teacher remarks can be typed when the student is Ready for you (label on the right is **Head teacher** until a head-teacher person exists). **Release** saves those remarks. After release, **Generate report** opens the report page: if no PDF exists yet it is generated, uploaded to R2, and embedded; later visits load the stored PDF (Regenerate overwrites).
 
-API: `GET /academics/assessments/admin/classes/:streamId/?term_id=`, `POST …/release/`.
+Report layout: school header + logo, student box (next term begins when known, no. on roll = class size, position when used), subject table with **TOTAL** row, blank attendance dotted lines, conduct/attitude/interest, remarks, signatures, then grades interpretation.
+
+API:
+- `GET …/students/:studentId/report/` — stored PDF metadata + signed URL (404 if missing in DB **or** on R2; client auto-generates)
+- `POST …/students/:studentId/report/generate/` — generate/overwrite PDF on R2
+- `GET …/students/:studentId/report/preview/` — JSON payload (HTML/debug)
+- also `GET /academics/assessments/admin/classes/:streamId/?term_id=`, `POST …/release/`
+
+Report page actions: **Open in new tab** + **Share** when ready; **Regenerate** only if load/generate fails.

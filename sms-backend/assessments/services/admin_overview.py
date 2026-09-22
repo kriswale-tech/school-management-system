@@ -296,6 +296,9 @@ def get_admin_assessment_detail(*, school, stream_id, term_id=None) -> dict:
             'subjects_published_count': sum(1 for row in subject_rows if row['is_published']),
             'subjects_required_count': len(subject_rows),
             'class_teacher_remarks': result_row.remarks if result_row else '',
+            'conduct': result_row.conduct if result_row else '',
+            'attitude': result_row.attitude if result_row else '',
+            'interest': result_row.interest if result_row else '',
             'head_teacher_remarks': result_row.head_teacher_remarks if result_row else '',
             'subjects': subject_rows,
         })

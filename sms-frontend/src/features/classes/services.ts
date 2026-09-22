@@ -19,6 +19,8 @@ import type {
   AdminAssessmentDetail,
   AdminAssessmentFilterOptions,
   AdminAssessmentOverview,
+  StudentReportPreview,
+  StoredStudentReport,
   AssessmentWorkspace,
   CaItem,
   CaItemWritePayload,
@@ -275,6 +277,43 @@ export const releaseAdminAssessmentStudents = async (
   return response.data
 }
 
+export const getStudentReportPreview = async (
+  streamId: string,
+  studentId: string,
+  termId?: string,
+): Promise<StudentReportPreview> => {
+  const response = await api.get<StudentReportPreview>(
+    `/academics/assessments/admin/classes/${streamId}/students/${studentId}/report/preview/`,
+    { params: termId ? { term_id: termId } : undefined },
+  )
+  return response.data
+}
+
+export const getStoredStudentReport = async (
+  streamId: string,
+  studentId: string,
+  termId?: string,
+): Promise<StoredStudentReport> => {
+  const response = await api.get<StoredStudentReport>(
+    `/academics/assessments/admin/classes/${streamId}/students/${studentId}/report/`,
+    { params: termId ? { term_id: termId } : undefined },
+  )
+  return response.data
+}
+
+export const generateStudentReport = async (
+  streamId: string,
+  studentId: string,
+  termId?: string,
+): Promise<StoredStudentReport> => {
+  const response = await api.post<StoredStudentReport>(
+    `/academics/assessments/admin/classes/${streamId}/students/${studentId}/report/generate/`,
+    {},
+    { params: termId ? { term_id: termId } : undefined },
+  )
+  return response.data
+}
+
 export const getClassTeacherAssessmentOverview =
   async (): Promise<ClassTeacherAssessmentOverview> => {
     const response = await api.get<ClassTeacherAssessmentOverview>(
@@ -294,7 +333,13 @@ export const getClassTeacherAssessmentDetail = async (
 
 export const approveClassTeacherStudents = async (
   classTeacherId: string,
-  payload: { student_ids: string[]; remarks?: string },
+  payload: {
+    student_ids: string[]
+    remarks?: string
+    conduct?: string
+    attitude?: string
+    interest?: string
+  },
 ): Promise<ClassTeacherAssessmentDetail> => {
   const response = await api.post<ClassTeacherAssessmentDetail>(
     `/academics/assessments/class-teachers/${classTeacherId}/approve/`,

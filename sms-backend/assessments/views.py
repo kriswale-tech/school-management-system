@@ -16,6 +16,8 @@ from assessments.serializers import (
     ClassTeacherAssessmentOverviewSerializer,
     PublishStudentsSerializer,
     SaveMarksSerializer,
+    StoredStudentReportSerializer,
+    StudentReportPreviewSerializer,
 )
 from assessments.services.admin_overview import (
     get_admin_assessment_detail,
@@ -23,6 +25,8 @@ from assessments.services.admin_overview import (
     list_admin_assessment_overview,
     release_admin_students,
 )
+from assessments.services.report import get_student_report_preview
+from assessments.services.report_pdf import generate_student_report, get_stored_student_report
 from assessments.services.class_overview import (
     approve_class_students,
     get_class_teacher_assessment_detail,
@@ -261,6 +265,64 @@ class AdminAssessmentReleaseView(SchoolScopedAPIView):
 
 @extend_schema(
     tags=['Assessments'],
+    summary='Student report preview for a released assessment',
+    responses={200: StudentReportPreviewSerializer},
+)
+class AdminStudentReportPreviewView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.ASSESSMENTS_RELEASE
+
+    def get(self, request, stream_id, student_id):
+        payload = get_student_report_preview(
+            school=self.school,
+            stream_id=stream_id,
+            student_id=student_id,
+            term_id=request.query_params.get('term_id') or None,
+        )
+        return Response(StudentReportPreviewSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Assessments'],
+    summary='Get stored student report PDF (signed URL)',
+    responses={200: StoredStudentReportSerializer},
+)
+class AdminStudentReportView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.ASSESSMENTS_RELEASE
+
+    def get(self, request, stream_id, student_id):
+        payload = get_stored_student_report(
+            school=self.school,
+            stream_id=stream_id,
+            student_id=student_id,
+            term_id=request.query_params.get('term_id') or None,
+        )
+        return Response(StoredStudentReportSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Assessments'],
+    summary='Generate or overwrite student report PDF',
+    responses={200: StoredStudentReportSerializer},
+)
+class AdminStudentReportGenerateView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.ASSESSMENTS_RELEASE
+
+    def post(self, request, stream_id, student_id):
+        payload = generate_student_report(
+            school=self.school,
+            membership=self.membership,
+            stream_id=stream_id,
+            student_id=student_id,
+            term_id=request.query_params.get('term_id') or None,
+        )
+        return Response(StoredStudentReportSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Assessments'],
     summary='Class teacher assessment overview',
     responses={200: ClassTeacherAssessmentOverviewSerializer},
 )
@@ -313,5 +375,8 @@ class ClassTeacherApproveStudentsView(SchoolScopedAPIView):
             class_teacher_id=class_teacher_id,
             student_ids=serializer.validated_data['student_ids'],
             remarks=serializer.validated_data.get('remarks', ''),
+            conduct=serializer.validated_data.get('conduct', ''),
+            attitude=serializer.validated_data.get('attitude', ''),
+            interest=serializer.validated_data.get('interest', ''),
         )
         return Response(ClassTeacherAssessmentDetailSerializer(payload).data)
