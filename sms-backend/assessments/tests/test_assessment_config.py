@@ -17,11 +17,13 @@ from assessments.services import (
     validate_assessment_config_ready,
     validate_grade_bands,
 )
+from schools.tests.factories import create_active_term
 
 
 class AssessmentConfigModelTests(TestCase):
     def setUp(self):
         self.school = create_school()
+        self.term = create_active_term(self.school)
         self.level = Level.objects.create(
             school=self.school,
             name='Junior High',
@@ -31,6 +33,7 @@ class AssessmentConfigModelTests(TestCase):
     def test_creates_with_default_weights_summing_to_100(self):
         config = AssessmentConfig.objects.create(
             level=self.level,
+            term=self.term,
             result_type=AssessmentConfig.ResultType.POSITION,
         )
 
@@ -42,6 +45,7 @@ class AssessmentConfigModelTests(TestCase):
         with self.assertRaises(ValidationError) as ctx:
             AssessmentConfig.objects.create(
                 level=self.level,
+                term=self.term,
                 continuous_assessment_weight=Decimal('30.00'),
                 exam_weight=Decimal('60.00'),
                 result_type=AssessmentConfig.ResultType.POSITION,
@@ -53,6 +57,7 @@ class AssessmentConfigModelTests(TestCase):
         with self.assertRaises(ValidationError) as ctx:
             AssessmentConfig.objects.create(
                 level=self.level,
+                term=self.term,
                 result_type=AssessmentConfig.ResultType.GRADE,
             )
 
@@ -62,25 +67,26 @@ class AssessmentConfigModelTests(TestCase):
         with self.assertRaises(ValidationError) as ctx:
             AssessmentConfig.objects.create(
                 level=self.level,
+                term=self.term,
                 result_type=AssessmentConfig.ResultType.POSITION,
                 grade_type=AssessmentConfig.GradeType.LETTER,
             )
 
         self.assertIn('grade_type', ctx.exception.message_dict)
 
-    def test_one_config_per_level(self):
+    def test_one_config_per_level_and_term(self):
         AssessmentConfig.objects.create(
             level=self.level,
+            term=self.term,
             result_type=AssessmentConfig.ResultType.POSITION,
         )
 
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises(ValidationError):
             AssessmentConfig.objects.create(
                 level=self.level,
+                term=self.term,
                 result_type=AssessmentConfig.ResultType.POSITION,
             )
-
-        self.assertIn('level', ctx.exception.message_dict)
 
 
 class GradeBandValidationTests(TestCase):
@@ -128,6 +134,7 @@ class GradeBandValidationTests(TestCase):
 class AssessmentConfigServiceTests(TestCase):
     def setUp(self):
         self.school = create_school()
+        self.term = create_active_term(self.school)
         self.level = Level.objects.create(
             school=self.school,
             name='Junior High',
@@ -135,6 +142,7 @@ class AssessmentConfigServiceTests(TestCase):
         )
         self.config = AssessmentConfig.objects.create(
             level=self.level,
+            term=self.term,
             result_type=AssessmentConfig.ResultType.GRADE_AND_POSITION,
             grade_type=AssessmentConfig.GradeType.LETTER,
         )

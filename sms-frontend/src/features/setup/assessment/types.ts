@@ -49,3 +49,21 @@ export interface GradeBand {
     grade_templates: GradeTemplates;
     levels: Level[];
   }
+
+  export interface AssessmentSettingsTermOption {
+    id: string
+    label: string
+    is_active: boolean
+    is_ended: boolean
+    academic_year_id: string
+    academic_year: string
+  }
+
+  export interface AssessmentSettingsResponse extends AssessmentConfigResponse {
+    term_id: string
+    term_ended: boolean
+    is_editable: boolean
+    has_recorded_marks: boolean
+    terms: AssessmentSettingsTermOption[]
+    active_term_id: string | null
+  }

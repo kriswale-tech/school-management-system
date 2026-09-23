@@ -8,7 +8,7 @@ from django.utils import timezone
 from rest_framework.exceptions import NotFound, ValidationError
 
 from academics.models import ClassStream, Level
-from assessments.models import AssessmentConfig, StudentResult
+from assessments.models import StudentResult
 from assessments.services.class_overview import (
     _apply_positions,
     _assignment_contexts_for_student,
@@ -17,6 +17,7 @@ from assessments.services.class_overview import (
 )
 from schools.models import AcademicYear, Term
 from students.models import ClassEnrollment
+from assessments.services.term_config import get_term_assessment_config
 from students.services import resolve_term
 from teachers.models import ClassTeacher
 
@@ -255,18 +256,10 @@ def get_admin_assessment_detail(*, school, stream_id, term_id=None) -> dict:
     term = resolve_term(school, term_id)
     stream = _load_stream(school=school, stream_id=stream_id)
     class_level = stream.class_level
-    config = (
-        AssessmentConfig.objects.filter(level_id=class_level.level_id)
-        .prefetch_related('grade_bands')
-        .first()
+    config = get_term_assessment_config(
+        level_id=class_level.level_id,
+        term_id=term.id,
     )
-    if config is None:
-        raise ValidationError({
-            'detail': (
-                'Assessment setup is incomplete for this class level. '
-                'Ask an admin to finish assessment configuration.'
-            ),
-        })
     bands = list(config.grade_bands.all())
     teacher = _teacher_for_entry(
         {'class_level_id': class_level.id, 'stream_id': stream.id},

@@ -36,26 +36,41 @@ const showsGradeTypeTable = (resultFormat: ResultType | null) =>
 
 type AssessmentSetupFormProps = {
   config: AssessmentConfigResponse
-  onComplete: () => void
-  isCompleting: boolean
+  onComplete?: () => void
+  isCompleting?: boolean
+  termId?: string
+  readOnly?: boolean
+  queryKey?: readonly unknown[]
 }
 
-const AssessmentSetupForm = ({ config, onComplete, isCompleting }: AssessmentSetupFormProps) => {
+const AssessmentSetupForm = ({
+  config,
+  onComplete,
+  isCompleting = false,
+  termId,
+  readOnly = false,
+  queryKey = ['assessmentConfig'],
+}: AssessmentSetupFormProps) => {
   const sortedLevels = [...config.levels].sort((a, b) => a.level_order - b.level_order)
 
   return (
     <div className="space-y-6">
       {sortedLevels.map((level) => (
         <AssessmentSetupFormItem
-          key={level.level_id}
+          key={`${termId ?? 'setup'}-${level.level_id}`}
           level={level}
           gradeTemplates={config.grade_templates}
+          termId={termId}
+          readOnly={readOnly}
+          queryKey={queryKey}
         />
       ))}
 
-      <Button type="button" variant="outline" onClick={onComplete} loading={isCompleting}>
-        Proceed to Next Step
-      </Button>
+      {onComplete ? (
+        <Button type="button" variant="outline" onClick={onComplete} loading={isCompleting}>
+          Proceed to Next Step
+        </Button>
+      ) : null}
     </div>
   )
 }
@@ -65,9 +80,18 @@ export default AssessmentSetupForm
 type AssessmentSetupFormItemProps = {
   level: Level
   gradeTemplates: AssessmentConfigResponse['grade_templates']
+  termId?: string
+  readOnly?: boolean
+  queryKey: readonly unknown[]
 }
 
-const AssessmentSetupFormItem = ({ level, gradeTemplates }: AssessmentSetupFormItemProps) => {
+const AssessmentSetupFormItem = ({
+  level,
+  gradeTemplates,
+  termId,
+  readOnly = false,
+  queryKey,
+}: AssessmentSetupFormItemProps) => {
   const queryClient = useQueryClient()
   const { config } = level
 
@@ -94,10 +118,10 @@ const AssessmentSetupFormItem = ({ level, gradeTemplates }: AssessmentSetupFormI
 
   const { mutate: saveConfig, isPending: isSaving } = useMutation({
     mutationFn: (payload: Parameters<typeof saveLevelConfig>[1]) =>
-      saveLevelConfig(level.level_id, payload),
+      saveLevelConfig(level.level_id, payload, termId),
     onSuccess: () => {
       toast.success(`${level.level_name} saved`)
-      void queryClient.invalidateQueries({ queryKey: ['assessmentConfig'] })
+      void queryClient.invalidateQueries({ queryKey })
     },
     onError: (error) => {
       toast.error(getApiErrorMessage(error, `Unable to save ${level.level_name}`))
@@ -134,7 +158,7 @@ const AssessmentSetupFormItem = ({ level, gradeTemplates }: AssessmentSetupFormI
   }
 
   return (
-    <div className="form-field-wrapper space-y-5">
+    <fieldset disabled={readOnly} className="form-field-wrapper space-y-5 disabled:opacity-70">
       <h3 className="text-lg text-slate-900">{level.level_name}</h3>
 
       <div className="flex gap-4 items-center justify-between">
@@ -184,11 +208,13 @@ const AssessmentSetupFormItem = ({ level, gradeTemplates }: AssessmentSetupFormI
         ) : null}
       </div>
 
-      <div className="flex justify-end pt-2">
-        <Button type="button" className="w-fit" onClick={handleSave} loading={isSaving}>
-          Save
-        </Button>
-      </div>
-    </div>
+      {readOnly ? null : (
+        <div className="flex justify-end pt-2">
+          <Button type="button" className="w-fit" onClick={handleSave} loading={isSaving}>
+            Save
+          </Button>
+        </div>
+      )}
+    </fieldset>
   )
 }

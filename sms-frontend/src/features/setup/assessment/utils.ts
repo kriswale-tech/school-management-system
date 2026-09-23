@@ -105,8 +105,8 @@ export const validateLevelForm = (
   return null
 }
 
-export const parseConfigWeight = (value: string | null | undefined): string => {
-  if (value === null || value === undefined || value.trim() === '') {
+export const parseConfigWeight = (value: string | number | null | undefined): string => {
+  if (value === null || value === undefined || value === '') {
     return ''
   }
 

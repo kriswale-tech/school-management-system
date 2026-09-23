@@ -1,4 +1,6 @@
-from schools.models import SchoolSetup
+from datetime import date, timedelta
+
+from schools.models import AcademicYear, SchoolSetup, Term
 
 
 def create_school_setup(
@@ -38,3 +40,25 @@ def academic_year_term_payload(**overrides):
     }
     data.update(overrides)
     return data
+
+
+def create_active_term(school, **overrides):
+    today = date.today()
+    start = overrides.pop('start_date', today - timedelta(days=30))
+    end = overrides.pop('end_date', today + timedelta(days=60))
+    year = AcademicYear.objects.create(
+        school=school,
+        academic_year=overrides.pop('academic_year', '2025/2026'),
+        start_date=overrides.pop('year_start', start),
+        end_date=overrides.pop('year_end', end),
+        is_active=True,
+    )
+    return Term.objects.create(
+        school=school,
+        academic_year=year,
+        term=overrides.pop('term', Term.TermChoices.FIRST_TERM),
+        start_date=start,
+        end_date=end,
+        is_active=True,
+        **overrides,
+    )

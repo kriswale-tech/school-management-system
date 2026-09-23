@@ -92,7 +92,7 @@ Checklist by domain. Status values:
 
 | Feature | Backend | Frontend | Status |
 | --- | --- | --- | --- |
-| Level assessment config + grade bands | Yes | Setup wizard | Done |
+| Level assessment config + grade bands | Yes | Setup wizard + `/assessments/settings` | Done (per term; see [assessment-config.md](./assessment-config.md)) |
 | Assessment items / scores | Empty models | — | Stub |
 | Results / subject scores / reports | Empty models | — | Stub |
 | Correction requests | Empty model | — | Stub |
@@ -123,3 +123,4 @@ Checklist by domain. Status values:
 ## Existing deep-dive notes
 
 - Teacher bulk import (frontend contract): [`sms-backend/docs/frontend-teacher-bulk-import.md`](../sms-backend/docs/frontend-teacher-bulk-import.md)
+- Assessment structure per term: [assessment-config.md](./assessment-config.md)

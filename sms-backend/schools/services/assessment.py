@@ -15,8 +15,13 @@ from assessments.services.assessment_config import (
     replace_grade_bands,
     validate_assessment_config_ready,
 )
-from schools.models import SchoolSetup
+from assessments.services.term_config import (
+    assert_term_editable,
+    copy_forward_to_sibling_terms,
+)
+from schools.models import SchoolSetup, Term
 from schools.services.setup import advance_setup_if_needed, require_prior_setup_steps
+from students.services import get_active_term, resolve_term
 
 
 def _raise_drf(exc: DjangoValidationError):
@@ -60,18 +65,23 @@ def _serialize_level_assessment(level, config=None):
     }
 
 
-def get_assessment_setup(school):
+def get_assessment_setup(school, term=None):
     levels = list(
         Level.objects.filter(school=school, is_active=True)
         .order_by('order', 'name')
     )
-    configs_by_level_id = {
-        config.level_id: config
-        for config in AssessmentConfig.objects.filter(
-            level__school=school,
-            level__is_active=True,
-        ).prefetch_related('grade_bands')
-    }
+    if term is None:
+        term = Term.objects.filter(school=school, is_active=True).first()
+    configs_by_level_id = {}
+    if term is not None:
+        configs_by_level_id = {
+            config.level_id: config
+            for config in AssessmentConfig.objects.filter(
+                level__school=school,
+                level__is_active=True,
+                term=term,
+            ).prefetch_related('grade_bands')
+        }
 
     return {
         'grade_templates': {
@@ -105,6 +115,7 @@ def save_level_assessment_config(
     result_type,
     grade_type=None,
     grade_bands=None,
+    term_id=None,
 ):
     school_setup, _ = SchoolSetup.objects.get_or_create(school=school)
     require_prior_setup_steps(
@@ -113,13 +124,18 @@ def save_level_assessment_config(
     )
 
     level = _get_active_level(school, level_id)
+    term = resolve_term(school, term_id) if term_id else get_active_term(
+        school,
+        detail='Set an active term before saving assessment configuration.',
+    )
+    assert_term_editable(term)
     grade_bands = grade_bands or []
     uses_grades = result_type in AssessmentConfig.GRADE_RESULT_TYPES
 
     try:
-        config = AssessmentConfig.objects.select_for_update().get(level=level)
+        config = AssessmentConfig.objects.select_for_update().get(level=level, term=term)
     except AssessmentConfig.DoesNotExist:
-        config = AssessmentConfig(level=level)
+        config = AssessmentConfig(level=level, term=term)
 
     config.continuous_assessment_weight = Decimal(continuous_assessment_weight)
     config.exam_weight = Decimal(exam_weight)
@@ -143,6 +159,10 @@ def save_level_assessment_config(
 
 
 def validate_assessment_setup_ready(school):
+    term = get_active_term(
+        school,
+        detail='Set an active term before completing assessment setup.',
+    )
     levels = list(
         Level.objects.filter(school=school, is_active=True)
         .order_by('order', 'name')
@@ -152,6 +172,7 @@ def validate_assessment_setup_ready(school):
         for config in AssessmentConfig.objects.filter(
             level__school=school,
             level__is_active=True,
+            term=term,
         ).prefetch_related('grade_bands')
     }
 
@@ -183,6 +204,8 @@ def complete_assessment_setup(school):
         SchoolSetup.SetupStep.ASSESSMENT,
     )
     validate_assessment_setup_ready(school)
+    active_term = get_active_term(school)
+    copy_forward_to_sibling_terms(school=school, source_term=active_term)
     return advance_setup_if_needed(
         school_setup,
         SchoolSetup.SetupStep.ASSESSMENT,

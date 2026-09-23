@@ -28,6 +28,8 @@ from assessments.views import (
     AdminStudentReportPreviewView,
     AdminStudentReportView,
     AdminStudentReportGenerateView,
+    AssessmentSettingsLevelView,
+    AssessmentSettingsView,
     ClassTeacherApproveStudentsView,
     ClassTeacherAssessmentDetailView,
     ClassTeacherAssessmentOverviewView,
@@ -104,6 +106,16 @@ urlpatterns = [
         'assessments/admin/filter-options/',
         AdminAssessmentFilterOptionsView.as_view(),
         name='academics-assessments-admin-filter-options',
+    ),
+    path(
+        'assessments/settings/',
+        AssessmentSettingsView.as_view(),
+        name='academics-assessments-settings',
+    ),
+    path(
+        'assessments/settings/levels/<uuid:level_id>/',
+        AssessmentSettingsLevelView.as_view(),
+        name='academics-assessments-settings-level',
     ),
     path(
         'assessments/admin/classes/',

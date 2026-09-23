@@ -11,7 +11,7 @@ from assessments.constants.grade_templates import (
 from assessments.models import AssessmentConfig
 from assessments.services import apply_grade_template
 from schools.models import SchoolSetup
-from schools.tests.factories import create_school_setup
+from schools.tests.factories import create_active_term, create_school_setup
 
 
 class SetupAssessmentViewTests(APITestCase):
@@ -59,6 +59,7 @@ class SetupAssessmentViewTests(APITestCase):
         self.assertTrue(all(level['config'] is None for level in response.data['levels']))
 
     def test_get_includes_config_and_omits_inactive_levels(self):
+        term = create_active_term(self.school)
         active_level = Level.objects.create(
             school=self.school,
             name='Junior High',
@@ -74,12 +75,14 @@ class SetupAssessmentViewTests(APITestCase):
         )
         config = AssessmentConfig.objects.create(
             level=active_level,
+            term=term,
             result_type=AssessmentConfig.ResultType.GRADE_AND_POSITION,
             grade_type=AssessmentConfig.GradeType.LETTER,
         )
         apply_grade_template(config, AssessmentConfig.GradeType.LETTER)
         AssessmentConfig.objects.create(
             level=inactive_level,
+            term=term,
             result_type=AssessmentConfig.ResultType.POSITION,
         )
 
@@ -121,6 +124,7 @@ class SetupAssessmentMutationTests(APITestCase):
             order=1,
             is_system_generated=False,
         )
+        self.term = create_active_term(self.school)
         self.url = reverse(
             'school-setup-assessment-level-config',
             kwargs={'level_id': self.level.id},
@@ -160,7 +164,7 @@ class SetupAssessmentMutationTests(APITestCase):
             len(GES_INTERNAL_LETTER_GRADES),
         )
         self.assertTrue(
-            AssessmentConfig.objects.filter(level=self.level).exists(),
+            AssessmentConfig.objects.filter(level=self.level, term=self.term).exists(),
         )
 
     def test_save_position_only_clears_grades(self):

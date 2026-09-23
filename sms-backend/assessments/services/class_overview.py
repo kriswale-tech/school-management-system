@@ -10,13 +10,13 @@ from rest_framework.exceptions import NotFound, PermissionDenied, ValidationErro
 from academics.models import ClassSubject, StudentSubjectGroup, SubjectGroup
 from accounts.services.access_scope import resolve_access_scope
 from assessments.models import (
-    AssessmentConfig,
     AssessmentItem,
     AssessmentItemScore,
     StudentResult,
     SubjectScore,
 )
 from assessments.services.ranking import average_totals, competition_ranks
+from assessments.services.term_config import get_term_assessment_config
 from assessments.services.scoring import (
     compute_class_score,
     compute_exam_contribution,
@@ -611,18 +611,7 @@ def get_class_teacher_assessment_detail(*, school, membership, class_teacher_id)
     _ensure_class_teacher(membership, class_teacher)
 
     level = class_teacher.class_level.level
-    config = (
-        AssessmentConfig.objects.filter(level_id=level.id)
-        .prefetch_related('grade_bands')
-        .first()
-    )
-    if config is None:
-        raise ValidationError({
-            'detail': (
-                'Assessment setup is incomplete for this class level. '
-                'Ask an admin to finish assessment configuration.'
-            ),
-        })
+    config = get_term_assessment_config(level_id=level.id, term_id=term.id)
     bands = list(config.grade_bands.all())
 
     stream = class_teacher.stream

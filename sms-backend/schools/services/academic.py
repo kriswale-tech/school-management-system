@@ -82,4 +82,9 @@ def save_academic_year_setup(school, validated_data):
                 },
             )
 
+        from assessments.services.term_config import copy_forward_assessment_configs
+
+        for term in Term.objects.filter(academic_year=academic_year).order_by('start_date'):
+            copy_forward_assessment_configs(school=school, target_term=term)
+
     return get_academic_year_setup(school)

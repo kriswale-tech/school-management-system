@@ -6,7 +6,8 @@ from decimal import Decimal
 
 from rest_framework.exceptions import NotFound, ValidationError
 
-from assessments.models import AssessmentConfig, StudentResult
+from assessments.models import StudentResult
+from assessments.services.term_config import get_term_assessment_config
 from assessments.services.admin_overview import (
     _apply_positions,
     _assignment_contexts_for_student,
@@ -160,15 +161,10 @@ def get_student_report_preview(*, school, stream_id, student_id, term_id=None) -
             'detail': 'Reports can only be generated for released students.',
         })
 
-    config = (
-        AssessmentConfig.objects.filter(level_id=class_level.level_id)
-        .prefetch_related('grade_bands')
-        .first()
+    config = get_term_assessment_config(
+        level_id=class_level.level_id,
+        term_id=term.id,
     )
-    if config is None:
-        raise ValidationError({
-            'detail': 'Assessment setup is incomplete for this class level.',
-        })
     bands = list(config.grade_bands.all())
     teacher = _teacher_for_entry(
         {'class_level_id': class_level.id, 'stream_id': stream.id},

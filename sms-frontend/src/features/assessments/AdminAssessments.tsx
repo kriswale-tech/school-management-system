@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import ActionBar from '@/components/shared/ActionBar'
 import StatsCard from '@/components/shared/StatsCard'
+import { Button } from '@/components/ui'
 import FilterComponent, { type FilterSelection } from '@/components/ui/FilterComponent'
 import SearchComponent from '@/components/ui/SearchComponent'
 import {
@@ -86,6 +87,15 @@ const AdminAssessments = () => {
           placeholder={filtersLoading ? 'Loading…' : 'Academic year & term'}
           onChange={setTermSelection}
         />
+        <Button
+          type="button"
+          variant="outline"
+          className="py-2 text-sm max-w-fit"
+          onClick={() => navigate('/assessments/settings')}
+        >
+          <Icon icon="hugeicons:settings-02" className="size-4" />
+          Assessment Settings
+        </Button>
       </ActionBar>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

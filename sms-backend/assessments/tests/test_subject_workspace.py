@@ -66,6 +66,7 @@ class SubjectAssessmentWorkspaceApiTests(APITestCase):
 
         self.config = AssessmentConfig.objects.create(
             level=self.level,
+            term=self.term,
             continuous_assessment_weight=Decimal('40'),
             exam_weight=Decimal('60'),
             result_type=AssessmentConfig.ResultType.GRADE_AND_POSITION,

@@ -30,11 +30,8 @@ from assessments.services.scoring import (
     resolve_grade,
     resolve_status,
 )
+from assessments.services.term_config import get_term_assessment_config
 
-MISSING_CONFIG_MESSAGE = (
-    'Assessment setup is incomplete for this class level. '
-    'Ask an admin to finish assessment configuration.'
-)
 CA_MARKS_REQUIRED_MESSAGE = (
     'Fill every class assessment mark before saving. Exam can wait until it is taken.'
 )
@@ -66,16 +63,9 @@ def ensure_can_record_teaching_assignment(membership, assignment) -> None:
         raise PermissionDenied('Only the assigned subject teacher can record assessments.')
 
 
-def _get_assessment_config(assignment) -> AssessmentConfig:
+def _get_assessment_config(assignment):
     level = assignment.class_subject.class_level.level
-    config = (
-        AssessmentConfig.objects.filter(level_id=level.id)
-        .prefetch_related('grade_bands')
-        .first()
-    )
-    if config is None:
-        raise ValidationError({'detail': MISSING_CONFIG_MESSAGE})
-    return config
+    return get_term_assessment_config(level_id=level.id, term_id=assignment.term_id)
 
 
 def _serialize_weights(config: AssessmentConfig) -> dict:

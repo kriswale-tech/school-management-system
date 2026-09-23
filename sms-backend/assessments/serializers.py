@@ -2,6 +2,16 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
+from schools.setup_serializers.assessment import (
+    GradeTemplatesSerializer,
+    SetupAssessmentLevelSerializer,
+)
+
+from schools.setup_serializers.assessment import (
+    GradeTemplatesSerializer,
+    SetupAssessmentLevelSerializer,
+)
+
 
 class CaItemSerializer(serializers.Serializer):
     id = serializers.UUIDField(read_only=True)
@@ -380,3 +390,23 @@ class StoredStudentReportSerializer(serializers.Serializer):
     url = serializers.CharField(allow_null=True)
     url_expires_in = serializers.IntegerField()
     status = serializers.CharField()
+
+
+class AssessmentSettingsTermOptionSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    label = serializers.CharField()
+    is_active = serializers.BooleanField()
+    is_ended = serializers.BooleanField()
+    academic_year_id = serializers.UUIDField()
+    academic_year = serializers.CharField()
+
+
+class AssessmentSettingsSerializer(serializers.Serializer):
+    grade_templates = GradeTemplatesSerializer()
+    levels = SetupAssessmentLevelSerializer(many=True)
+    term_id = serializers.UUIDField()
+    term_ended = serializers.BooleanField()
+    is_editable = serializers.BooleanField()
+    has_recorded_marks = serializers.BooleanField()
+    terms = AssessmentSettingsTermOptionSerializer(many=True)
+    active_term_id = serializers.UUIDField(allow_null=True)

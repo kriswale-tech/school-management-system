@@ -21,6 +21,7 @@ from assessments.serializers import (
     SaveMarksSerializer,
     StoredStudentReportSerializer,
     StudentReportPreviewSerializer,
+    AssessmentSettingsSerializer,
 )
 from assessments.services.admin_overview import (
     get_admin_assessment_detail,
@@ -28,6 +29,7 @@ from assessments.services.admin_overview import (
     list_admin_assessment_overview,
     release_admin_students,
 )
+from assessments.services.settings import get_assessment_settings
 from assessments.services.corrections import (
     reject_class_teacher_student,
     reject_or_reopen_student,
@@ -50,6 +52,11 @@ from assessments.services.workspace import (
     unpublish_students,
     update_ca_item,
 )
+from schools.setup_serializers.assessment import (
+    SaveLevelAssessmentConfigSerializer,
+    SetupAssessmentLevelSerializer,
+)
+from schools.services.assessment import save_level_assessment_config
 from shared.views import SchoolScopedAPIView
 
 
@@ -211,6 +218,45 @@ class AdminAssessmentFilterOptionsView(SchoolScopedAPIView):
     def get(self, request):
         payload = get_admin_assessment_filter_options(school=self.school)
         return Response(AdminAssessmentFilterOptionsSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Assessments'],
+    summary='Assessment structure for a term',
+    responses={200: AssessmentSettingsSerializer},
+)
+class AssessmentSettingsView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.ASSESSMENTS_RELEASE
+
+    def get(self, request):
+        payload = get_assessment_settings(
+            school=self.school,
+            term_id=request.query_params.get('term_id') or None,
+        )
+        return Response(AssessmentSettingsSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Assessments'],
+    summary='Save assessment structure for a level in a term',
+    request=SaveLevelAssessmentConfigSerializer,
+    responses={200: SetupAssessmentLevelSerializer},
+)
+class AssessmentSettingsLevelView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.ASSESSMENTS_RELEASE
+
+    def put(self, request, level_id):
+        serializer = SaveLevelAssessmentConfigSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = save_level_assessment_config(
+            self.school,
+            level_id=level_id,
+            term_id=request.query_params.get('term_id') or None,
+            **serializer.validated_data,
+        )
+        return Response(SetupAssessmentLevelSerializer(data).data)
 
 
 @extend_schema(

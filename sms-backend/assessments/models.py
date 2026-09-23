@@ -27,10 +27,15 @@ class AssessmentConfig(BaseModel):
         ResultType.GRADE_AND_POSITION,
     })
 
-    level = models.OneToOneField(
+    level = models.ForeignKey(
         'academics.Level',
         on_delete=models.CASCADE,
-        related_name='assessment_config',
+        related_name='assessment_configs',
+    )
+    term = models.ForeignKey(
+        'schools.Term',
+        on_delete=models.CASCADE,
+        related_name='assessment_configs',
     )
     continuous_assessment_weight = models.DecimalField(
         max_digits=5,
@@ -59,6 +64,10 @@ class AssessmentConfig(BaseModel):
 
     class Meta:
         constraints = [
+            models.UniqueConstraint(
+                fields=['level', 'term'],
+                name='unique_assessment_config_per_level_term',
+            ),
             models.CheckConstraint(
                 condition=Q(continuous_assessment_weight__gte=0) & Q(exam_weight__gte=0),
                 name='assessment_config_weights_non_negative',
@@ -99,6 +108,13 @@ class AssessmentConfig(BaseModel):
                 'Grade type must be empty when result type is position only.'
             )
 
+        if (
+            self.level_id
+            and self.term_id
+            and self.level.school_id != self.term.school_id
+        ):
+            errors['term'] = 'Term must belong to the same school as the level.'
+
         if errors:
             raise ValidationError(errors)
 
@@ -107,7 +123,7 @@ class AssessmentConfig(BaseModel):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f'Assessment config for {self.level}'
+        return f'Assessment config for {self.level} ({self.term})'
 
 
 class GradeBand(BaseModel):

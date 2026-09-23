@@ -80,10 +80,14 @@ Only the **assigned teacher** for that subject (assignment) can create CA items.
 
 ## Scoring (locked)
 
-School setup (per level) defines:
+Structure is **per department + term** (not a single live school-wide config). See [assessment-config.md](./assessment-config.md).
+
+That term’s setup defines:
 
 - `continuous_assessment_weight` + `exam_weight` = 100 (e.g. 40 / 60)
 - Grade bands / result type when grades are used
+
+Raw marks are stored. Totals and grades are computed on read from **that term’s** structure. Changing a later term does not rewrite earlier terms.
 
 ### Class score
 
