@@ -2,6 +2,7 @@ import { Icon } from '@iconify/react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { ButtonTabComponent } from '@/components/shared'
 import { Button } from '@/components/ui'
+import { mergeClasses } from '@/utils'
 import type {
   StaffDeskClassTeacherAssignment,
   StaffDeskTeachingAssignment,
@@ -53,9 +54,15 @@ export const SubjectTeachingCard = ({
   const subjectLabel = assignment.subject_group_name
     ? `${assignment.subject_name} (${assignment.subject_group_name})`
     : assignment.subject_name
+  const correctionCount = assignment.needs_correction_count ?? 0
 
   return (
-    <div className="flex flex-col justify-between rounded-lg border border-slate-200 bg-white p-4 custom-shadow-sm">
+    <div
+      className={mergeClasses(
+        'flex flex-col justify-between rounded-lg border bg-white p-4 custom-shadow-sm',
+        correctionCount > 0 ? 'border-orange-200' : 'border-slate-200',
+      )}
+    >
       <div className="space-y-1 mb-4">
         <div className="flex items-start justify-between gap-3">
           <p className="text-base font-medium text-slate-900">{subjectLabel}</p>
@@ -65,6 +72,11 @@ export const SubjectTeachingCard = ({
           </div>
         </div>
         <p className="text-sm text-slate-500">{assignment.display_class_name}</p>
+        {correctionCount > 0 ? (
+          <span className="inline-flex rounded-full bg-orange-50 px-2.5 py-0.5 text-xs font-medium text-orange-800">
+            Needs correction {correctionCount}
+          </span>
+        ) : null}
       </div>
       <Button type="button" className="py-2 text-sm" onClick={onAction} disabled={actionDisabled}>
         {actionLabel}
@@ -87,6 +99,8 @@ type TeacherAssignmentsWorkspaceProps = {
   activeTab?: TeacherAssignmentTab
   onTabChange?: (_tab: TeacherAssignmentTab) => void
   defaultTab?: TeacherAssignmentTab
+  /** Optional controls shown next to the subject-teaching tab (e.g. corrections pill). */
+  subjectTabExtra?: ReactNode
 }
 
 const TeacherAssignmentsWorkspace = ({
@@ -101,6 +115,7 @@ const TeacherAssignmentsWorkspace = ({
   activeTab: controlledTab,
   onTabChange,
   defaultTab,
+  subjectTabExtra,
 }: TeacherAssignmentsWorkspaceProps) => {
   const initialTab =
     defaultTab ??
@@ -134,19 +149,22 @@ const TeacherAssignmentsWorkspace = ({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <ButtonTabComponent
-          activeTab={activeTab}
-          tabs={[
-            {
-              label: TAB_MANAGED,
-              onClick: () => setActiveTab(TAB_MANAGED),
-            },
-            {
-              label: TAB_SUBJECT,
-              onClick: () => setActiveTab(TAB_SUBJECT),
-            },
-          ]}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <ButtonTabComponent
+            activeTab={activeTab}
+            tabs={[
+              {
+                label: TAB_MANAGED,
+                onClick: () => setActiveTab(TAB_MANAGED),
+              },
+              {
+                label: TAB_SUBJECT,
+                onClick: () => setActiveTab(TAB_SUBJECT),
+              },
+            ]}
+          />
+          {activeTab === TAB_SUBJECT ? subjectTabExtra : null}
+        </div>
         <div className="flex items-center gap-4 text-sm text-slate-600">
           <div className="flex items-center gap-1.5">
             <Icon icon={stats.primaryIcon} className="size-4" aria-hidden />

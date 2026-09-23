@@ -49,6 +49,8 @@ export type AssessmentWorkspaceStudent = {
   grade: string | null
   status: AssessmentStatus
   is_published: boolean
+  needs_correction?: boolean
+  correction_reason?: string
 }
 
 export type AssessmentWorkspace = {
@@ -86,6 +88,44 @@ export type ClassTeacherAssessmentOverviewRow = {
   pending_count: number
   awaiting_approval_count: number
   approved_count: number
+  needs_correction_count: number
+}
+
+export type ClassAssessmentStudentStatus =
+  | 'pending'
+  | 'awaiting_approval'
+  | 'approved'
+  | 'needs_correction'
+
+export type CorrectionSubject = {
+  teaching_assignment_id: string
+  subject_label: string
+}
+
+export type CorrectionRequest = {
+  id: string
+  kind: 'reject' | 'reopen' | 'reopen_request'
+  status: 'open' | 'declined' | 'applied' | 'resolved'
+  reason: string
+  previous_result_status: string | null
+  student_id: string
+  stream_id: string
+  term_id: string
+  subjects: CorrectionSubject[]
+  raised_by_name: string
+  raised_at: string | null
+  reviewed_by_name: string
+  reviewed_at: string | null
+  applied_at: string | null
+  resolved_at: string | null
+}
+
+export type CorrectionInboxItem = CorrectionRequest & {
+  student_name: string
+  student_code: string
+  class_name: string
+  class_teacher_id: string | null
+  term_label: string | null
 }
 
 export type ClassTeacherAssessmentOverview = {
@@ -93,15 +133,14 @@ export type ClassTeacherAssessmentOverview = {
   pending_count: number
   awaiting_approval_count: number
   approved_count: number
+  needs_correction_count: number
+  corrections_inbox_count: number
+  corrections_inbox: CorrectionInboxItem[]
   results: ClassTeacherAssessmentOverviewRow[]
 }
 
-export type ClassAssessmentStudentStatus =
-  | 'pending'
-  | 'awaiting_approval'
-  | 'approved'
-
 export type ClassAssessmentSubjectRow = {
+  teaching_assignment_id: string | null
   subject_label: string
   subject_name: string
   group_name: string | null
@@ -122,6 +161,7 @@ export type ClassAssessmentDetailStudent = {
   full_name: string
   student_id: string
   status: ClassAssessmentStudentStatus
+  is_released: boolean
   subjects_published_count: number
   subjects_required_count: number
   class_teacher_remarks: string
@@ -132,6 +172,7 @@ export type ClassAssessmentDetailStudent = {
   overall_average: number | null
   overall_cohort_size: number | null
   subjects: ClassAssessmentSubjectRow[]
+  active_correction: CorrectionRequest | null
 }
 
 export type AdminAssessmentTermOption = {
@@ -164,6 +205,7 @@ export type AdminAssessmentStudentStatus =
   | 'with_class_teacher'
   | 'ready_for_you'
   | 'released'
+  | 'needs_correction'
 
 export type AdminAssessmentDetailStudent = {
   id: string
@@ -181,6 +223,7 @@ export type AdminAssessmentDetailStudent = {
   overall_average: number | null
   overall_cohort_size: number | null
   subjects: ClassAssessmentSubjectRow[]
+  active_correction: CorrectionRequest | null
 }
 
 export type AdminAssessmentDetail = {
@@ -192,6 +235,8 @@ export type AdminAssessmentDetail = {
   with_class_teacher_count: number
   ready_for_you_count: number
   released_count: number
+  needs_correction_count: number
+  pending_reopen_requests_count: number
   students_count: number
   weights: AssessmentWeights
   result_type: string
@@ -206,7 +251,10 @@ export type AdminAssessmentOverview = {
   with_class_teacher_count: number
   ready_for_you_count: number
   released_count: number
+  needs_correction_count?: number
   classes_fully_ready_count: number
+  corrections_inbox_count: number
+  corrections_inbox: CorrectionInboxItem[]
   results: AdminAssessmentClassRow[]
 }
 
@@ -282,6 +330,7 @@ export type ClassTeacherAssessmentDetail = {
   pending_count: number
   awaiting_approval_count: number
   approved_count: number
+  needs_correction_count: number
   students_count: number
   weights: AssessmentWeights
   result_type: string

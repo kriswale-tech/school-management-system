@@ -68,6 +68,8 @@ class WorkspaceStudentSerializer(serializers.Serializer):
     grade = serializers.CharField(allow_null=True)
     status = serializers.CharField()
     is_published = serializers.BooleanField()
+    needs_correction = serializers.BooleanField(required=False)
+    correction_reason = serializers.CharField(required=False, allow_blank=True)
 
 
 class AssessmentWorkspaceSerializer(serializers.Serializer):
@@ -99,6 +101,7 @@ class ClassTeacherAssessmentRowSerializer(serializers.Serializer):
     pending_count = serializers.IntegerField()
     awaiting_approval_count = serializers.IntegerField()
     approved_count = serializers.IntegerField()
+    needs_correction_count = serializers.IntegerField()
 
 
 class AdminAssessmentTermOptionSerializer(serializers.Serializer):
@@ -119,30 +122,13 @@ class AdminAssessmentClassRowSerializer(serializers.Serializer):
     class_level_id = serializers.UUIDField()
     stream_id = serializers.UUIDField()
     display_name = serializers.CharField()
-    class_teacher_id = serializers.UUIDField(allow_null=True)
     class_teacher_name = serializers.CharField(allow_null=True)
+    class_teacher_id = serializers.UUIDField(allow_null=True)
     students_count = serializers.IntegerField()
     with_class_teacher_count = serializers.IntegerField()
     ready_for_you_count = serializers.IntegerField()
     released_count = serializers.IntegerField()
-
-
-class AdminAssessmentOverviewSerializer(serializers.Serializer):
-    term_id = serializers.UUIDField()
-    term_label = serializers.CharField()
-    with_class_teacher_count = serializers.IntegerField()
-    ready_for_you_count = serializers.IntegerField()
-    released_count = serializers.IntegerField()
-    classes_fully_ready_count = serializers.IntegerField()
-    results = AdminAssessmentClassRowSerializer(many=True)
-
-
-class ClassTeacherAssessmentOverviewSerializer(serializers.Serializer):
-    term_id = serializers.UUIDField()
-    pending_count = serializers.IntegerField()
-    awaiting_approval_count = serializers.IntegerField()
-    approved_count = serializers.IntegerField()
-    results = ClassTeacherAssessmentRowSerializer(many=True)
+    needs_correction_count = serializers.IntegerField(required=False)
 
 
 class ApproveClassStudentsSerializer(serializers.Serializer):
@@ -157,6 +143,7 @@ class ApproveClassStudentsSerializer(serializers.Serializer):
 
 
 class AssessmentSubjectRowSerializer(serializers.Serializer):
+    teaching_assignment_id = serializers.UUIDField(allow_null=True)
     subject_label = serializers.CharField()
     subject_name = serializers.CharField()
     group_name = serializers.CharField(allow_null=True)
@@ -170,6 +157,78 @@ class AssessmentSubjectRowSerializer(serializers.Serializer):
     band_remark = serializers.CharField(allow_null=True)
     position = serializers.IntegerField(allow_null=True)
     position_cohort_size = serializers.IntegerField(allow_null=True, required=False)
+
+
+class CorrectionSubjectSerializer(serializers.Serializer):
+    teaching_assignment_id = serializers.UUIDField()
+    subject_label = serializers.CharField()
+
+
+class CorrectionRequestSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    kind = serializers.CharField()
+    status = serializers.CharField()
+    reason = serializers.CharField()
+    previous_result_status = serializers.CharField(allow_null=True)
+    student_id = serializers.UUIDField()
+    stream_id = serializers.UUIDField()
+    term_id = serializers.UUIDField()
+    subjects = CorrectionSubjectSerializer(many=True)
+    raised_by_name = serializers.CharField(allow_blank=True)
+    raised_at = serializers.CharField(allow_null=True)
+    reviewed_by_name = serializers.CharField(allow_blank=True)
+    reviewed_at = serializers.CharField(allow_null=True)
+    applied_at = serializers.CharField(allow_null=True)
+    resolved_at = serializers.CharField(allow_null=True)
+
+
+class CorrectionInboxItemSerializer(CorrectionRequestSerializer):
+    student_name = serializers.CharField()
+    student_code = serializers.CharField()
+    class_name = serializers.CharField()
+    class_teacher_id = serializers.UUIDField(allow_null=True)
+    term_label = serializers.CharField(allow_null=True)
+
+
+class AdminAssessmentOverviewSerializer(serializers.Serializer):
+    term_id = serializers.UUIDField()
+    term_label = serializers.CharField()
+    with_class_teacher_count = serializers.IntegerField()
+    ready_for_you_count = serializers.IntegerField()
+    released_count = serializers.IntegerField()
+    needs_correction_count = serializers.IntegerField(required=False)
+    classes_fully_ready_count = serializers.IntegerField()
+    corrections_inbox_count = serializers.IntegerField()
+    corrections_inbox = CorrectionInboxItemSerializer(many=True)
+    results = AdminAssessmentClassRowSerializer(many=True)
+
+
+class ClassTeacherAssessmentOverviewSerializer(serializers.Serializer):
+    term_id = serializers.UUIDField()
+    pending_count = serializers.IntegerField()
+    awaiting_approval_count = serializers.IntegerField()
+    approved_count = serializers.IntegerField()
+    needs_correction_count = serializers.IntegerField()
+    corrections_inbox_count = serializers.IntegerField()
+    corrections_inbox = CorrectionInboxItemSerializer(many=True)
+    results = ClassTeacherAssessmentRowSerializer(many=True)
+
+
+class CorrectionActionSerializer(serializers.Serializer):
+    teaching_assignment_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        allow_empty=False,
+    )
+    reason = serializers.CharField()
+
+
+class CorrectionReviewSerializer(serializers.Serializer):
+    approve = serializers.BooleanField()
+
+
+class CorrectionActionResponseSerializer(serializers.Serializer):
+    correction = CorrectionRequestSerializer()
+    detail = serializers.DictField()
 
 
 class AdminAssessmentDetailStudentSerializer(serializers.Serializer):
@@ -188,6 +247,7 @@ class AdminAssessmentDetailStudentSerializer(serializers.Serializer):
     overall_average = serializers.FloatField(allow_null=True)
     overall_cohort_size = serializers.IntegerField(allow_null=True)
     subjects = AssessmentSubjectRowSerializer(many=True)
+    active_correction = CorrectionRequestSerializer(allow_null=True)
 
 
 class AdminAssessmentDetailSerializer(serializers.Serializer):
@@ -199,6 +259,8 @@ class AdminAssessmentDetailSerializer(serializers.Serializer):
     with_class_teacher_count = serializers.IntegerField()
     ready_for_you_count = serializers.IntegerField()
     released_count = serializers.IntegerField()
+    needs_correction_count = serializers.IntegerField()
+    pending_reopen_requests_count = serializers.IntegerField()
     students_count = serializers.IntegerField()
     weights = AssessmentWeightsSerializer()
     result_type = serializers.CharField()
@@ -212,6 +274,7 @@ class ClassAssessmentDetailStudentSerializer(serializers.Serializer):
     full_name = serializers.CharField()
     student_id = serializers.CharField()
     status = serializers.CharField()
+    is_released = serializers.BooleanField()
     subjects_published_count = serializers.IntegerField()
     subjects_required_count = serializers.IntegerField()
     class_teacher_remarks = serializers.CharField(allow_blank=True)
@@ -222,6 +285,7 @@ class ClassAssessmentDetailStudentSerializer(serializers.Serializer):
     overall_average = serializers.FloatField(allow_null=True)
     overall_cohort_size = serializers.IntegerField(allow_null=True)
     subjects = AssessmentSubjectRowSerializer(many=True)
+    active_correction = CorrectionRequestSerializer(allow_null=True)
 
 
 class ClassTeacherAssessmentDetailSerializer(serializers.Serializer):
@@ -234,6 +298,7 @@ class ClassTeacherAssessmentDetailSerializer(serializers.Serializer):
     pending_count = serializers.IntegerField()
     awaiting_approval_count = serializers.IntegerField()
     approved_count = serializers.IntegerField()
+    needs_correction_count = serializers.IntegerField()
     students_count = serializers.IntegerField()
     weights = AssessmentWeightsSerializer()
     result_type = serializers.CharField()

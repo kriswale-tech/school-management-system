@@ -8,8 +8,10 @@ import { Button } from '@/components/ui'
 import { Capability } from '@/features/auth/capabilities'
 import { useCan } from '@/features/auth/hooks'
 import {
+  adminCorrectStudent,
   getAdminAssessmentDetail,
   releaseAdminAssessmentStudents,
+  reviewAdminCorrection,
 } from '@/features/classes/services'
 import type {
   AdminAssessmentDetailStudent,
@@ -17,12 +19,14 @@ import type {
 } from '@/features/classes/assessment/types'
 import { getApiErrorMessage, mergeClasses } from '@/utils'
 import BulkReleaseModal from './components/BulkReleaseModal'
+import CorrectionModal from './components/CorrectionModal'
 
-type StatusFilter = 'all' | 'ready_for_you' | 'released'
+type StatusFilter = 'all' | 'ready_for_you' | 'released' | 'needs_correction'
 
 const statusLabel = (status: AdminAssessmentStudentStatus) => {
   if (status === 'ready_for_you') return 'Ready for you'
   if (status === 'released') return 'Released'
+  if (status === 'needs_correction') return 'Needs correction'
   return 'With class teacher'
 }
 
@@ -31,6 +35,7 @@ const statusChipClass = (status: AdminAssessmentStudentStatus) =>
     'inline-flex rounded-md px-2 py-0.5 text-xs font-medium',
     status === 'released' && 'bg-emerald-50 text-emerald-800',
     status === 'ready_for_you' && 'bg-blue-50 text-blue-800',
+    status === 'needs_correction' && 'bg-orange-50 text-orange-800',
     status === 'with_class_teacher' && 'bg-amber-50 text-amber-800',
   )
 
@@ -67,6 +72,7 @@ const AdminAssessmentDetail = () => {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
   const [headRemarks, setHeadRemarks] = useState('')
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [correctionOpen, setCorrectionOpen] = useState(false)
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: DETAIL_QUERY_KEY(streamId ?? '', termId ?? ''),
@@ -114,6 +120,36 @@ const AdminAssessmentDetail = () => {
     onError: (err) => toast.error(getApiErrorMessage(err, 'Unable to release students')),
   })
 
+  const { mutate: correctStudent, isPending: isCorrecting } = useMutation({
+    mutationFn: (payload: { teaching_assignment_ids: string[]; reason: string }) =>
+      adminCorrectStudent(streamId!, selectedStudentId!, payload, termId),
+    onSuccess: (payload) => {
+      toast.success(
+        payload.correction.kind === 'reopen'
+          ? 'Results reopened for correction'
+          : 'Subjects sent back for correction',
+      )
+      queryClient.setQueryData(DETAIL_QUERY_KEY(streamId ?? '', termId ?? ''), payload.detail)
+      setCorrectionOpen(false)
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Unable to send back subjects')),
+  })
+
+  const { mutate: reviewCorrection, isPending: isReviewing } = useMutation({
+    mutationFn: (approve: boolean) =>
+      reviewAdminCorrection(
+        streamId!,
+        selectedStudent!.active_correction!.id,
+        approve,
+        termId,
+      ),
+    onSuccess: (payload, approve) => {
+      toast.success(approve ? 'Reopen approved' : 'Reopen request declined')
+      queryClient.setQueryData(DETAIL_QUERY_KEY(streamId ?? '', termId ?? ''), payload.detail)
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Unable to review request')),
+  })
+
   const readyIds =
     data?.students.filter((student) => student.status === 'ready_for_you').map((student) => student.id) ??
     []
@@ -122,11 +158,26 @@ const AdminAssessmentDetail = () => {
     { key: 'all', label: 'All', count: data?.students_count ?? 0 },
     { key: 'ready_for_you', label: 'Ready for you', count: data?.ready_for_you_count ?? 0 },
     { key: 'released', label: 'Released', count: data?.released_count ?? 0 },
+    {
+      key: 'needs_correction',
+      label: 'Needs correction',
+      count: data?.needs_correction_count ?? 0,
+    },
   ]
 
   const weights = data?.weights
   const canReleaseSelected = selectedStudent?.status === 'ready_for_you' && canRelease
   const canGenerateReport = selectedStudent?.status === 'released'
+  const canCorrectSelected =
+    canRelease &&
+    selectedStudent &&
+    (selectedStudent.status === 'ready_for_you' ||
+      selectedStudent.status === 'released' ||
+      selectedStudent.status === 'needs_correction')
+  const pendingReopen =
+    selectedStudent?.active_correction?.kind === 'reopen_request' &&
+    selectedStudent.active_correction.status === 'open'
+  const activeCorrection = selectedStudent?.active_correction
 
   return (
     <div className="space-y-6">
@@ -151,6 +202,12 @@ const AdminAssessmentDetail = () => {
                 {data.with_class_teacher_count > 0 ? (
                   <p className="text-xs text-slate-400 mt-1">
                     {data.with_class_teacher_count} still with the class teacher — not shown
+                  </p>
+                ) : null}
+                {(data.pending_reopen_requests_count ?? 0) > 0 ? (
+                  <p className="text-xs text-orange-700 mt-1">
+                    {data.pending_reopen_requests_count} reopen request
+                    {data.pending_reopen_requests_count === 1 ? '' : 's'} awaiting review
                   </p>
                 ) : null}
               </div>
@@ -217,9 +274,17 @@ const AdminAssessmentDetail = () => {
                             </p>
                             <p className="text-xs text-slate-500 mt-0.5">{student.student_id}</p>
                           </div>
+                          <div className="flex shrink-0 flex-col items-end gap-1">
                           <span className={statusChipClass(student.status)}>
                             {statusLabel(student.status)}
                           </span>
+                          {student.active_correction?.kind === 'reopen_request' &&
+                          student.active_correction.status === 'open' ? (
+                            <span className="inline-flex rounded-md bg-orange-50 px-2 py-0.5 text-[10px] font-medium text-orange-800">
+                              Reopen requested
+                            </span>
+                          ) : null}
+                          </div>
                         </div>
                       </button>
                     </li>
@@ -247,6 +312,45 @@ const AdminAssessmentDetail = () => {
                     {statusLabel(selectedStudent.status)}
                   </span>
                 </div>
+
+                {activeCorrection ? (
+                  <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-3 text-sm text-orange-950">
+                    <p className="font-medium">
+                      {pendingReopen
+                        ? 'Reopen requested'
+                        : activeCorrection.status === 'applied'
+                          ? 'Correction in progress'
+                          : 'Correction'}
+                    </p>
+                    <p className="mt-1 text-orange-900/90">{activeCorrection.reason}</p>
+                    <p className="mt-1 text-xs text-orange-800/80">
+                      Subjects:{' '}
+                      {activeCorrection.subjects.map((subject) => subject.subject_label).join(', ')}
+                    </p>
+                    {pendingReopen && canRelease ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          className="max-w-fit py-2 text-sm"
+                          loading={isReviewing}
+                          loadingText="Saving"
+                          onClick={() => reviewCorrection(true)}
+                        >
+                          Approve reopen
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="max-w-fit py-2 text-sm"
+                          disabled={isReviewing}
+                          onClick={() => reviewCorrection(false)}
+                        >
+                          Decline
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <TableWrapper
                   isEmpty={selectedStudent.subjects.length === 0}
@@ -443,6 +547,19 @@ const AdminAssessmentDetail = () => {
                           Generate report
                         </Button>
                       ) : null}
+                      {canCorrectSelected ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          color="red"
+                          className="max-w-fit py-2 text-sm"
+                          onClick={() => setCorrectionOpen(true)}
+                        >
+                          {selectedStudent.status === 'released'
+                            ? 'Reopen subjects'
+                            : 'Send back subjects'}
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -458,6 +575,25 @@ const AdminAssessmentDetail = () => {
         isSubmitting={isReleasing}
         onClose={() => setBulkOpen(false)}
         onConfirm={(remarks) => releaseStudents({ student_ids: readyIds, remarks })}
+      />
+
+      <CorrectionModal
+        open={correctionOpen}
+        title={
+          selectedStudent?.status === 'released'
+            ? 'Reopen subjects'
+            : 'Send subjects back'
+        }
+        description={
+          selectedStudent?.status === 'released'
+            ? 'Select subjects to reopen. The stored report PDF will be deleted until results are released again.'
+            : 'Select published subjects to return to the subject teacher, and explain why.'
+        }
+        confirmLabel={selectedStudent?.status === 'released' ? 'Reopen' : 'Send back'}
+        subjects={selectedStudent?.subjects ?? []}
+        isSubmitting={isCorrecting}
+        onClose={() => setCorrectionOpen(false)}
+        onConfirm={(payload) => correctStudent(payload)}
       />
     </div>
   )

@@ -265,6 +265,7 @@ Same split layout, admin statuses:
 
 - **Left:** class name, **Release all ready**, pills (All / Ready for you / Released). Students still with the class teacher are a count only — they are not listed, so the admin never sees incomplete dashes.
 - **Right:** same subject table. Class teacher remarks are read-only (name on the right). Head teacher remarks can be typed when the student is Ready for you (label on the right is **Head teacher** until a head-teacher person exists). **Release** saves those remarks. After release, **Generate report** opens the report page: if no PDF exists yet it is generated, uploaded to R2, and embedded; later visits load the stored PDF (Regenerate overwrites).
+- **Corrections:** Admin can send back / reopen selected subjects with a reason; class teacher can reject or request reopen. See [assessment-corrections.md](./assessment-corrections.md).
 
 Report layout: school header + logo, student box (next term begins when known, no. on roll = class size, position when used), subject table with **TOTAL** row, blank attendance dotted lines, conduct/attitude/interest, remarks, signatures, then grades interpretation.
 

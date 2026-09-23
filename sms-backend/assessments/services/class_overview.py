@@ -31,6 +31,7 @@ from teachers.models import ClassTeacher, TeachingAssignment
 CLASS_STATUS_PENDING = 'pending'
 CLASS_STATUS_AWAITING = 'awaiting_approval'
 CLASS_STATUS_APPROVED = 'approved'
+CLASS_STATUS_NEEDS_CORRECTION = 'needs_correction'
 
 
 def _ensure_class_teacher(membership, class_teacher: ClassTeacher) -> None:
@@ -168,6 +169,19 @@ def _subject_published(assignment, student_id) -> bool:
 
 
 def _class_bucket_for_student(*, student_id, class_teacher: ClassTeacher, term) -> str:
+    result_qs = StudentResult.objects.filter(
+        student_id=student_id,
+        term_id=term.id,
+        class_level_id=class_teacher.class_level_id,
+    )
+    if class_teacher.stream_id:
+        result_qs = result_qs.filter(stream_id=class_teacher.stream_id)
+    else:
+        result_qs = result_qs.filter(stream__isnull=True)
+    result_row = result_qs.first()
+    if result_row and result_row.status == StudentResult.Status.NEEDS_CORRECTION:
+        return CLASS_STATUS_NEEDS_CORRECTION
+
     approved = StudentResult.objects.filter(
         student_id=student_id,
         term_id=term.id,
@@ -215,11 +229,12 @@ def list_class_teacher_assessment_overview(*, school, membership) -> dict:
         'pending_count': 0,
         'awaiting_approval_count': 0,
         'approved_count': 0,
+        'needs_correction_count': 0,
     }
 
     for class_teacher in qs:
         enrollments = list(_enrollment_qs(class_teacher=class_teacher, term=term))
-        pending = awaiting = approved = 0
+        pending = awaiting = approved = needs_correction = 0
         for enrollment in enrollments:
             bucket = _class_bucket_for_student(
                 student_id=enrollment.student_id,
@@ -230,12 +245,15 @@ def list_class_teacher_assessment_overview(*, school, membership) -> dict:
                 approved += 1
             elif bucket == CLASS_STATUS_AWAITING:
                 awaiting += 1
+            elif bucket == CLASS_STATUS_NEEDS_CORRECTION:
+                needs_correction += 1
             else:
                 pending += 1
 
         totals['pending_count'] += pending
         totals['awaiting_approval_count'] += awaiting
         totals['approved_count'] += approved
+        totals['needs_correction_count'] += needs_correction
 
         stream = class_teacher.stream
         display_name = class_teacher.class_level.name
@@ -262,11 +280,32 @@ def list_class_teacher_assessment_overview(*, school, membership) -> dict:
             'pending_count': pending,
             'awaiting_approval_count': awaiting,
             'approved_count': approved,
+            'needs_correction_count': needs_correction,
         })
+
+    from assessments.models import CorrectionRequest
+    from assessments.services.corrections import list_corrections_inbox
+
+    stream_ids = [ct.stream_id for ct in qs if ct.stream_id]
+    class_teacher_ids_by_stream = {
+        ct.stream_id: ct.id for ct in qs if ct.stream_id
+    }
+    inbox = list_corrections_inbox(
+        school=school,
+        term=term,
+        stream_ids=stream_ids,
+        statuses=(
+            CorrectionRequest.Status.OPEN,
+            CorrectionRequest.Status.APPLIED,
+        ),
+        class_teacher_ids_by_stream=class_teacher_ids_by_stream,
+    )
 
     return {
         'term_id': str(term.id),
         **totals,
+        'corrections_inbox_count': len(inbox),
+        'corrections_inbox': inbox,
         'results': results,
     }
 
@@ -318,13 +357,30 @@ def approve_class_students(
         )
         if bucket == CLASS_STATUS_APPROVED:
             continue
-        if bucket != CLASS_STATUS_AWAITING:
+        if bucket not in (CLASS_STATUS_AWAITING, CLASS_STATUS_NEEDS_CORRECTION):
             raise ValidationError({
                 'detail': (
                     'Only students with all subjects published can be approved '
-                    '(Awaiting approval).'
+                    '(Awaiting approval or Needs correction).'
                 ),
             })
+        if bucket == CLASS_STATUS_NEEDS_CORRECTION:
+            # Must have all required subjects published again before re-approve.
+            assignments = _required_teaching_assignments_for_student(
+                student_id=student_id,
+                class_level_id=class_teacher.class_level_id,
+                term=term,
+                stream_id=class_teacher.stream_id,
+            )
+            if not assignments or not all(
+                _subject_published(assignment, student_id) for assignment in assignments
+            ):
+                raise ValidationError({
+                    'detail': (
+                        'All subjects must be published again before re-approving '
+                        'a student who needs correction.'
+                    ),
+                })
 
         defaults = {
             'status': StudentResult.Status.APPROVED,
@@ -334,6 +390,8 @@ def approve_class_students(
             'interest': (interest or '').strip(),
             'approved_at': now,
             'approved_by': membership.user,
+            'released_at': None,
+            'released_by': None,
         }
         if class_teacher.stream_id:
             StudentResult.objects.update_or_create(
@@ -342,6 +400,15 @@ def approve_class_students(
                 class_level_id=class_teacher.class_level_id,
                 stream_id=class_teacher.stream_id,
                 defaults=defaults,
+            )
+            from assessments.services.corrections import resolve_applied_corrections_for_student
+
+            resolve_applied_corrections_for_student(
+                school=school,
+                stream_id=class_teacher.stream_id,
+                student_id=student_id,
+                term_id=term.id,
+                actor=membership.user,
             )
         else:
             StudentResult.objects.update_or_create(
@@ -382,6 +449,7 @@ def _serialize_subject_row(*, ctx, student_id, config, bands) -> dict:
 
     if ctx.get('unplaced'):
         return {
+            'teaching_assignment_id': None,
             'subject_label': subject_label,
             'subject_name': subject_name,
             'group_name': None,
@@ -398,6 +466,7 @@ def _serialize_subject_row(*, ctx, student_id, config, bands) -> dict:
 
     if assignment is None:
         return {
+            'teaching_assignment_id': None,
             'subject_label': subject_label,
             'subject_name': subject_name,
             'group_name': subject_group.name if subject_group else None,
@@ -439,6 +508,7 @@ def _serialize_subject_row(*, ctx, student_id, config, bands) -> dict:
         status = 'Incomplete'
 
     return {
+        'teaching_assignment_id': str(assignment.id),
         'subject_label': subject_label,
         'subject_name': subject_name,
         'group_name': subject_group.name if subject_group else None,
@@ -561,7 +631,7 @@ def get_class_teacher_assessment_detail(*, school, membership, class_teacher_id)
         display_name = f'{display_name} {stream.name}'
 
     enrollments = list(_enrollment_qs(class_teacher=class_teacher, term=term))
-    pending = awaiting = approved = 0
+    pending = awaiting = approved = needs_correction = 0
     students = []
 
     for enrollment in enrollments:
@@ -575,6 +645,8 @@ def get_class_teacher_assessment_detail(*, school, membership, class_teacher_id)
             approved += 1
         elif bucket == CLASS_STATUS_AWAITING:
             awaiting += 1
+        elif bucket == CLASS_STATUS_NEEDS_CORRECTION:
+            needs_correction += 1
         else:
             pending += 1
 
@@ -611,6 +683,9 @@ def get_class_teacher_assessment_detail(*, school, membership, class_teacher_id)
             'full_name': _student_full_name(student),
             'student_id': student.student_id,
             'status': bucket,
+            'is_released': bool(
+                result_row and result_row.status == StudentResult.Status.RELEASED
+            ),
             'subjects_published_count': published_count,
             'subjects_required_count': required_count,
             'class_teacher_remarks': result_row.remarks if result_row else '',
@@ -618,7 +693,20 @@ def get_class_teacher_assessment_detail(*, school, membership, class_teacher_id)
             'attitude': result_row.attitude if result_row else '',
             'interest': result_row.interest if result_row else '',
             'subjects': subject_rows,
+            'active_correction': None,
         })
+
+    if class_teacher.stream_id and students:
+        from assessments.services.corrections import list_active_corrections_for_students
+
+        by_student = list_active_corrections_for_students(
+            school=school,
+            stream_id=class_teacher.stream_id,
+            term_id=term.id,
+            student_ids=[s['id'] for s in students],
+        )
+        for student in students:
+            student['active_correction'] = by_student.get(student['id'])
 
     uses_position = config.uses_position()
     _apply_positions(students=students, uses_position=uses_position)
@@ -633,6 +721,7 @@ def get_class_teacher_assessment_detail(*, school, membership, class_teacher_id)
         'pending_count': pending,
         'awaiting_approval_count': awaiting,
         'approved_count': approved,
+        'needs_correction_count': needs_correction,
         'students_count': len(students),
         'weights': {
             'continuous_assessment_weight': float(config.continuous_assessment_weight),

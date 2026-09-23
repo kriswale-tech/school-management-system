@@ -219,6 +219,8 @@ def serialize_teacher_assignments(*, user, school) -> dict:
         return {
             'class_teacher_assignments': class_teacher_assignments,
             'teaching_assignments': teaching_assignments,
+            'corrections_inbox': [],
+            'corrections_inbox_count': 0,
         }
 
     for assignment in ClassTeacher.objects.filter(
@@ -243,15 +245,30 @@ def serialize_teacher_assignments(*, user, school) -> dict:
             ),
         })
 
-    for assignment in TeachingAssignment.objects.filter(
-        teacher=user,
-        term=active_term,
-    ).select_related(
-        'class_subject__class_level',
-        'class_subject__subject',
-        'stream',
-        'subject_group',
-    ):
+    teaching_qs = list(
+        TeachingAssignment.objects.filter(
+            teacher=user,
+            term=active_term,
+        ).select_related(
+            'class_subject__class_level',
+            'class_subject__subject',
+            'stream',
+            'subject_group',
+        )
+    )
+    teaching_ids = [assignment.id for assignment in teaching_qs]
+    corrections_inbox: list = []
+    correction_counts: dict[str, int] = {}
+    if teaching_ids:
+        from assessments.services.corrections import list_subject_teacher_corrections_inbox
+
+        corrections_inbox, correction_counts = list_subject_teacher_corrections_inbox(
+            school=school,
+            term=active_term,
+            teaching_assignment_ids=teaching_ids,
+        )
+
+    for assignment in teaching_qs:
         class_level_id = assignment.class_subject.class_level_id
         if assignment.subject_group_id:
             students_count = _subject_group_student_count(
@@ -282,6 +299,7 @@ def serialize_teacher_assignments(*, user, school) -> dict:
             ),
             'display_class_name': _teaching_display_class_name(assignment),
             'students_count': students_count,
+            'needs_correction_count': correction_counts.get(str(assignment.id), 0),
             'view_stream_id': _resolve_view_stream_id(
                 class_level_id=class_level_id,
                 stream_id=assignment.stream_id,
@@ -291,6 +309,8 @@ def serialize_teacher_assignments(*, user, school) -> dict:
     return {
         'class_teacher_assignments': class_teacher_assignments,
         'teaching_assignments': teaching_assignments,
+        'corrections_inbox': corrections_inbox,
+        'corrections_inbox_count': len(corrections_inbox),
     }
 
 
@@ -319,6 +339,8 @@ def serialize_staff_desk_detail(membership) -> dict:
         assignments = {
             'class_teacher_assignments': [],
             'teaching_assignments': [],
+            'corrections_inbox': [],
+            'corrections_inbox_count': 0,
         }
 
     return {
@@ -326,5 +348,6 @@ def serialize_staff_desk_detail(membership) -> dict:
         'profile': _serialize_profile(user),
         'school_id': school.id,
         'school_setup_completed': school.setup_completed,
-        **assignments,
+        'class_teacher_assignments': assignments['class_teacher_assignments'],
+        'teaching_assignments': assignments['teaching_assignments'],
     }

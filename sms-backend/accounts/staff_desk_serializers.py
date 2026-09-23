@@ -2,6 +2,8 @@
 
 from rest_framework import serializers
 
+from assessments.serializers import CorrectionInboxItemSerializer
+
 
 class StaffDeskRowSerializer(serializers.Serializer):
     """One row in the staff directory table."""
@@ -101,6 +103,11 @@ class StaffDeskTeachingAssignmentSerializer(serializers.Serializer):
     students_count = serializers.IntegerField(
         help_text='Students covered by this teaching assignment in the active term.',
     )
+    needs_correction_count = serializers.IntegerField(
+        required=False,
+        default=0,
+        help_text='Students on this assignment with an applied correction still unpublished.',
+    )
     view_stream_id = serializers.UUIDField(
         allow_null=True,
         help_text='Stream id to open on the Classes detail page.',
@@ -112,6 +119,8 @@ class MyTeachingSerializer(serializers.Serializer):
 
     is_class_teacher = serializers.BooleanField()
     is_subject_teacher = serializers.BooleanField()
+    corrections_inbox_count = serializers.IntegerField()
+    corrections_inbox = CorrectionInboxItemSerializer(many=True)
     class_teacher_assignments = StaffDeskClassTeacherAssignmentSerializer(many=True)
     teaching_assignments = StaffDeskTeachingAssignmentSerializer(many=True)
 

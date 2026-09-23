@@ -13,6 +13,7 @@ import AdminAssessments from './AdminAssessments'
 import ClassTeacherAssessmentsTable, {
   type ClassTeacherAssessmentRow,
 } from './components/ClassTeacherAssessmentsTable'
+import CorrectionsInbox from './components/CorrectionsInbox'
 
 const OVERVIEW_QUERY_KEY = ['assessments', 'my-classes'] as const
 
@@ -20,6 +21,7 @@ const Assessments = () => {
   const canRelease = useCan(Capability.ASSESSMENTS_RELEASE)
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
+  const [inboxOpen, setInboxOpen] = useState(false)
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: OVERVIEW_QUERY_KEY,
@@ -44,11 +46,14 @@ const Assessments = () => {
         pending_count: item.pending_count,
         ready_count: item.awaiting_approval_count,
         approved_count: item.approved_count,
+        needs_correction_count: item.needs_correction_count ?? 0,
       }))
   }, [data?.results, search])
 
   const classCount = rows.length
   const studentCount = rows.reduce((total, row) => total + row.students_count, 0)
+  const inbox = data?.corrections_inbox ?? []
+  const inboxCount = data?.corrections_inbox_count ?? inbox.length
 
   if (canRelease) {
     return <AdminAssessments />
@@ -60,7 +65,7 @@ const Assessments = () => {
         <SearchComponent value={search} onChange={setSearch} placeholder="Search classes" />
       </ActionBar>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <StatsCard
           title="Pending"
           value={String(data?.pending_count ?? 0)}
@@ -76,11 +81,25 @@ const Assessments = () => {
           value={String(data?.approved_count ?? 0)}
           description="You approved these results; they are with admin for final review."
         />
+        <StatsCard
+          title="Needs correction"
+          value={String(data?.needs_correction_count ?? 0)}
+          description="Students with subjects sent back for correction."
+        />
       </div>
 
       <div className="bg-white p-4 custom-shadow-md space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-medium text-slate-900">My classes</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-medium text-slate-900">My classes</h2>
+            <button
+              type="button"
+              onClick={() => setInboxOpen(true)}
+              className="rounded-full bg-orange-50 px-3 py-1 text-xs font-medium text-orange-800 hover:bg-orange-100 cursor-pointer"
+            >
+              Corrections {inboxCount}
+            </button>
+          </div>
           <div className="flex items-center gap-4 text-sm text-slate-600">
             <div className="flex items-center gap-1.5">
               <Icon icon="hugeicons:notebook-01" className="size-4" aria-hidden />
@@ -96,6 +115,19 @@ const Assessments = () => {
             </div>
           </div>
         </div>
+
+        <CorrectionsInbox
+          open={inboxOpen}
+          onClose={() => setInboxOpen(false)}
+          items={inbox}
+          title="Corrections"
+          emptyLabel="No corrections or reopen requests right now."
+          onOpenItem={(item) => {
+            if (item.class_teacher_id) {
+              navigate(`/assessments/${item.class_teacher_id}`)
+            }
+          }}
+        />
 
         {isError ? (
           <p className="text-sm text-red-600 py-6" role="alert">

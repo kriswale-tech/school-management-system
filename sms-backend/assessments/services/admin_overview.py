@@ -23,6 +23,7 @@ from teachers.models import ClassTeacher
 ADMIN_WITH_CLASS_TEACHER = 'with_class_teacher'
 ADMIN_READY = 'ready_for_you'
 ADMIN_RELEASED = 'released'
+ADMIN_NEEDS_CORRECTION = 'needs_correction'
 
 
 def get_admin_assessment_filter_options(*, school) -> dict:
@@ -60,13 +61,18 @@ def list_admin_assessment_overview(*, school, term_id=None) -> dict:
     results_by_key = _results_by_key(term)
 
     rows = []
-    with_class_teacher = ready = released = 0
+    with_class_teacher = ready = released = needs_correction = 0
     classes_fully_ready = 0
 
     for entry in class_entries:
         teacher = _teacher_for_entry(entry, teachers_by_key)
         enrollments = enrollments_by_stream.get(entry['stream_id'], [])
-        counts = {'with_class_teacher_count': 0, 'ready_for_you_count': 0, 'released_count': 0}
+        counts = {
+            'with_class_teacher_count': 0,
+            'ready_for_you_count': 0,
+            'released_count': 0,
+            'needs_correction_count': 0,
+        }
         for enrollment in enrollments:
             bucket = _admin_bucket(
                 student_id=enrollment.student_id,
@@ -80,6 +86,7 @@ def list_admin_assessment_overview(*, school, term_id=None) -> dict:
         with_class_teacher += counts['with_class_teacher_count']
         ready += counts['ready_for_you_count']
         released += counts['released_count']
+        needs_correction += counts['needs_correction_count']
         if students_count and counts['ready_for_you_count'] == students_count:
             classes_fully_ready += 1
 
@@ -94,13 +101,26 @@ def list_admin_assessment_overview(*, school, term_id=None) -> dict:
             **counts,
         })
 
+    from assessments.models import CorrectionRequest
+    from assessments.services.corrections import list_corrections_inbox
+
+    inbox = list_corrections_inbox(
+        school=school,
+        term=term,
+        statuses=(CorrectionRequest.Status.OPEN,),
+        kinds=(CorrectionRequest.Kind.REOPEN_REQUEST,),
+    )
+
     return {
         'term_id': str(term.id),
         'term_label': f'{term.academic_year.academic_year} · {term.get_term_display()}',
         'with_class_teacher_count': with_class_teacher,
         'ready_for_you_count': ready,
         'released_count': released,
+        'needs_correction_count': needs_correction,
         'classes_fully_ready_count': classes_fully_ready,
+        'corrections_inbox_count': len(inbox),
+        'corrections_inbox': inbox,
         'results': rows,
     }
 
@@ -198,6 +218,8 @@ def _bucket_from_status(status: str | None) -> str:
         return ADMIN_RELEASED
     if status == StudentResult.Status.APPROVED:
         return ADMIN_READY
+    if status == StudentResult.Status.NEEDS_CORRECTION:
+        return ADMIN_NEEDS_CORRECTION
     return ADMIN_WITH_CLASS_TEACHER
 
 
@@ -256,7 +278,7 @@ def get_admin_assessment_detail(*, school, stream_id, term_id=None) -> dict:
         .select_related('student')
         .order_by('student__last_name', 'student__first_name')
     )
-    with_class_teacher = ready = released = 0
+    with_class_teacher = ready = released = needs_correction = 0
     students = []
     for enrollment in enrollments:
         student = enrollment.student
@@ -271,6 +293,8 @@ def get_admin_assessment_detail(*, school, stream_id, term_id=None) -> dict:
             released += 1
         elif bucket == ADMIN_READY:
             ready += 1
+        elif bucket == ADMIN_NEEDS_CORRECTION:
+            needs_correction += 1
         else:
             with_class_teacher += 1
 
@@ -301,15 +325,40 @@ def get_admin_assessment_detail(*, school, stream_id, term_id=None) -> dict:
             'interest': result_row.interest if result_row else '',
             'head_teacher_remarks': result_row.head_teacher_remarks if result_row else '',
             'subjects': subject_rows,
+            'active_correction': None,
         })
 
+    from assessments.services.corrections import list_active_corrections_for_students
+
+    by_student = list_active_corrections_for_students(
+        school=school,
+        stream_id=stream.id,
+        term_id=term.id,
+        student_ids=[s['id'] for s in students],
+    )
+    for student in students:
+        student['active_correction'] = by_student.get(student['id'])
+
     _apply_positions(students=students, uses_position=config.uses_position())
-    # Admin reviews complete results only. Unfinished students stay a count, not a roster.
+    # Admin reviews ready/released/needs-correction. Pending stay a count only.
+    # Also keep released students who have an open reopen request.
     visible_students = [
         student
         for student in students
-        if student['status'] in (ADMIN_READY, ADMIN_RELEASED)
+        if student['status'] in (ADMIN_READY, ADMIN_RELEASED, ADMIN_NEEDS_CORRECTION)
+        or (
+            student['active_correction']
+            and student['active_correction']['status'] == 'open'
+            and student['active_correction']['kind'] == 'reopen_request'
+        )
     ]
+    pending_reopen_requests = sum(
+        1
+        for student in students
+        if student['active_correction']
+        and student['active_correction']['status'] == 'open'
+        and student['active_correction']['kind'] == 'reopen_request'
+    )
     return {
         'id': str(stream.id),
         'term_id': str(term.id),
@@ -319,6 +368,8 @@ def get_admin_assessment_detail(*, school, stream_id, term_id=None) -> dict:
         'with_class_teacher_count': with_class_teacher,
         'ready_for_you_count': ready,
         'released_count': released,
+        'needs_correction_count': needs_correction,
+        'pending_reopen_requests_count': pending_reopen_requests,
         'students_count': len(visible_students),
         'weights': {
             'continuous_assessment_weight': float(config.continuous_assessment_weight),

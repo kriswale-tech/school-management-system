@@ -309,6 +309,7 @@ class StudentResult(BaseModel):
         AWAITING_APPROVAL = 'awaiting_approval', 'Awaiting approval'
         APPROVED = 'approved', 'Approved'
         RELEASED = 'released', 'Released'
+        NEEDS_CORRECTION = 'needs_correction', 'Needs correction'
 
     student = models.ForeignKey(
         'students.Student',
@@ -431,6 +432,117 @@ class Report(BaseModel):
         return f'report {self.student_id} {self.term_id}'
 
 
-# tentative
 class CorrectionRequest(BaseModel):
-    pass
+    """Audit + workflow for send-back / reopen of selected subjects."""
+
+    class Kind(models.TextChoices):
+        REJECT = 'reject', 'Reject'
+        REOPEN = 'reopen', 'Reopen'
+        REOPEN_REQUEST = 'reopen_request', 'Reopen request'
+
+    class Status(models.TextChoices):
+        OPEN = 'open', 'Open'
+        DECLINED = 'declined', 'Declined'
+        APPLIED = 'applied', 'Applied'
+        RESOLVED = 'resolved', 'Resolved'
+
+    school = models.ForeignKey(
+        'schools.School',
+        on_delete=models.CASCADE,
+        related_name='correction_requests',
+    )
+    student = models.ForeignKey(
+        'students.Student',
+        on_delete=models.CASCADE,
+        related_name='correction_requests',
+    )
+    stream = models.ForeignKey(
+        'academics.ClassStream',
+        on_delete=models.CASCADE,
+        related_name='correction_requests',
+    )
+    term = models.ForeignKey(
+        'schools.Term',
+        on_delete=models.CASCADE,
+        related_name='correction_requests',
+    )
+    kind = models.CharField(max_length=32, choices=Kind.choices)
+    status = models.CharField(
+        max_length=32,
+        choices=Status.choices,
+        default=Status.OPEN,
+    )
+    reason = models.TextField()
+    previous_result_status = models.CharField(max_length=32, blank=True, default='')
+    raised_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='raised_correction_requests',
+    )
+    raised_at = models.DateTimeField()
+    reviewed_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_correction_requests',
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    applied_at = models.DateTimeField(null=True, blank=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-raised_at']
+
+    def __str__(self):
+        return f'{self.kind} {self.status} {self.student_id}'
+
+
+class CorrectionRequestSubject(BaseModel):
+    correction_request = models.ForeignKey(
+        CorrectionRequest,
+        on_delete=models.CASCADE,
+        related_name='subjects',
+    )
+    teaching_assignment = models.ForeignKey(
+        'teachers.TeachingAssignment',
+        on_delete=models.CASCADE,
+        related_name='correction_request_subjects',
+    )
+    subject_label = models.CharField(max_length=255, blank=True, default='')
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['correction_request', 'teaching_assignment'],
+                name='unique_correction_request_teaching_assignment',
+            ),
+        ]
+
+
+class CorrectionRequestEvent(BaseModel):
+    """Append-only audit log for a correction request."""
+
+    correction_request = models.ForeignKey(
+        CorrectionRequest,
+        on_delete=models.CASCADE,
+        related_name='events',
+    )
+    event_type = models.CharField(max_length=64)
+    detail = models.JSONField(default=dict, blank=True)
+    actor = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='correction_request_events',
+    )
+    occurred_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ['occurred_at', 'created_at']
+
+
+# tentative stub removed — CorrectionRequest is implemented above

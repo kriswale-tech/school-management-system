@@ -14,6 +14,7 @@ export type ClassTeacherAssessmentRow = {
   pending_count: number
   ready_count: number
   approved_count: number
+  needs_correction_count: number
 }
 
 type ClassTeacherAssessmentsTableProps = {
@@ -22,12 +23,13 @@ type ClassTeacherAssessmentsTableProps = {
   onViewClass?: (_row: ClassTeacherAssessmentRow) => void
 }
 
-const countClassName = (tone: 'amber' | 'blue' | 'green') =>
+const countClassName = (tone: 'amber' | 'blue' | 'green' | 'orange') =>
   mergeClasses(
     'font-medium',
     tone === 'amber' && 'text-amber-700',
     tone === 'blue' && 'text-blue-700',
     tone === 'green' && 'text-emerald-700',
+    tone === 'orange' && 'text-orange-700',
   )
 
 const ClassTeacherAssessmentsTable = ({
@@ -55,6 +57,7 @@ const ClassTeacherAssessmentsTable = ({
             <Table.HeaderCell className="text-amber-700">Pending</Table.HeaderCell>
             <Table.HeaderCell className="text-blue-700">Awaiting approval</Table.HeaderCell>
             <Table.HeaderCell className="text-emerald-700">Approved</Table.HeaderCell>
+            <Table.HeaderCell className="text-orange-700">Corrections</Table.HeaderCell>
             <Table.HeaderCell>Action</Table.HeaderCell>
           </Table.Row>
         </Table.Head>
@@ -66,6 +69,9 @@ const ClassTeacherAssessmentsTable = ({
               <Table.Cell className={countClassName('amber')}>{row.pending_count}</Table.Cell>
               <Table.Cell className={countClassName('blue')}>{row.ready_count}</Table.Cell>
               <Table.Cell className={countClassName('green')}>{row.approved_count}</Table.Cell>
+              <Table.Cell className={countClassName('orange')}>
+                {row.needs_correction_count}
+              </Table.Cell>
               <Table.Cell>
                 <ActionButton
                   icon="hugeicons:view"

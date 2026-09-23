@@ -9,6 +9,8 @@ import { Capability } from '@/features/auth/capabilities'
 import { useCan } from '@/features/auth/hooks'
 import {
   approveClassTeacherStudents,
+  classTeacherRejectStudent,
+  classTeacherRequestReopen,
   getClassTeacherAssessmentDetail,
 } from '@/features/classes/services'
 import type {
@@ -17,12 +19,14 @@ import type {
 } from '@/features/classes/assessment/types'
 import { getApiErrorMessage, mergeClasses } from '@/utils'
 import BulkApproveModal from './components/BulkApproveModal'
+import CorrectionModal from './components/CorrectionModal'
 
 type StatusFilter = 'all' | ClassAssessmentStudentStatus
 
 const statusLabel = (status: ClassAssessmentStudentStatus) => {
   if (status === 'awaiting_approval') return 'Awaiting approval'
   if (status === 'approved') return 'Approved'
+  if (status === 'needs_correction') return 'Needs correction'
   return 'Pending'
 }
 
@@ -31,6 +35,7 @@ const statusChipClass = (status: ClassAssessmentStudentStatus) =>
     'inline-flex rounded-md px-2 py-0.5 text-xs font-medium',
     status === 'approved' && 'bg-emerald-50 text-emerald-800',
     status === 'awaiting_approval' && 'bg-blue-50 text-blue-800',
+    status === 'needs_correction' && 'bg-orange-50 text-orange-800',
     status === 'pending' && 'bg-amber-50 text-amber-800',
   )
 
@@ -63,6 +68,8 @@ const AssessmentDetail = () => {
   const [attitude, setAttitude] = useState('')
   const [interest, setInterest] = useState('')
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [correctionOpen, setCorrectionOpen] = useState(false)
+  const [correctionMode, setCorrectionMode] = useState<'reject' | 'request_reopen'>('reject')
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: DETAIL_QUERY_KEY(classTeacherId ?? ''),
@@ -128,6 +135,25 @@ const AssessmentDetail = () => {
     onError: (err) => toast.error(getApiErrorMessage(err, 'Unable to approve students')),
   })
 
+  const { mutate: submitCorrection, isPending: isCorrecting } = useMutation({
+    mutationFn: (payload: { teaching_assignment_ids: string[]; reason: string }) => {
+      if (correctionMode === 'request_reopen') {
+        return classTeacherRequestReopen(classTeacherId!, selectedStudentId!, payload)
+      }
+      return classTeacherRejectStudent(classTeacherId!, selectedStudentId!, payload)
+    },
+    onSuccess: (payload) => {
+      toast.success(
+        correctionMode === 'request_reopen'
+          ? 'Reopen requested from admin'
+          : 'Subjects sent back for correction',
+      )
+      queryClient.setQueryData(DETAIL_QUERY_KEY(classTeacherId!), payload.detail)
+      setCorrectionOpen(false)
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Unable to submit correction')),
+  })
+
   const awaitingIds =
     data?.students
       .filter((student) => student.status === 'awaiting_approval')
@@ -142,10 +168,42 @@ const AssessmentDetail = () => {
       count: data?.awaiting_approval_count ?? 0,
     },
     { key: 'approved', label: 'Approved', count: data?.approved_count ?? 0 },
+    {
+      key: 'needs_correction',
+      label: 'Needs correction',
+      count: data?.needs_correction_count ?? 0,
+    },
   ]
 
   const weights = data?.weights
-  const canApproveSelected = selectedStudent?.status === 'awaiting_approval' && canApprove
+  const canApproveSelected =
+    canApprove &&
+    selectedStudent &&
+    (selectedStudent.status === 'awaiting_approval' ||
+      (selectedStudent.status === 'needs_correction' &&
+        selectedStudent.subjects_published_count ===
+          selectedStudent.subjects_required_count &&
+        selectedStudent.subjects_required_count > 0))
+  const activeCorrection = selectedStudent?.active_correction
+  const canRejectSelected =
+    canApprove &&
+    selectedStudent &&
+    !selectedStudent.is_released &&
+    selectedStudent.status !== 'pending' &&
+    !(
+      selectedStudent.active_correction?.kind === 'reopen_request' &&
+      selectedStudent.active_correction.status === 'open'
+    ) &&
+    selectedStudent.subjects.some(
+      (subject) => subject.teaching_assignment_id && subject.is_published,
+    )
+  const canRequestReopen =
+    canApprove &&
+    Boolean(selectedStudent?.is_released) &&
+    !(
+      selectedStudent?.active_correction?.kind === 'reopen_request' &&
+      selectedStudent.active_correction.status === 'open'
+    )
 
   return (
     <div className="space-y-6">
@@ -266,6 +324,22 @@ const AssessmentDetail = () => {
                     {statusLabel(selectedStudent.status)}
                   </span>
                 </div>
+
+                {activeCorrection ? (
+                  <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-3 text-sm text-orange-950">
+                    <p className="font-medium">
+                      {activeCorrection.kind === 'reopen_request' &&
+                      activeCorrection.status === 'open'
+                        ? 'Reopen requested — waiting for admin'
+                        : 'Needs correction'}
+                    </p>
+                    <p className="mt-1 text-orange-900/90">{activeCorrection.reason}</p>
+                    <p className="mt-1 text-xs text-orange-800/80">
+                      Subjects:{' '}
+                      {activeCorrection.subjects.map((subject) => subject.subject_label).join(', ')}
+                    </p>
+                  </div>
+                ) : null}
 
                 <TableWrapper
                   isEmpty={selectedStudent.subjects.length === 0}
@@ -456,6 +530,34 @@ const AssessmentDetail = () => {
                           Approve
                         </Button>
                       ) : null}
+                      {canRejectSelected ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          color="red"
+                          className="max-w-fit py-2 text-sm"
+                          onClick={() => {
+                            setCorrectionMode('reject')
+                            setCorrectionOpen(true)
+                          }}
+                        >
+                          Send back subjects
+                        </Button>
+                      ) : null}
+                      {canRequestReopen ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          color="red"
+                          className="max-w-fit py-2 text-sm"
+                          onClick={() => {
+                            setCorrectionMode('request_reopen')
+                            setCorrectionOpen(true)
+                          }}
+                        >
+                          Request reopen
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -476,6 +578,21 @@ const AssessmentDetail = () => {
             remarks: sharedRemarks,
           })
         }
+      />
+
+      <CorrectionModal
+        open={correctionOpen}
+        title={correctionMode === 'request_reopen' ? 'Request reopen' : 'Send subjects back'}
+        description={
+          correctionMode === 'request_reopen'
+            ? 'Ask admin to reopen selected subjects after release. Include a clear reason.'
+            : 'Select published subjects to return to the subject teacher, and explain why.'
+        }
+        confirmLabel={correctionMode === 'request_reopen' ? 'Request reopen' : 'Send back'}
+        subjects={selectedStudent?.subjects ?? []}
+        isSubmitting={isCorrecting}
+        onClose={() => setCorrectionOpen(false)}
+        onConfirm={(payload) => submitCorrection(payload)}
       />
     </div>
   )

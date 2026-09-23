@@ -68,6 +68,7 @@ const SubjectDetail = () => {
       void queryClient.invalidateQueries({
         queryKey: ['classes', 'teaching-assignment', assignmentId, 'workspace'],
       })
+      void queryClient.invalidateQueries({ queryKey: ['me', 'teaching'] })
       setPublishOpen(false)
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'Unable to publish results')),

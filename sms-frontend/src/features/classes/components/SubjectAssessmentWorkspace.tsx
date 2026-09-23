@@ -68,6 +68,7 @@ const SubjectAssessmentWorkspace = ({
   const [draftMarks, setDraftMarks] = useState<StudentAssessmentMarks[]>([])
   const [editingItem, setEditingItem] = useState<CaItem | null>(null)
   const [pendingDelete, setPendingDelete] = useState<CaItem | null>(null)
+  const [statusFilter, setStatusFilter] = useState<'all' | 'needs_correction'>('all')
 
   const {
     data: workspace,
@@ -85,6 +86,13 @@ const SubjectAssessmentWorkspace = ({
   const gradeBands =
     workspace?.grade_bands?.length ? workspace.grade_bands : DEFAULT_GRADE_BANDS
   const students = workspace?.students ?? []
+  const needsCorrectionCount = students.filter((student) => student.needs_correction).length
+  const visibleStudents = useMemo(() => {
+    if (statusFilter === 'needs_correction') {
+      return students.filter((student) => student.needs_correction)
+    }
+    return students
+  }, [students, statusFilter])
 
   const savedMarks: StudentAssessmentMarks[] = useMemo(
     () =>
@@ -165,6 +173,7 @@ const SubjectAssessmentWorkspace = ({
     onSuccess: () => {
       toast.success('Result unpublished — you can edit again')
       void invalidateWorkspace()
+      void queryClient.invalidateQueries({ queryKey: ['me', 'teaching'] })
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'Unable to unpublish')),
   })
@@ -292,6 +301,11 @@ const SubjectAssessmentWorkspace = ({
     )
   }
 
+  const pillTabs: Array<{ key: 'all' | 'needs_correction'; label: string; count: number }> = [
+    { key: 'all', label: 'All', count: students.length },
+    { key: 'needs_correction', label: 'Needs correction', count: needsCorrectionCount },
+  ]
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
@@ -304,12 +318,47 @@ const SubjectAssessmentWorkspace = ({
         ) : null}
       </div>
 
+      {!isRecording ? (
+        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Student status filter">
+          {pillTabs.map((tab) => {
+            const active = statusFilter === tab.key
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setStatusFilter(tab.key)}
+                className={mergeClasses(
+                  'rounded-full px-3 py-1 text-xs font-medium transition-colors cursor-pointer',
+                  active
+                    ? tab.key === 'needs_correction'
+                      ? 'bg-orange-700 text-white'
+                      : 'bg-slate-900 text-white'
+                    : tab.key === 'needs_correction'
+                      ? 'bg-orange-50 text-orange-800 hover:bg-orange-100'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                )}
+              >
+                {tab.label} {tab.count}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
+
       <TableWrapper
         isLoading={isLoading}
-        isEmpty={!isLoading && students.length === 0}
+        isEmpty={!isLoading && visibleStudents.length === 0}
         emptyState={{
-          title: 'No students to assess',
-          description: 'Students on this subject roster will appear in the mark sheet.',
+          title:
+            statusFilter === 'needs_correction'
+              ? 'No students need correction'
+              : 'No students to assess',
+          description:
+            statusFilter === 'needs_correction'
+              ? 'Students sent back for this subject will appear here.'
+              : 'Students on this subject roster will appear in the mark sheet.',
           icon: 'hugeicons:student',
         }}
         skeletonColumns={isRecording ? 5 : 6}
@@ -377,7 +426,7 @@ const SubjectAssessmentWorkspace = ({
               </Table.Row>
             </Table.Head>
             <Table.Body>
-              {students.map((student) => {
+              {visibleStudents.map((student) => {
                 const marks = marksByStudent.get(student.id) ?? {
                   student_id: student.id,
                   ca: {},
@@ -394,6 +443,10 @@ const SubjectAssessmentWorkspace = ({
                   : student.status
                 const examDisplay = isRecording ? marks.exam : student.exam
                 const locked = student.is_published
+                const correctionReason =
+                  student.needs_correction && student.correction_reason
+                    ? student.correction_reason
+                    : null
 
                 return (
                   <Table.Row key={student.id}>
@@ -405,6 +458,11 @@ const SubjectAssessmentWorkspace = ({
                           <p className="text-xs font-normal text-slate-500">
                             {student.student_id}
                           </p>
+                          {correctionReason ? (
+                            <p className="text-xs font-normal text-orange-700 line-clamp-2">
+                              {correctionReason}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                     </Table.Cell>
@@ -471,14 +529,16 @@ const SubjectAssessmentWorkspace = ({
                             <span
                               className={mergeClasses(
                                 'inline-flex rounded-md px-2 py-0.5 text-xs font-medium',
-                                status === 'Published'
-                                  ? 'bg-emerald-50 text-emerald-800'
-                                  : status === 'Complete'
-                                    ? 'bg-blue-50 text-blue-800'
-                                    : 'bg-slate-100 text-slate-600',
+                                student.needs_correction
+                                  ? 'bg-orange-50 text-orange-800'
+                                  : status === 'Published'
+                                    ? 'bg-emerald-50 text-emerald-800'
+                                    : status === 'Complete'
+                                      ? 'bg-blue-50 text-blue-800'
+                                      : 'bg-slate-100 text-slate-600',
                               )}
                             >
-                              {status}
+                              {student.needs_correction ? 'Needs correction' : status}
                             </span>
                             {canRecord && status === 'Published' ? (
                               <ActionButton

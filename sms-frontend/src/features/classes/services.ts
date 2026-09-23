@@ -26,6 +26,7 @@ import type {
   CaItemWritePayload,
   ClassTeacherAssessmentDetail,
   ClassTeacherAssessmentOverview,
+  CorrectionRequest,
   SaveMarksPayload,
 } from './assessment/types'
 
@@ -343,6 +344,68 @@ export const approveClassTeacherStudents = async (
 ): Promise<ClassTeacherAssessmentDetail> => {
   const response = await api.post<ClassTeacherAssessmentDetail>(
     `/academics/assessments/class-teachers/${classTeacherId}/approve/`,
+    payload,
+  )
+  return response.data
+}
+
+export type CorrectionActionPayload = {
+  teaching_assignment_ids: string[]
+  reason: string
+}
+
+export type CorrectionActionResponse<TDetail> = {
+  correction: CorrectionRequest
+  detail: TDetail
+}
+
+export const adminCorrectStudent = async (
+  streamId: string,
+  studentId: string,
+  payload: CorrectionActionPayload,
+  termId?: string,
+): Promise<CorrectionActionResponse<AdminAssessmentDetail>> => {
+  const response = await api.post<CorrectionActionResponse<AdminAssessmentDetail>>(
+    `/academics/assessments/admin/classes/${streamId}/students/${studentId}/correction/`,
+    payload,
+    { params: termId ? { term_id: termId } : undefined },
+  )
+  return response.data
+}
+
+export const reviewAdminCorrection = async (
+  streamId: string,
+  correctionId: string,
+  approve: boolean,
+  termId?: string,
+): Promise<CorrectionActionResponse<AdminAssessmentDetail>> => {
+  const response = await api.post<CorrectionActionResponse<AdminAssessmentDetail>>(
+    `/academics/assessments/admin/classes/${streamId}/corrections/${correctionId}/review/`,
+    { approve },
+    { params: termId ? { term_id: termId } : undefined },
+  )
+  return response.data
+}
+
+export const classTeacherRejectStudent = async (
+  classTeacherId: string,
+  studentId: string,
+  payload: CorrectionActionPayload,
+): Promise<CorrectionActionResponse<ClassTeacherAssessmentDetail>> => {
+  const response = await api.post<CorrectionActionResponse<ClassTeacherAssessmentDetail>>(
+    `/academics/assessments/class-teachers/${classTeacherId}/students/${studentId}/reject/`,
+    payload,
+  )
+  return response.data
+}
+
+export const classTeacherRequestReopen = async (
+  classTeacherId: string,
+  studentId: string,
+  payload: CorrectionActionPayload,
+): Promise<CorrectionActionResponse<ClassTeacherAssessmentDetail>> => {
+  const response = await api.post<CorrectionActionResponse<ClassTeacherAssessmentDetail>>(
+    `/academics/assessments/class-teachers/${classTeacherId}/students/${studentId}/request-reopen/`,
     payload,
   )
   return response.data

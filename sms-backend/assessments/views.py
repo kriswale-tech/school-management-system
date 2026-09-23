@@ -14,6 +14,9 @@ from assessments.serializers import (
     CaItemWriteSerializer,
     ClassTeacherAssessmentDetailSerializer,
     ClassTeacherAssessmentOverviewSerializer,
+    CorrectionActionResponseSerializer,
+    CorrectionActionSerializer,
+    CorrectionReviewSerializer,
     PublishStudentsSerializer,
     SaveMarksSerializer,
     StoredStudentReportSerializer,
@@ -24,6 +27,12 @@ from assessments.services.admin_overview import (
     get_admin_assessment_filter_options,
     list_admin_assessment_overview,
     release_admin_students,
+)
+from assessments.services.corrections import (
+    reject_class_teacher_student,
+    reject_or_reopen_student,
+    request_reopen_student,
+    review_reopen_request,
 )
 from assessments.services.report import get_student_report_preview
 from assessments.services.report_pdf import generate_student_report, get_stored_student_report
@@ -380,3 +389,112 @@ class ClassTeacherApproveStudentsView(SchoolScopedAPIView):
             interest=serializer.validated_data.get('interest', ''),
         )
         return Response(ClassTeacherAssessmentDetailSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Assessments'],
+    summary='Admin reject or reopen selected subjects for a student',
+    request=CorrectionActionSerializer,
+    responses={200: CorrectionActionResponseSerializer},
+)
+class AdminStudentCorrectionView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.ASSESSMENTS_RELEASE
+
+    def post(self, request, stream_id, student_id):
+        serializer = CorrectionActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = reject_or_reopen_student(
+            school=self.school,
+            membership=self.membership,
+            stream_id=stream_id,
+            student_id=student_id,
+            teaching_assignment_ids=serializer.validated_data['teaching_assignment_ids'],
+            reason=serializer.validated_data['reason'],
+            term_id=request.query_params.get('term_id') or None,
+        )
+        return Response({
+            'correction': payload['correction'],
+            'detail': AdminAssessmentDetailSerializer(payload['detail']).data,
+        })
+
+
+@extend_schema(
+    tags=['Assessments'],
+    summary='Admin approve or decline a reopen request',
+    request=CorrectionReviewSerializer,
+    responses={200: CorrectionActionResponseSerializer},
+)
+class AdminCorrectionReviewView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.ASSESSMENTS_RELEASE
+
+    def post(self, request, stream_id, correction_id):
+        serializer = CorrectionReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = review_reopen_request(
+            school=self.school,
+            membership=self.membership,
+            stream_id=stream_id,
+            correction_id=correction_id,
+            approve=serializer.validated_data['approve'],
+            term_id=request.query_params.get('term_id') or None,
+        )
+        return Response({
+            'correction': payload['correction'],
+            'detail': AdminAssessmentDetailSerializer(payload['detail']).data,
+        })
+
+
+@extend_schema(
+    tags=['Assessments'],
+    summary='Class teacher reject selected subjects (pre-release)',
+    request=CorrectionActionSerializer,
+    responses={200: CorrectionActionResponseSerializer},
+)
+class ClassTeacherRejectStudentView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.ASSESSMENTS_APPROVE
+
+    def post(self, request, class_teacher_id, student_id):
+        serializer = CorrectionActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = reject_class_teacher_student(
+            school=self.school,
+            membership=self.membership,
+            class_teacher_id=class_teacher_id,
+            student_id=student_id,
+            teaching_assignment_ids=serializer.validated_data['teaching_assignment_ids'],
+            reason=serializer.validated_data['reason'],
+        )
+        return Response({
+            'correction': payload['correction'],
+            'detail': ClassTeacherAssessmentDetailSerializer(payload['detail']).data,
+        })
+
+
+@extend_schema(
+    tags=['Assessments'],
+    summary='Class teacher request reopen after release',
+    request=CorrectionActionSerializer,
+    responses={200: CorrectionActionResponseSerializer},
+)
+class ClassTeacherRequestReopenView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.ASSESSMENTS_APPROVE
+
+    def post(self, request, class_teacher_id, student_id):
+        serializer = CorrectionActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = request_reopen_student(
+            school=self.school,
+            membership=self.membership,
+            class_teacher_id=class_teacher_id,
+            student_id=student_id,
+            teaching_assignment_ids=serializer.validated_data['teaching_assignment_ids'],
+            reason=serializer.validated_data['reason'],
+        )
+        return Response({
+            'correction': payload['correction'],
+            'detail': ClassTeacherAssessmentDetailSerializer(payload['detail']).data,
+        })

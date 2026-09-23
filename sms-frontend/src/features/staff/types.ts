@@ -1,3 +1,5 @@
+import type { CorrectionInboxItem } from '@/features/classes/assessment/types'
+
 export type StaffGender = 'male' | 'female'
 
 export type StaffQueryParams = {
@@ -124,6 +126,7 @@ export interface StaffDeskTeachingAssignment {
   subject_group_name: string | null
   display_class_name: string
   students_count: number
+  needs_correction_count?: number
   view_stream_id: string | null
 }
 
@@ -131,6 +134,8 @@ export interface StaffDeskTeachingAssignment {
 export interface MyTeaching {
   is_class_teacher: boolean
   is_subject_teacher: boolean
+  corrections_inbox_count: number
+  corrections_inbox: CorrectionInboxItem[]
   class_teacher_assignments: StaffDeskClassTeacherAssignment[]
   teaching_assignments: StaffDeskTeachingAssignment[]
 }

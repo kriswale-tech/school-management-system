@@ -12,6 +12,7 @@ import {
 } from '@/features/classes/services'
 import { getApiErrorMessage } from '@/utils'
 import AdminAssessmentsTable from './components/AdminAssessmentsTable'
+import CorrectionsInbox from './components/CorrectionsInbox'
 
 const FILTERS_QUERY_KEY = ['assessments', 'admin', 'filters'] as const
 
@@ -19,6 +20,7 @@ const AdminAssessments = () => {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [termSelection, setTermSelection] = useState<FilterSelection | undefined>(undefined)
+  const [inboxOpen, setInboxOpen] = useState(false)
 
   const { data: filters, isLoading: filtersLoading } = useQuery({
     queryKey: FILTERS_QUERY_KEY,
@@ -38,7 +40,13 @@ const AdminAssessments = () => {
   const rows = useMemo(() => {
     const termText = search.trim().toLowerCase()
     return (data?.results ?? []).filter((row) => {
-      if (row.ready_for_you_count === 0 && row.released_count === 0) return false
+      if (
+        row.ready_for_you_count === 0 &&
+        row.released_count === 0 &&
+        (row.needs_correction_count ?? 0) === 0
+      ) {
+        return false
+      }
       if (!termText) return true
       const teacher = row.class_teacher_name?.toLowerCase() ?? ''
       return row.display_name.toLowerCase().includes(termText) || teacher.includes(termText)
@@ -47,7 +55,8 @@ const AdminAssessments = () => {
 
   const classCount = rows.length
   const studentCount = rows.reduce(
-    (total, row) => total + row.ready_for_you_count + row.released_count,
+    (total, row) =>
+      total + row.ready_for_you_count + row.released_count + (row.needs_correction_count ?? 0),
     0,
   )
   const fullyReady = data?.classes_fully_ready_count ?? 0
@@ -62,6 +71,8 @@ const AdminAssessments = () => {
     value: item.id,
     label: item.label,
   }))
+  const inbox = data?.corrections_inbox ?? []
+  const inboxCount = data?.corrections_inbox_count ?? inbox.length
 
   return (
     <div className="space-y-6">
@@ -97,7 +108,16 @@ const AdminAssessments = () => {
 
       <div className="bg-white p-4 custom-shadow-md space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-medium text-slate-900">Classes</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-medium text-slate-900">Classes</h2>
+            <button
+              type="button"
+              onClick={() => setInboxOpen(true)}
+              className="rounded-full bg-orange-50 px-3 py-1 text-xs font-medium text-orange-800 hover:bg-orange-100 cursor-pointer"
+            >
+              Reopen requests {inboxCount}
+            </button>
+          </div>
           <div className="flex items-center gap-4 text-sm text-slate-600">
             <div className="flex items-center gap-1.5">
               <Icon icon="hugeicons:notebook-01" className="size-4" aria-hidden />
@@ -114,6 +134,18 @@ const AdminAssessments = () => {
           </div>
         </div>
 
+        <CorrectionsInbox
+          open={inboxOpen}
+          onClose={() => setInboxOpen(false)}
+          items={inbox}
+          title="Reopen requests"
+          emptyLabel="No reopen requests from class teachers right now."
+          onOpenItem={(item) => {
+            const query = termId ? `?term=${termId}` : ''
+            navigate(`/assessments/classes/${item.stream_id}${query}`)
+          }}
+        />
+
         {isError ? (
           <p className="text-sm text-red-600 py-6" role="alert">
             {getApiErrorMessage(error, 'Unable to load assessments.')}
@@ -125,8 +157,8 @@ const AdminAssessments = () => {
             rows={rows}
             isLoading={isLoading}
             onViewClass={(row) => {
-              const term = termId ? `?term=${termId}` : ''
-              navigate(`/assessments/classes/${row.id}${term}`)
+              const query = termId ? `?term=${termId}` : ''
+              navigate(`/assessments/classes/${row.id}${query}`)
             }}
           />
         )}

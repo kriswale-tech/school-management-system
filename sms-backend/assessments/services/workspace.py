@@ -50,7 +50,8 @@ NOT_COMPLETE_MESSAGE = (
 )
 NOT_PUBLISHED_MESSAGE = 'Only published students can be unpublished.'
 CLASS_APPROVED_MESSAGE = (
-    'Cannot unpublish — the class teacher has already approved this student.'
+    'Cannot unpublish — the class teacher has already approved this student, '
+    'or results have been released. Use the correction flow instead.'
 )
 
 
@@ -141,6 +142,17 @@ def get_workspace(*, school, membership, assignment_id) -> dict:
     }
 
     bands = list(config.grade_bands.all())
+    from assessments.models import CorrectionRequest, CorrectionRequestSubject
+
+    correction_by_student = {
+        str(row.correction_request.student_id): row.correction_request
+        for row in CorrectionRequestSubject.objects.filter(
+            teaching_assignment_id=assignment.id,
+            correction_request__status=CorrectionRequest.Status.APPLIED,
+            correction_request__school=school,
+        ).select_related('correction_request')
+    }
+
     results = []
     for student in students_payload['results']:
         student_id = student['id']
@@ -158,6 +170,7 @@ def get_workspace(*, school, membership, assignment_id) -> dict:
         )
         exam_contrib = compute_exam_contribution(exam_mark, config.exam_weight)
         total = compute_total(class_score, exam_contrib)
+        correction = correction_by_student.get(str(student_id))
         results.append({
             **student,
             'ca': ca_payload,
@@ -173,6 +186,8 @@ def get_workspace(*, school, membership, assignment_id) -> dict:
                 is_published=is_published,
             ),
             'is_published': is_published,
+            'needs_correction': correction is not None and not is_published,
+            'correction_reason': correction.reason if correction else '',
         })
 
     return {
@@ -388,13 +403,17 @@ def save_marks(*, school, membership, assignment_id, students: list[dict]) -> di
     )
 
 
-def _student_is_class_approved(*, assignment, student_id) -> bool:
+def _student_is_class_locked(*, assignment, student_id) -> bool:
+    """Block subject-teacher unpublish once class teacher approved or admin released."""
     class_level_id = assignment.class_subject.class_level_id
     qs = StudentResult.objects.filter(
         student_id=student_id,
         term_id=assignment.term_id,
         class_level_id=class_level_id,
-        status=StudentResult.Status.APPROVED,
+        status__in=(
+            StudentResult.Status.APPROVED,
+            StudentResult.Status.RELEASED,
+        ),
     )
     if assignment.stream_id:
         return qs.filter(stream_id=assignment.stream_id).exists() or qs.filter(
@@ -492,7 +511,7 @@ def unpublish_students(*, school, membership, assignment_id, student_ids: list) 
         ).first()
         if subject_row is None or not subject_row.is_published:
             raise ValidationError({'detail': NOT_PUBLISHED_MESSAGE})
-        if _student_is_class_approved(assignment=assignment, student_id=student_id):
+        if _student_is_class_locked(assignment=assignment, student_id=student_id):
             raise ValidationError({'detail': CLASS_APPROVED_MESSAGE})
         subject_row.is_published = False
         subject_row.published_at = None
