@@ -245,3 +245,7 @@ export type StudentFeesQueryParams = {
   academic_year?: string
   term?: string
 }
+
+export type StudentAssessmentsQueryParams = {
+  term?: string
+}

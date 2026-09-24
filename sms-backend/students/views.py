@@ -4,6 +4,12 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from core.pagination import StandardResultsSetPagination, paginated_schema
+from assessments.serializers import StudentAssessmentSerializer, StoredStudentReportSerializer
+from assessments.services.admin_overview import get_student_assessment_detail
+from assessments.services.report_pdf import (
+    generate_student_profile_report,
+    get_student_profile_report,
+)
 from fees.services import get_student_fee_history, get_student_fees, list_student_payments
 from shared.views import SchoolScopedAPIView
 from students.filters import ParentFilter, StudentEnrollmentFilter
@@ -202,6 +208,87 @@ class StudentDetailView(SchoolScopedAPIView):
             **serializer.validated_data,
         )
         return Response(StudentDetailSerializer(detail).data)
+
+
+class StudentAssessmentView(SchoolScopedAPIView):
+    @extend_schema(
+        tags=['Students'],
+        summary='Student assessment for a term',
+        description=(
+            'Returns this student’s subject scores, remarks, and class position '
+            'for a term. Defaults to the active term when the student is enrolled '
+            'there, otherwise the most recent enrollment. Term options are the '
+            'terms this student has been enrolled in.'
+        ),
+        parameters=[
+            OpenApiParameter(
+                name='term',
+                type=str,
+                description='Optional term UUID. Defaults as described above.',
+            ),
+        ],
+        responses={200: StudentAssessmentSerializer},
+    )
+    def get(self, request, student_id):
+        payload = get_student_assessment_detail(
+            school=self.school,
+            student_id=student_id,
+            term_id=request.query_params.get('term') or None,
+        )
+        return Response(StudentAssessmentSerializer(payload).data)
+
+
+class StudentAssessmentReportView(SchoolScopedAPIView):
+    @extend_schema(
+        tags=['Students'],
+        summary='Stored student report PDF',
+        description=(
+            'Returns the signed URL for this student’s stored report for a term. '
+            '404 if it has not been generated yet.'
+        ),
+        parameters=[
+            OpenApiParameter(
+                name='term',
+                type=str,
+                description='Optional term UUID. Defaults to the school active term.',
+            ),
+        ],
+        responses={200: StoredStudentReportSerializer},
+    )
+    def get(self, request, student_id):
+        payload = get_student_profile_report(
+            school=self.school,
+            student_id=student_id,
+            term_id=request.query_params.get('term') or None,
+        )
+        return Response(StoredStudentReportSerializer(payload).data)
+
+
+class StudentAssessmentReportGenerateView(SchoolScopedAPIView):
+    @extend_schema(
+        tags=['Students'],
+        summary='Generate student report PDF',
+        description=(
+            'Generates or overwrites the report PDF for a released student in '
+            'the selected term, uploads it, and returns a signed URL.'
+        ),
+        parameters=[
+            OpenApiParameter(
+                name='term',
+                type=str,
+                description='Optional term UUID. Defaults to the school active term.',
+            ),
+        ],
+        responses={200: StoredStudentReportSerializer},
+    )
+    def post(self, request, student_id):
+        payload = generate_student_profile_report(
+            school=self.school,
+            membership=self.membership,
+            student_id=student_id,
+            term_id=request.query_params.get('term') or None,
+        )
+        return Response(StoredStudentReportSerializer(payload).data)
 
 
 class StudentGuardianListCreateView(SchoolScopedAPIView):

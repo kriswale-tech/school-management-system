@@ -252,26 +252,14 @@ def _result_row(*, student_id, class_level_id, stream_id, term_id):
     ).first()
 
 
-def get_admin_assessment_detail(*, school, stream_id, term_id=None) -> dict:
-    term = resolve_term(school, term_id)
-    stream = _load_stream(school=school, stream_id=stream_id)
+def _serialize_stream_assessment_students(*, school, stream, term, config, bands) -> list[dict]:
+    """Serialize every enrolled student in the stream, with class positions applied."""
     class_level = stream.class_level
-    config = get_term_assessment_config(
-        level_id=class_level.level_id,
-        term_id=term.id,
-    )
-    bands = list(config.grade_bands.all())
-    teacher = _teacher_for_entry(
-        {'class_level_id': class_level.id, 'stream_id': stream.id},
-        _class_teachers_by_key(school=school, term=term),
-    )
-
     enrollments = list(
         ClassEnrollment.objects.filter(term_id=term.id, stream_id=stream.id)
         .select_related('student')
         .order_by('student__last_name', 'student__first_name')
     )
-    with_class_teacher = ready = released = needs_correction = 0
     students = []
     for enrollment in enrollments:
         student = enrollment.student
@@ -281,16 +269,6 @@ def get_admin_assessment_detail(*, school, stream_id, term_id=None) -> dict:
             stream_id=stream.id,
             term_id=term.id,
         )
-        bucket = _bucket_from_status(result_row.status if result_row else None)
-        if bucket == ADMIN_RELEASED:
-            released += 1
-        elif bucket == ADMIN_READY:
-            ready += 1
-        elif bucket == ADMIN_NEEDS_CORRECTION:
-            needs_correction += 1
-        else:
-            with_class_teacher += 1
-
         subject_rows = [
             _serialize_subject_row(
                 ctx=ctx,
@@ -309,7 +287,7 @@ def get_admin_assessment_detail(*, school, stream_id, term_id=None) -> dict:
             'id': str(student.id),
             'full_name': _student_full_name(student),
             'student_id': student.student_id,
-            'status': bucket,
+            'status': _bucket_from_status(result_row.status if result_row else None),
             'subjects_published_count': sum(1 for row in subject_rows if row['is_published']),
             'subjects_required_count': len(subject_rows),
             'class_teacher_remarks': result_row.remarks if result_row else '',
@@ -333,6 +311,33 @@ def get_admin_assessment_detail(*, school, stream_id, term_id=None) -> dict:
         student['active_correction'] = by_student.get(student['id'])
 
     _apply_positions(students=students, uses_position=config.uses_position())
+    return students
+
+
+def get_admin_assessment_detail(*, school, stream_id, term_id=None) -> dict:
+    term = resolve_term(school, term_id)
+    stream = _load_stream(school=school, stream_id=stream_id)
+    class_level = stream.class_level
+    config = get_term_assessment_config(
+        level_id=class_level.level_id,
+        term_id=term.id,
+    )
+    bands = list(config.grade_bands.all())
+    teacher = _teacher_for_entry(
+        {'class_level_id': class_level.id, 'stream_id': stream.id},
+        _class_teachers_by_key(school=school, term=term),
+    )
+    students = _serialize_stream_assessment_students(
+        school=school,
+        stream=stream,
+        term=term,
+        config=config,
+        bands=bands,
+    )
+    with_class_teacher = sum(1 for s in students if s['status'] == ADMIN_WITH_CLASS_TEACHER)
+    ready = sum(1 for s in students if s['status'] == ADMIN_READY)
+    released = sum(1 for s in students if s['status'] == ADMIN_RELEASED)
+    needs_correction = sum(1 for s in students if s['status'] == ADMIN_NEEDS_CORRECTION)
     # Admin reviews ready/released/needs-correction. Pending stay a count only.
     # Also keep released students who have an open reopen request.
     visible_students = [
@@ -372,6 +377,117 @@ def get_admin_assessment_detail(*, school, stream_id, term_id=None) -> dict:
         'uses_grades': config.uses_grades(),
         'uses_position': config.uses_position(),
         'students': visible_students,
+    }
+
+
+def _term_label(term) -> str:
+    return f'{term.academic_year.academic_year} · {term.get_term_display()}'
+
+
+def _empty_student_assessment(*, term=None, active_term=None, terms=None) -> dict:
+    return {
+        'term_id': str(term.id) if term else None,
+        'term_label': _term_label(term) if term else None,
+        'active_term_id': str(active_term.id) if active_term else None,
+        'terms': terms or [],
+        'enrolled': False,
+        'stream_id': None,
+        'display_name': None,
+        'class_teacher_name': None,
+        'weights': None,
+        'result_type': None,
+        'uses_grades': False,
+        'uses_position': False,
+        'student': None,
+    }
+
+
+def get_student_assessment_detail(*, school, student_id, term_id=None) -> dict:
+    """One student's assessment for a term, with positions vs the class cohort."""
+    from students.services import get_student
+
+    student = get_student(school=school, student_id=student_id)
+    enrollments = list(
+        ClassEnrollment.objects.filter(student=student)
+        .select_related(
+            'term__academic_year',
+            'stream',
+            'stream__class_level',
+            'class_level',
+        )
+        .order_by('-term__start_date', '-term__created_at')
+    )
+    active_term = (
+        Term.objects.filter(school=school, is_active=True)
+        .select_related('academic_year')
+        .first()
+    )
+
+    terms = []
+    seen = set()
+    for enrollment in enrollments:
+        enrolled_term = enrollment.term
+        if enrolled_term.id in seen:
+            continue
+        seen.add(enrolled_term.id)
+        year = enrolled_term.academic_year
+        terms.append({
+            'id': str(enrolled_term.id),
+            'label': _term_label(enrolled_term),
+            'is_active': bool(active_term and enrolled_term.id == active_term.id),
+            'academic_year_id': str(year.id),
+            'academic_year': year.academic_year,
+        })
+
+    if term_id:
+        term = resolve_term(school, term_id)
+    elif active_term and any(item.term_id == active_term.id for item in enrollments):
+        term = active_term
+    elif enrollments:
+        term = enrollments[0].term
+    else:
+        return _empty_student_assessment(term=active_term, active_term=active_term, terms=terms)
+
+    enrollment = next((item for item in enrollments if item.term_id == term.id), None)
+    if enrollment is None:
+        return _empty_student_assessment(term=term, active_term=active_term, terms=terms)
+
+    stream = enrollment.stream
+    class_level = enrollment.class_level
+    config = get_term_assessment_config(
+        level_id=class_level.level_id,
+        term_id=term.id,
+    )
+    bands = list(config.grade_bands.all())
+    teacher = _teacher_for_entry(
+        {'class_level_id': class_level.id, 'stream_id': stream.id},
+        _class_teachers_by_key(school=school, term=term),
+    )
+    students = _serialize_stream_assessment_students(
+        school=school,
+        stream=stream,
+        term=term,
+        config=config,
+        bands=bands,
+    )
+    row = next((item for item in students if item['id'] == str(student.id)), None)
+    return {
+        'term_id': str(term.id),
+        'term_label': _term_label(term),
+        'active_term_id': str(active_term.id) if active_term else None,
+        'terms': terms,
+        'enrolled': True,
+        'stream_id': str(stream.id),
+        'display_name': stream.full_name,
+        'class_teacher_name': _teacher_name(teacher),
+        'weights': {
+            'continuous_assessment_weight': float(config.continuous_assessment_weight),
+            'exam_weight': float(config.exam_weight),
+        },
+        'result_type': config.result_type,
+        'uses_grades': config.uses_grades(),
+        'uses_position': config.uses_position(),
+        'student': row,
     }
 
 

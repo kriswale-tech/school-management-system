@@ -280,3 +280,19 @@ API:
 - also `GET /academics/assessments/admin/classes/:streamId/?term_id=`, `POST …/release/`
 
 Report page actions: **Open in new tab** + **Share** when ready; **Regenerate** only if load/generate fails.
+
+### Student detail — Reports & Assessment (`/students/:id`)
+
+Read-only view of **this student** for a selected academic year & term (same term picker pattern as the Fees tab).
+
+Header is one row: class name, class teacher, and year/term on the left; role-neutral status chip and term filter on the right. Status labels (any role): **In progress** · **Awaiting release** · **Released** · **Needs correction**.
+
+- **Table:** subject + instructor, class score (weight %), exams score (weight %), total (100 %), grade and/or position, band remark.
+- **Under the table:** overall position (when the level uses position), then conduct, attitude, interest, class-teacher remarks, head-teacher remarks.
+- **Released reports:** **Generate report** is shown under the remarks. The PDF is not loaded on landing. After click, the stored Cloudflare file is shown **inline** if it exists; otherwise it is generated and then shown. **Open in new tab** + **Share** when ready; **Regenerate** if load/generate fails. Remarks cannot be edited here.
+
+Term options come from the student’s class enrollments, not the admin assessment filter API.
+
+API: `GET /students/:id/assessments/?term=` — same student payload as admin class detail (scores computed on read from that term’s `AssessmentConfig`; positions vs the class cohort). Report: `GET /students/:id/assessments/report/?term=` (404 if missing), `POST /students/:id/assessments/report/generate/?term=` (released students only). Anyone who can open the student tab can view/generate a released report.
+
+---

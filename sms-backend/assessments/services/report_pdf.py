@@ -194,3 +194,49 @@ def generate_student_report(
     report.generated_by = getattr(membership, 'user', None)
     report.save()
     return serialize_stored_report(report)
+
+
+def resolve_student_report_target(*, school, student_id, term_id=None):
+    """Resolve stream + term from the student's enrollment."""
+    from students.models import ClassEnrollment
+    from students.services import get_student
+
+    student = get_student(school=school, student_id=student_id)
+    term = resolve_term(school, term_id)
+    enrollment = (
+        ClassEnrollment.objects.filter(student=student, term_id=term.id)
+        .select_related('stream')
+        .first()
+    )
+    if enrollment is None:
+        raise NotFound('Student is not enrolled in this term.')
+    return student, enrollment.stream, term
+
+
+def get_student_profile_report(*, school, student_id, term_id=None) -> dict:
+    student, stream, term = resolve_student_report_target(
+        school=school,
+        student_id=student_id,
+        term_id=term_id,
+    )
+    return get_stored_student_report(
+        school=school,
+        stream_id=stream.id,
+        student_id=student.id,
+        term_id=term.id,
+    )
+
+
+def generate_student_profile_report(*, school, membership, student_id, term_id=None) -> dict:
+    student, stream, term = resolve_student_report_target(
+        school=school,
+        student_id=student_id,
+        term_id=term_id,
+    )
+    return generate_student_report(
+        school=school,
+        membership=membership,
+        stream_id=stream.id,
+        student_id=student.id,
+        term_id=term.id,
+    )

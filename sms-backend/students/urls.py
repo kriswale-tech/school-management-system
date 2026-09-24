@@ -7,6 +7,9 @@ from students.bulk_views import (
 )
 from students.views import (
     ParentListView,
+    StudentAssessmentReportGenerateView,
+    StudentAssessmentReportView,
+    StudentAssessmentView,
     StudentCurrentYearFeesView,
     StudentDetailView,
     StudentFeeHistoryView,
@@ -27,6 +30,21 @@ urlpatterns = [
         '<uuid:student_id>/',
         StudentDetailView.as_view(),
         name='student-detail',
+    ),
+    path(
+        '<uuid:student_id>/assessments/',
+        StudentAssessmentView.as_view(),
+        name='student-assessments',
+    ),
+    path(
+        '<uuid:student_id>/assessments/report/',
+        StudentAssessmentReportView.as_view(),
+        name='student-assessment-report',
+    ),
+    path(
+        '<uuid:student_id>/assessments/report/generate/',
+        StudentAssessmentReportGenerateView.as_view(),
+        name='student-assessment-report-generate',
     ),
     path(
         '<uuid:student_id>/fees/',

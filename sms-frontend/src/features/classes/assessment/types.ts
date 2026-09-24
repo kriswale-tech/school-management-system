@@ -226,6 +226,22 @@ export type AdminAssessmentDetailStudent = {
   active_correction: CorrectionRequest | null
 }
 
+export type StudentAssessment = {
+  term_id: string | null
+  term_label: string | null
+  active_term_id: string | null
+  terms: AdminAssessmentTermOption[]
+  enrolled: boolean
+  stream_id: string | null
+  display_name: string | null
+  class_teacher_name: string | null
+  weights: AssessmentWeights | null
+  result_type: string | null
+  uses_grades: boolean
+  uses_position: boolean
+  student: AdminAssessmentDetailStudent | null
+}
+
 export type AdminAssessmentDetail = {
   id: string
   term_id: string

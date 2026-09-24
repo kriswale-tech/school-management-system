@@ -14,10 +14,12 @@ import type {
   StudentGuardian,
   StudentOnboardPayload,
   StudentPayment,
+  StudentAssessmentsQueryParams,
   StudentQueryParams,
   StudentStats,
   StudentYearFees,
 } from './types'
+import type { StudentAssessment, StoredStudentReport } from '@/features/classes/assessment/types'
 
 export const getStudents = async (
   params: StudentQueryParams,
@@ -108,5 +110,32 @@ export const getStudentPayments = async (
 ): Promise<StudentPayment[]> => {
   const url = getQueryUrl(`/students/${studentId}/payments/`, params)
   const response = await api.get<StudentPayment[]>(url)
+  return response.data
+}
+
+export const getStudentAssessments = async (
+  studentId: string,
+  params: StudentAssessmentsQueryParams = {},
+): Promise<StudentAssessment> => {
+  const url = getQueryUrl(`/students/${studentId}/assessments/`, params)
+  const response = await api.get<StudentAssessment>(url)
+  return response.data
+}
+
+export const getStudentAssessmentReport = async (
+  studentId: string,
+  params: StudentAssessmentsQueryParams = {},
+): Promise<StoredStudentReport> => {
+  const url = getQueryUrl(`/students/${studentId}/assessments/report/`, params)
+  const response = await api.get<StoredStudentReport>(url)
+  return response.data
+}
+
+export const generateStudentAssessmentReport = async (
+  studentId: string,
+  params: StudentAssessmentsQueryParams = {},
+): Promise<StoredStudentReport> => {
+  const url = getQueryUrl(`/students/${studentId}/assessments/report/generate/`, params)
+  const response = await api.post<StoredStudentReport>(url)
   return response.data
 }

@@ -180,7 +180,7 @@ One-time guided configuration for a new school (see steps above).
 - List and search students  
 - Onboard a student (bio, class, guardians)  
 - Bulk import  
-- Student detail (bio, guardians, fee balance/history)  
+- Student detail (bio, guardians, fee balance/history, reports & assessment)  
 
 ### Classes
 

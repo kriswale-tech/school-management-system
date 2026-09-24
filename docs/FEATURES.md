@@ -60,7 +60,7 @@ Checklist by domain. Status values:
 | Bulk import | Yes | Yes | Done |
 | Class enrollment per term | Yes | Via onboard / class views | Done |
 | Fees on student (read) | Yes | Yes | Done |
-| Reports & assessment tab | No scoring API | Placeholder | Stub |
+| Reports & assessment tab | Yes (`GET /students/:id/assessments/`) | Student detail tab | Done |
 | Promotion / transfer | — | — | Not started |
 | Parent login portal | — | — | Not started |
 
@@ -97,7 +97,7 @@ Checklist by domain. Status values:
 | Results / subject scores / reports | Empty models | — | Stub |
 | Correction requests | Empty model | — | Stub |
 | Assessments nav page | No APIs | Placeholder | Stub |
-| Report card generation | — | — | Not started |
+| Report card generation | Yes (R2 PDF; released only) | Assessments report page + student Reports tab (inline) | Done |
 
 ## Dashboard & shell
 

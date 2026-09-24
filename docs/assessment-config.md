@@ -64,6 +64,8 @@ Teachers still enter raw CA marks and exam / 100. Class score, exam contribution
 
 Preview and a newly generated PDF use that term’s snapshot. An already stored PDF file stays as-is until it is generated again; regeneration still uses **that term’s** structure, not whatever is on a later term.
 
+The student profile **Reports & Assessment** tab (`GET /students/:id/assessments/?term=`) uses the same per-term structure and live scores.
+
 ---
 
 ## Lock rule

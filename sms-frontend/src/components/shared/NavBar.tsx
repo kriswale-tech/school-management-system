@@ -24,10 +24,12 @@ const NavBar = () => {
     staleTime: 60_000,
   })
 
+  const schoolName = activeSchool?.school_name
   const termName =
     session?.terms.find((term) => term.is_active)?.name ??
     (session?.current_term ? TERM_LABELS[session.current_term] : null)
   const academicYear = session?.academic_year
+  const sessionLabel = [termName, academicYear].filter(Boolean).join(' • ')
 
   return (
     <nav className="app-shell-header flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 print:hidden">
@@ -35,20 +37,20 @@ const NavBar = () => {
         {schoolLogo ? (
           <img
             src={schoolLogo}
-            alt={activeSchool?.school_name ? `${activeSchool.school_name} logo` : 'School logo'}
+            alt={schoolName ? `${schoolName} logo` : 'School logo'}
             className="h-11 w-auto max-w-40 shrink-0 object-contain"
           />
         ) : (
           <AppLogo widthPx={60} />
         )}
 
-        {termName || academicYear ? (
+        {schoolName || sessionLabel ? (
           <div className="min-w-0 leading-tight">
-            {termName ? (
-              <p className="truncate text-sm font-semibold text-slate-900">{termName}</p>
+            {schoolName ? (
+              <p className="truncate text-sm font-bold text-slate-900">{schoolName}</p>
             ) : null}
-            {academicYear ? (
-              <p className="truncate text-xs text-slate-500">{academicYear}</p>
+            {sessionLabel ? (
+              <p className="truncate text-xs text-slate-500">{sessionLabel}</p>
             ) : null}
           </div>
         ) : null}

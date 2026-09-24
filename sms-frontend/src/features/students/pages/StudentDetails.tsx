@@ -96,7 +96,7 @@ const StudentDetails = () => {
               {activeTab === TAB_GUARDIAN && (
                 <Guardian studentId={student.id} guardians={student.guardians} />
               )}
-              {activeTab === TAB_ASSESSMENT && <Assessment />}
+              {activeTab === TAB_ASSESSMENT && <Assessment studentId={student.id} />}
               {activeTab === TAB_FEES && <Fees studentId={student.id} />}
             </div>
           </>

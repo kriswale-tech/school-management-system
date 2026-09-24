@@ -279,6 +279,30 @@ class AdminAssessmentDetailSerializer(serializers.Serializer):
     students = AdminAssessmentDetailStudentSerializer(many=True)
 
 
+class StudentAssessmentTermOptionSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    label = serializers.CharField()
+    is_active = serializers.BooleanField()
+    academic_year_id = serializers.UUIDField()
+    academic_year = serializers.CharField()
+
+
+class StudentAssessmentSerializer(serializers.Serializer):
+    term_id = serializers.UUIDField(allow_null=True)
+    term_label = serializers.CharField(allow_null=True, allow_blank=True)
+    active_term_id = serializers.UUIDField(allow_null=True)
+    terms = StudentAssessmentTermOptionSerializer(many=True)
+    enrolled = serializers.BooleanField()
+    stream_id = serializers.UUIDField(allow_null=True)
+    display_name = serializers.CharField(allow_null=True, allow_blank=True)
+    class_teacher_name = serializers.CharField(allow_null=True, allow_blank=True)
+    weights = AssessmentWeightsSerializer(allow_null=True)
+    result_type = serializers.CharField(allow_null=True, allow_blank=True)
+    uses_grades = serializers.BooleanField()
+    uses_position = serializers.BooleanField()
+    student = AdminAssessmentDetailStudentSerializer(allow_null=True)
+
+
 class ClassAssessmentDetailStudentSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     full_name = serializers.CharField()

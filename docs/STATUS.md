@@ -53,7 +53,7 @@ Frontend mirrors these steps under `/setup/:step`. Staff UI in setup talks to `/
 
 - List + stats, filters
 - Onboarding wizard (bio, class/stream, guardians, fees snapshot)
-- Student detail: bio edit, guardians CRUD, **fees view/history** (read-only)
+- Student detail: bio edit, guardians CRUD, **fees view/history** (read-only), **reports & assessment** (read-only, term filter)
 - Parent reuse across students
 - Class enrollment per term (with stream)
 - **Bulk student import** (template + upload + failure download)
@@ -87,7 +87,7 @@ Frontend mirrors these steps under `/setup/:step`. Staff UI in setup talks to `/
 - Config service + tests
 
 **Stubbed empty models:** `AssessmentItem`, `AssessmentItemScore`, `StudentResult`, `SubjectScore`, `Report`, `CorrectionRequest`  
-**No runtime scoring/report APIs or real UI** (nav page and student “Reports & Assessment” tab are placeholders)
+Runtime scoring, class/admin assessment, and the student **Reports & Assessment** tab exist; STATUS snapshot above is otherwise stale on assessments.
 
 ---
 
@@ -98,7 +98,7 @@ Frontend mirrors these steps under `/setup/:step`. Staff UI in setup talks to `/
 | Area | Gap |
 | --- | --- |
 | **Dashboard** | Placeholder lorem content only |
-| **Assessments (runtime)** | Enter CA/exam scores, compute grades/positions, report cards, correction flow; wire student assessment tab |
+| **Assessments (runtime)** | Enter CA/exam scores, compute grades/positions, report cards, correction flow |
 | **Fees (operations)** | Record payments, issue receipts, fee desk list/filters, publish/apply fee structures after setup, arrears reporting |
 | **Staff main page** | Reuse setup staff components for `/staff` instead of placeholder |
 | **Profile** | Nav links to `/profile` but no route/page |
