@@ -54,7 +54,10 @@ class ClassStatsSerializer(serializers.Serializer):
     total_students = serializers.IntegerField()
     total_teachers_assigned = serializers.IntegerField()
     unassigned_classes = serializers.IntegerField()
+    assigned_classes = serializers.IntegerField()
     unassigned_class_subjects = serializers.IntegerField()
+    total_class_subjects = serializers.IntegerField()
+    assigned_class_subjects = serializers.IntegerField()
     empty_classes = serializers.IntegerField()
     classes_with_students = serializers.IntegerField()
 
@@ -108,6 +111,27 @@ class ClassSubjectListSerializer(serializers.Serializer):
     results = ClassSubjectRowSerializer(many=True)
 
 
+class SubjectClassPairingSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    stream_id = serializers.UUIDField()
+    class_name = serializers.CharField()
+    kind = serializers.ChoiceField(choices=['class_subject', 'subject_group'])
+    class_subject_id = serializers.UUIDField()
+    subject_group_id = serializers.UUIDField(allow_null=True)
+    subject_name = serializers.CharField()
+    group_name = serializers.CharField(allow_null=True)
+    name = serializers.CharField()
+    students_count = serializers.IntegerField()
+    teacher = ClassTeacherSummarySerializer(allow_null=True)
+    teaching_assignment_id = serializers.UUIDField(allow_null=True)
+    needs_attention = serializers.BooleanField()
+
+
+class SubjectClassListSerializer(serializers.Serializer):
+    term_id = serializers.UUIDField()
+    results = SubjectClassPairingSerializer(many=True)
+
+
 class ClassTeacherOptionSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     full_name = serializers.CharField()
@@ -128,6 +152,35 @@ class AssignSubjectTeacherSerializer(serializers.Serializer):
     teacher_id = serializers.UUIDField()
     class_subject_id = serializers.UUIDField()
     subject_group_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class LevelAssignableSubjectSerializer(serializers.Serializer):
+    subject_id = serializers.UUIDField()
+    name = serializers.CharField()
+    classes_count = serializers.IntegerField()
+    assigned_classes_count = serializers.IntegerField()
+
+
+class LevelAssignableSubjectListSerializer(serializers.Serializer):
+    level_id = serializers.UUIDField()
+    level_name = serializers.CharField()
+    results = LevelAssignableSubjectSerializer(many=True)
+
+
+class AssignLevelSubjectTeacherSerializer(serializers.Serializer):
+    teacher_id = serializers.UUIDField()
+    subject_id = serializers.UUIDField()
+
+
+class LevelSubjectTeacherAssignResultSerializer(serializers.Serializer):
+    term_id = serializers.UUIDField()
+    level_id = serializers.UUIDField()
+    level_name = serializers.CharField()
+    subject_id = serializers.UUIDField()
+    subject_name = serializers.CharField()
+    assigned_count = serializers.IntegerField()
+    replaced_count = serializers.IntegerField()
+    skipped_grouped_classes = serializers.ListField(child=serializers.CharField())
 
 
 class TeachingAssignmentDetailSerializer(serializers.Serializer):

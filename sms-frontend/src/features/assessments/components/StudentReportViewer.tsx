@@ -191,7 +191,7 @@ const StudentReportViewer = ({
         <p className="text-sm text-slate-500">No report available yet.</p>
       )}
     </>
-  )
+  ) : null
 
   if (variant === 'page') {
     return (

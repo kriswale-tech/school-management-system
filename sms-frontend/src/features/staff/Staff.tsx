@@ -32,22 +32,14 @@ const Staff = () => {
     [page, search, role],
   )
 
-  const statsParams = useMemo(
-    () => ({
-      search: queryParams.search,
-      role: queryParams.role,
-    }),
-    [queryParams.search, queryParams.role],
-  )
-
   const { data, isLoading } = useQuery({
     queryKey: [STAFF_DESK_QUERY_KEY, 'list', queryParams],
     queryFn: () => getStaffDeskList(queryParams),
   })
 
   const { data: stats } = useQuery({
-    queryKey: [STAFF_DESK_QUERY_KEY, 'stats', statsParams],
-    queryFn: () => getStaffDeskStats(statsParams),
+    queryKey: [STAFF_DESK_QUERY_KEY, 'stats'],
+    queryFn: getStaffDeskStats,
   })
 
   const openAdd = () => setAddOpen(true)
@@ -85,9 +77,10 @@ const Staff = () => {
         ) : null}
       </ActionBar>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard title="Total Staff" value={String(stats?.total_staff ?? 0)} />
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+        <StatsCard title="Total" value={String(stats?.total_staff ?? 0)} />
         <StatsCard title="Teachers" value={String(stats?.teachers ?? 0)} />
+        <StatsCard title="Staff" value={String(stats?.staff ?? 0)} />
         <StatsCard title="Accountants" value={String(stats?.accountants ?? 0)} />
         <StatsCard title="Admins" value={String(stats?.admins ?? 0)} />
       </div>

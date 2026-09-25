@@ -1,10 +1,13 @@
 from collections import defaultdict
 
+from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from rest_framework.exceptions import NotFound, ValidationError
 
-from academics.models import ClassStream, ClassSubject, StudentSubjectGroup, SubjectGroup
+from academics.models import ClassStream, ClassSubject, Level, StudentSubjectGroup, SubjectGroup
 from academics.services.classes import (
+    _active_streams_for_class_level,
+    _iter_listed_streams,
     _subject_slots_by_class_level,
     _teaching_coverage_maps,
     _unassigned_subject_count_for_stream,
@@ -60,24 +63,215 @@ def _class_teacher_summary(assignments):
     return f'class teacher of {_join_natural(labels)}'
 
 
-def _teaching_summary(assignments):
+def _teaching_summary(assignments, *, level_coverage):
+    """Short description of what a teacher teaches this term.
+
+    Ungrouped subjects collapse to the level name when the teacher covers
+    every listed stream in that level that offers the subject. Partial
+    coverage stays as class names. Subject groups always stay as
+    "Class (Group)" because each group can have its own teacher.
+
+    Returns ``(display, search_text)``. ``search_text`` keeps the individual
+    class labels so a class name still matches after the display collapses.
+    """
     if not assignments:
-        return 'No teaching assignments yet'
+        empty = 'No teaching assignments yet'
+        return empty, empty
 
-    by_subject = defaultdict(list)
+    by_subject = {}
     for item in assignments:
-        subject_name = item.class_subject.subject.name
+        subject = item.class_subject.subject
+        bucket = by_subject.setdefault(subject.id, {
+            'name': subject.name,
+            'ungrouped': [],
+            'grouped_labels': [],
+        })
         if item.subject_group_id:
-            label = f'{item.class_subject.class_level.name} ({item.subject_group.name})'
+            bucket['grouped_labels'].append(
+                f'{item.class_subject.class_level.name} ({item.subject_group.name})',
+            )
         else:
-            label = _format_class_label(item.class_subject.class_level.name, item.stream)
-        by_subject[subject_name].append(label)
+            bucket['ungrouped'].append(item)
 
-    parts = [
-        f'teaches {subject} in {_join_natural(classes)}'
-        for subject, classes in by_subject.items()
-    ]
-    return '; '.join(parts)
+    display_parts = []
+    search_labels = []
+    for subject_id, bucket in by_subject.items():
+        labels = []
+        by_level = {}
+        level_order = []
+        for item in bucket['ungrouped']:
+            level_id = item.class_subject.class_level.level_id
+            if level_id not in by_level:
+                level_order.append(level_id)
+                by_level[level_id] = []
+            by_level[level_id].append(item)
+
+        for level_id in level_order:
+            items = by_level[level_id]
+            coverage = level_coverage.get((level_id, subject_id))
+            class_labels = [
+                _format_class_label(item.class_subject.class_level.name, item.stream)
+                for item in items
+            ]
+            deduped = list(dict.fromkeys(class_labels))
+            search_labels.extend(deduped)
+
+            covered = set()
+            if coverage is not None:
+                for item in items:
+                    if item.stream_id is None:
+                        covered.update(
+                            coverage['class_level_stream_ids'].get(
+                                item.class_subject.class_level_id,
+                                (),
+                            ),
+                        )
+                    else:
+                        covered.add(item.stream_id)
+
+            if (
+                coverage is not None
+                and coverage['stream_ids']
+                and coverage['stream_ids'] <= covered
+            ):
+                labels.append(coverage['level_name'])
+                search_labels.append(coverage['level_name'])
+            else:
+                labels.extend(deduped)
+
+        labels.extend(bucket['grouped_labels'])
+        search_labels.extend(bucket['grouped_labels'])
+        if labels:
+            display_parts.append(
+                f'teaches {bucket["name"]} in {_join_natural(labels)}',
+            )
+
+    display = '; '.join(display_parts) if display_parts else 'No teaching assignments yet'
+    search_text = f'{display} {" ".join(search_labels)}'.strip()
+    return display, search_text
+
+
+def _get_active_level(*, school, level_id):
+    level = Level.objects.filter(
+        id=level_id,
+        school=school,
+        is_active=True,
+    ).first()
+    if level is None:
+        raise NotFound('Level not found.')
+    return level
+
+
+def _level_subject_slots(*, school, level=None):
+    """Listed-stream slots for active class subjects.
+
+    Each slot is one class stream that offers a class subject. ``grouped`` is
+    true when that class subject has an active subject group; those slots are
+    not assignable by level.
+
+    Pass ``level`` to scan one level. Omit it to scan every active level,
+    which the teacher summary uses to decide when to collapse.
+    """
+    class_subject_qs = ClassSubject.objects.filter(
+        school=school,
+        is_active=True,
+        class_level__is_active=True,
+        class_level__level__is_active=True,
+    )
+    if level is not None:
+        class_subject_qs = class_subject_qs.filter(class_level__level=level)
+
+    class_subjects = class_subject_qs.select_related(
+        'subject',
+        'class_level',
+    ).prefetch_related(
+        Prefetch(
+            'groups',
+            queryset=SubjectGroup.objects.filter(is_active=True),
+        ),
+    )
+
+    by_class_level = defaultdict(list)
+    for class_subject in class_subjects:
+        by_class_level[class_subject.class_level_id].append(class_subject)
+
+    if level is None:
+        stream_rows = list(_iter_listed_streams(school=school))
+    else:
+        stream_rows = []
+        class_levels = (
+            level.class_levels.filter(is_active=True)
+            .prefetch_related('streams')
+            .order_by('order', 'name')
+        )
+        for class_level in class_levels:
+            for stream in _active_streams_for_class_level(class_level):
+                stream_rows.append((level, class_level, stream))
+
+    slots = []
+    for level_obj, class_level, stream in stream_rows:
+        for class_subject in by_class_level.get(class_level.id, []):
+            slots.append({
+                'level': level_obj,
+                'class_level': class_level,
+                'stream': stream,
+                'class_subject': class_subject,
+                'grouped': bool(class_subject.groups.all()),
+            })
+    return slots
+
+
+def _ungrouped_level_coverage(slots):
+    """Streams that offer each ungrouped subject, keyed by level and subject."""
+    coverage = {}
+    for slot in slots:
+        if slot['grouped']:
+            continue
+        key = (slot['level'].id, slot['class_subject'].subject_id)
+        bucket = coverage.get(key)
+        if bucket is None:
+            bucket = {
+                'level_name': slot['level'].name,
+                'stream_ids': set(),
+                'class_level_stream_ids': defaultdict(set),
+            }
+            coverage[key] = bucket
+        bucket['stream_ids'].add(slot['stream'].id)
+        bucket['class_level_stream_ids'][slot['class_level'].id].add(slot['stream'].id)
+    return coverage
+
+
+def _assignment_coverage_keys(*, school, term, class_subject_ids):
+    """Which ungrouped slots already have a teacher this term.
+
+    A whole-class row (no stream) covers every listed stream of that class
+    subject. Stream rows cover only that stream.
+    """
+    if not class_subject_ids:
+        return set(), set()
+
+    rows = TeachingAssignment.objects.filter(
+        term=term,
+        class_subject_id__in=class_subject_ids,
+        class_subject__school=school,
+        subject_group__isnull=True,
+    ).only('class_subject_id', 'stream_id')
+
+    whole_class_subjects = set()
+    stream_pairs = set()
+    for row in rows:
+        if row.stream_id is None:
+            whole_class_subjects.add(row.class_subject_id)
+        else:
+            stream_pairs.add((row.class_subject_id, row.stream_id))
+    return whole_class_subjects, stream_pairs
+
+
+def _slot_has_teacher(slot, *, whole_class_subjects, stream_pairs):
+    class_subject_id = slot['class_subject'].id
+    if class_subject_id in whole_class_subjects:
+        return True
+    return (class_subject_id, slot['stream'].id) in stream_pairs
 
 
 def get_stream_for_school(*, school, stream_id):
@@ -358,10 +552,17 @@ def get_class_subjects(*, school, stream_id, term=None):
 
 
 def get_class_teacher_options(*, school, term=None, search=None):
+    """Teachers available for class and subject assignment.
+
+    ``teaching_summary`` collapses a subject to the level name when the
+    teacher covers every listed stream in that level. Search still matches
+    the underlying class names.
+    """
     term = term or get_active_term(
         school,
         detail='Set an active term before assigning teachers.',
     )
+    level_coverage = _ungrouped_level_coverage(_level_subject_slots(school=school))
 
     memberships = (
         SchoolMembership.objects.filter(
@@ -381,7 +582,7 @@ def get_class_teacher_options(*, school, term=None, search=None):
             Prefetch(
                 'user__teaching_assignments',
                 queryset=TeachingAssignment.objects.filter(term=term).select_related(
-                    'class_subject__class_level',
+                    'class_subject__class_level__level',
                     'class_subject__subject',
                     'stream',
                     'subject_group',
@@ -399,12 +600,15 @@ def get_class_teacher_options(*, school, term=None, search=None):
         class_teacher_assignments = list(teacher.class_teacher_assignments.all())
         teaching_assignments = list(teacher.teaching_assignments.all())
         class_teacher_summary = _class_teacher_summary(class_teacher_assignments)
-        teaching_summary = _teaching_summary(teaching_assignments)
+        teaching_summary, teaching_search_text = _teaching_summary(
+            teaching_assignments,
+            level_coverage=level_coverage,
+        )
 
         if search_term and (
             search_term not in full_name.lower()
             and search_term not in class_teacher_summary.lower()
-            and search_term not in teaching_summary.lower()
+            and search_term not in teaching_search_text.lower()
         ):
             continue
 
@@ -516,3 +720,157 @@ def assign_subject_teacher(
         )
 
     return get_class_subjects(school=school, stream_id=stream.id, term=term)
+
+
+def list_level_assignable_subjects(*, school, level_id, term=None):
+    """Subjects one teacher can take across a whole level.
+
+    Included subjects are offered as an ungrouped class subject on at least
+    one listed stream in the level. Subjects that exist only as groups are
+    omitted; those are assigned class by class.
+
+    ``classes_count`` is the number of listed streams that offer the subject
+    without groups. ``assigned_classes_count`` is how many of those streams
+    already have a subject teacher for the term.
+    """
+    term = term or get_active_term(
+        school,
+        detail='Set an active term before assigning a subject teacher.',
+    )
+    level = _get_active_level(school=school, level_id=level_id)
+    slots = [
+        slot for slot in _level_subject_slots(school=school, level=level)
+        if not slot['grouped']
+    ]
+    class_subject_ids = {slot['class_subject'].id for slot in slots}
+    whole_class_subjects, stream_pairs = _assignment_coverage_keys(
+        school=school,
+        term=term,
+        class_subject_ids=class_subject_ids,
+    )
+
+    by_subject = {}
+    for slot in slots:
+        subject = slot['class_subject'].subject
+        bucket = by_subject.setdefault(subject.id, {
+            'subject_id': subject.id,
+            'name': subject.name,
+            'slots': [],
+        })
+        bucket['slots'].append(slot)
+
+    results = []
+    for bucket in sorted(by_subject.values(), key=lambda item: item['name'].lower()):
+        assigned = sum(
+            1
+            for slot in bucket['slots']
+            if _slot_has_teacher(
+                slot,
+                whole_class_subjects=whole_class_subjects,
+                stream_pairs=stream_pairs,
+            )
+        )
+        results.append({
+            'subject_id': bucket['subject_id'],
+            'name': bucket['name'],
+            'classes_count': len(bucket['slots']),
+            'assigned_classes_count': assigned,
+        })
+
+    return {
+        'level_id': level.id,
+        'level_name': level.name,
+        'results': results,
+    }
+
+
+def _unique_class_names(slots):
+    names = []
+    seen = set()
+    for slot in slots:
+        name = slot['class_level'].name
+        if name in seen:
+            continue
+        seen.add(name)
+        names.append(name)
+    return names
+
+
+def assign_level_subject_teacher(*, school, level_id, teacher_id, subject_id):
+    """Assign one teacher to a subject on every listed stream in a level.
+
+    Writes the same per-stream teaching rows as class-by-class assignment, in
+    one transaction. Streams that do not offer the subject are skipped. Class
+    subjects with active groups are skipped and named in
+    ``skipped_grouped_classes``. Existing teachers on the affected slots are
+    replaced. A whole-class row counts as already assigned for every stream
+    of that class.
+    """
+    term = get_active_term(
+        school,
+        detail='Set an active term before assigning a subject teacher.',
+    )
+    level = _get_active_level(school=school, level_id=level_id)
+    subject_slots = [
+        slot
+        for slot in _level_subject_slots(school=school, level=level)
+        if slot['class_subject'].subject_id == subject_id
+    ]
+    ungrouped = [slot for slot in subject_slots if not slot['grouped']]
+    grouped = [slot for slot in subject_slots if slot['grouped']]
+
+    if not ungrouped:
+        if grouped:
+            raise ValidationError({
+                'subject_id': (
+                    'This subject is split into groups. Assign it class by class.'
+                ),
+            })
+        raise ValidationError({
+            'subject_id': 'Subject is not offered by any class in this level.',
+        })
+
+    class_subject_ids = {slot['class_subject'].id for slot in ungrouped}
+    whole_class_subjects, stream_pairs = _assignment_coverage_keys(
+        school=school,
+        term=term,
+        class_subject_ids=class_subject_ids,
+    )
+    replaced_count = sum(
+        1
+        for slot in ungrouped
+        if _slot_has_teacher(
+            slot,
+            whole_class_subjects=whole_class_subjects,
+            stream_pairs=stream_pairs,
+        )
+    )
+
+    with transaction.atomic():
+        for slot in ungrouped:
+            class_subject = slot['class_subject']
+            stream = slot['stream']
+            TeachingAssignment.objects.filter(
+                Q(stream_id=stream.id) | Q(stream__isnull=True),
+                term=term,
+                class_subject_id=class_subject.id,
+                subject_group__isnull=True,
+            ).delete()
+            create_teaching_assignment(
+                school,
+                teacher_id=teacher_id,
+                class_subject_id=class_subject.id,
+                stream_id=stream.id,
+                subject_group_id=None,
+            )
+
+    return {
+        'term_id': term.id,
+        'level_id': level.id,
+        'level_name': level.name,
+        'subject_id': subject_id,
+        'subject_name': ungrouped[0]['class_subject'].subject.name,
+        'assigned_count': len(ungrouped),
+        'replaced_count': replaced_count,
+        'skipped_grouped_classes': _unique_class_names(grouped),
+    }

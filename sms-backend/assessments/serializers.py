@@ -210,6 +210,18 @@ class AdminAssessmentOverviewSerializer(serializers.Serializer):
     classes_fully_ready_count = serializers.IntegerField()
     corrections_inbox_count = serializers.IntegerField()
     corrections_inbox = CorrectionInboxItemSerializer(many=True)
+    filtered_students_count = serializers.IntegerField()
+    count = serializers.IntegerField()
+    page_count = serializers.IntegerField()
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    total_pages = serializers.IntegerField()
+    start_index = serializers.IntegerField()
+    end_index = serializers.IntegerField()
+    has_next = serializers.BooleanField()
+    has_previous = serializers.BooleanField()
+    next = serializers.URLField(allow_null=True, required=False)
+    previous = serializers.URLField(allow_null=True, required=False)
     results = AdminAssessmentClassRowSerializer(many=True)
 
 

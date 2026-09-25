@@ -78,7 +78,7 @@ const AssignClassTeacherContent = ({
   return (
     <Modal
       open
-      title="Assign Class Teacher"
+      title={selectedTeacherId ? 'Reassign Class Teacher' : 'Assign Class Teacher'}
       onClose={onClose}
       scrollable
       className="max-w-lg"

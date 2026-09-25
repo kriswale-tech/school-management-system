@@ -1,3 +1,5 @@
+import type { PaginatedResponse } from '@/types/generalTypes'
+
 export type AssessmentStatus = 'Incomplete' | 'Complete' | 'Published'
 
 export type CaItem = {
@@ -261,7 +263,15 @@ export type AdminAssessmentDetail = {
   students: AdminAssessmentDetailStudent[]
 }
 
-export type AdminAssessmentOverview = {
+export type AdminAssessmentOverviewQuery = {
+  term_id?: string
+  search?: string
+  status?: 'with_class_teacher' | 'ready_for_you' | 'released'
+  page?: number
+  page_size?: number
+}
+
+export type AdminAssessmentOverview = PaginatedResponse<AdminAssessmentClassRow> & {
   term_id: string
   term_label: string
   with_class_teacher_count: number
@@ -271,7 +281,7 @@ export type AdminAssessmentOverview = {
   classes_fully_ready_count: number
   corrections_inbox_count: number
   corrections_inbox: CorrectionInboxItem[]
-  results: AdminAssessmentClassRow[]
+  filtered_students_count: number
 }
 
 export type StudentReportPreview = {

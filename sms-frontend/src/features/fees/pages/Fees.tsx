@@ -1,10 +1,10 @@
 import { Icon } from '@iconify/react'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import ActionBar from '@/components/shared/ActionBar'
 import StatsCard from '@/components/shared/StatsCard'
-import { Button } from '@/components/ui'
+import { ActionButton, Button } from '@/components/ui'
 import FilterComponent, { type FilterSelection } from '@/components/ui/FilterComponent'
 import SearchComponent from '@/components/ui/SearchComponent'
 import { getClasses } from '@/features/classes/services'
@@ -22,8 +22,20 @@ import {
   formatFeeAmount,
 } from '../utils'
 
+const STATUS_FILTER_OPTIONS = [
+  { value: true, label: 'Debtors only' },
+  { value: false, label: 'Paid / no balance' },
+] as const
+
+const debtorsFromParam = (value: string | null): FilterSelection => {
+  if (value === 'true') return true
+  if (value === 'false') return false
+  return ''
+}
+
 const Fees = () => {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const canRecordPayment = useCan(Capability.FEES_RECORD_PAYMENT)
   const canManageSettings = useCan(Capability.FEES_MANAGE_SETTINGS)
   const [search, setSearch] = useState('')
@@ -31,6 +43,17 @@ const Fees = () => {
   const [termSelection, setTermSelection] = useState<FilterSelection | undefined>(undefined)
   const [page, setPage] = useState(1)
   const [recordOpen, setRecordOpen] = useState(false)
+
+  const debtors = debtorsFromParam(searchParams.get('debtors'))
+
+  const setDebtors = (value: FilterSelection) => {
+    const next = new URLSearchParams(searchParams)
+    if (value === true) next.set('debtors', 'true')
+    else if (value === false) next.set('debtors', 'false')
+    else next.delete('debtors')
+    setSearchParams(next, { replace: true })
+    setPage(1)
+  }
 
   const { data: filterOptions, isLoading: filtersLoading } = useQuery({
     queryKey: [FEE_DESK_FILTERS_QUERY_KEY],
@@ -53,8 +76,9 @@ const Fees = () => {
       search: search || undefined,
       class_level: classLevel === '' ? undefined : String(classLevel),
       term: term === '' ? undefined : String(term),
+      debtors: typeof debtors === 'boolean' ? debtors : undefined,
     }),
-    [page, search, classLevel, term],
+    [page, search, classLevel, term, debtors],
   )
 
   const statsParams: FeeDeskQueryParams = useMemo(
@@ -62,8 +86,9 @@ const Fees = () => {
       search: queryParams.search,
       class_level: queryParams.class_level,
       term: queryParams.term,
+      debtors: queryParams.debtors,
     }),
-    [queryParams.search, queryParams.class_level, queryParams.term],
+    [queryParams.search, queryParams.class_level, queryParams.term, queryParams.debtors],
   )
 
   const { data, isLoading } = useQuery({
@@ -120,8 +145,22 @@ const Fees = () => {
             setPage(1)
           }}
         />
+        <FilterComponent
+          filterName="Status"
+          filterKey="debtors"
+          options={[...STATUS_FILTER_OPTIONS]}
+          value={debtors}
+          placeholder="All Students"
+          onChange={(value) => {
+            setDebtors(value)
+          }}
+        />
         {canRecordPayment ? (
-          <Button type="button" className="py-2 text-sm max-w-fit" onClick={() => setRecordOpen(true)}>
+          <Button
+            type="button"
+            className="py-2 text-sm max-w-fit"
+            onClick={() => setRecordOpen(true)}
+          >
             <Icon
               icon="hugeicons:plus-sign"
               className="size-4 bg-white text-black rounded-full p-0.5"
@@ -130,15 +169,12 @@ const Fees = () => {
           </Button>
         ) : null}
         {canManageSettings ? (
-          <Button
-            type="button"
-            variant="outline"
-            className="py-2 text-sm max-w-fit"
+          <ActionButton
+            icon="hugeicons:settings-02"
+            label="Fees Settings"
+            tooltipSide="bottom"
             onClick={() => navigate('/fees/settings')}
-          >
-            <Icon icon="hugeicons:settings-02" className="size-4" />
-            Fees Settings
-          </Button>
+          />
         ) : null}
       </ActionBar>
 

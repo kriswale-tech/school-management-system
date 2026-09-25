@@ -53,7 +53,7 @@ class FeeDeskListView(SchoolScopedAPIView):
         summary='List student fee balances',
         description=(
             'Paginated fees desk rows for students enrolled in the selected term. '
-            'Defaults to the school active term. Supports search and class filters.'
+            'Defaults to the school active term. Supports search, class, and debtors filters.'
         ),
         parameters=[
             OpenApiParameter(
@@ -70,6 +70,14 @@ class FeeDeskListView(SchoolScopedAPIView):
                 name='stream',
                 type=str,
                 description='Filter by class stream UUID.',
+            ),
+            OpenApiParameter(
+                name='debtors',
+                type=bool,
+                description=(
+                    'When true, only students with an outstanding balance. '
+                    'When false, only students with no outstanding balance.'
+                ),
             ),
             OpenApiParameter(
                 name='term',
@@ -103,6 +111,14 @@ class FeeDeskStatsView(SchoolScopedAPIView):
             OpenApiParameter(name='search', type=str),
             OpenApiParameter(name='class_level', type=str),
             OpenApiParameter(name='stream', type=str),
+            OpenApiParameter(
+                name='debtors',
+                type=bool,
+                description=(
+                    'When true, only students with an outstanding balance. '
+                    'When false, only students with no outstanding balance.'
+                ),
+            ),
             OpenApiParameter(
                 name='term',
                 type=str,

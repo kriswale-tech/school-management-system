@@ -1,11 +1,14 @@
 import { Table, TableWrapper } from '@/components/shared'
 import ActionButton from '@/components/ui/ActionButton'
 import { mergeClasses } from '@/utils'
+import type { PaginatedResponse } from '@/types/generalTypes'
 import type { AdminAssessmentClassRow } from '@/features/classes/assessment/types'
 
 type AdminAssessmentsTableProps = {
   rows?: AdminAssessmentClassRow[]
   isLoading?: boolean
+  pagination?: PaginatedResponse<AdminAssessmentClassRow> | null
+  onPageChange?: (page: number) => void
   onViewClass?: (_row: AdminAssessmentClassRow) => void
 }
 
@@ -50,6 +53,8 @@ const countClassName = (tone: 'blue' | 'green') =>
 const AdminAssessmentsTable = ({
   rows = [],
   isLoading = false,
+  pagination = null,
+  onPageChange,
   onViewClass,
 }: AdminAssessmentsTableProps) => {
   return (
@@ -61,6 +66,8 @@ const AdminAssessmentsTable = ({
         description: 'Classes appear here once a class teacher has approved at least one student.',
         icon: 'hugeicons:school',
       }}
+      pagination={pagination}
+      onPageChange={onPageChange}
       skeletonColumns={4}
       variant="form-field"
     >

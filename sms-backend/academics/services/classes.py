@@ -1,6 +1,15 @@
+from collections import defaultdict
+
 from django.db.models import Count, Prefetch, Q
 
-from academics.models import ClassStream, ClassSubject, Level, SubjectGroup
+from academics.models import (
+    ClassStream,
+    ClassSubject,
+    Level,
+    StudentSubjectGroup,
+    SubjectGroup,
+)
+from students.models import ClassEnrollment
 from students.services import get_active_term
 from teachers.models import ClassTeacher, TeachingAssignment
 
@@ -248,6 +257,202 @@ def get_class_list(*, school, term=None, search=None, scope=None):
     }
 
 
+def _teacher_payload(teacher):
+    return {
+        'id': teacher.id,
+        'full_name': teacher.get_full_name(),
+    }
+
+
+def _school_teaching_assignment_maps(*, school, term):
+    assignments = TeachingAssignment.objects.filter(
+        term=term,
+        class_subject__school=school,
+    ).select_related('teacher')
+
+    by_group = {}
+    by_stream_subject = {}
+    by_whole_subject = {}
+
+    for assignment in assignments:
+        payload = {
+            'teacher': _teacher_payload(assignment.teacher),
+            'teaching_assignment_id': assignment.id,
+        }
+        if assignment.subject_group_id:
+            by_group[assignment.subject_group_id] = payload
+        elif assignment.stream_id:
+            by_stream_subject[(assignment.class_subject_id, assignment.stream_id)] = payload
+        else:
+            by_whole_subject[assignment.class_subject_id] = payload
+
+    return by_group, by_stream_subject, by_whole_subject
+
+
+def _resolve_pairing_teacher(
+    *,
+    class_subject_id,
+    stream_id,
+    subject_group_id,
+    by_group,
+    by_stream_subject,
+    by_whole_subject,
+):
+    if subject_group_id:
+        return by_group.get(subject_group_id)
+    return (
+        by_stream_subject.get((class_subject_id, stream_id))
+        or by_whole_subject.get(class_subject_id)
+    )
+
+
+def _class_subjects_by_level(*, school):
+    class_subjects = (
+        ClassSubject.objects.filter(
+            school=school,
+            is_active=True,
+            class_level__is_active=True,
+        )
+        .select_related('subject')
+        .prefetch_related(
+            Prefetch(
+                'groups',
+                queryset=SubjectGroup.objects.filter(is_active=True).order_by('name'),
+            ),
+        )
+        .order_by('subject__name')
+    )
+
+    by_level = defaultdict(list)
+    for class_subject in class_subjects:
+        by_level[class_subject.class_level_id].append(class_subject)
+    return by_level
+
+
+def _students_by_stream(*, school, term):
+    students_by_stream = defaultdict(set)
+    enrollments = ClassEnrollment.objects.filter(
+        term=term,
+        stream__class_level__school=school,
+    ).values_list('stream_id', 'student_id')
+    for stream_id, student_id in enrollments:
+        students_by_stream[stream_id].add(student_id)
+    return students_by_stream
+
+
+def _students_by_subject_group(*, school, academic_year):
+    students_by_group = defaultdict(set)
+    rows = StudentSubjectGroup.objects.filter(
+        academic_year=academic_year,
+        class_subject__school=school,
+        subject_group__isnull=False,
+    ).values_list('subject_group_id', 'student_id')
+    for group_id, student_id in rows:
+        students_by_group[group_id].add(student_id)
+    return students_by_group
+
+
+def get_subject_class_list(*, school, term=None, search=None, scope=None):
+    """One row per subject (or subject group) taught in a class stream.
+
+    needs_attention is true when that pairing has no students or no subject teacher.
+    """
+    term = term or get_active_term(
+        school,
+        detail='Set an active term before viewing subjects.',
+    )
+
+    students_by_stream = _students_by_stream(school=school, term=term)
+    students_by_group = _students_by_subject_group(
+        school=school,
+        academic_year=term.academic_year,
+    )
+    subjects_by_level = _class_subjects_by_level(school=school)
+    by_group, by_stream_subject, by_whole_subject = _school_teaching_assignment_maps(
+        school=school,
+        term=term,
+    )
+
+    search_term = (search or '').strip().lower()
+    allowed_stream_ids = None
+    if scope is not None and scope.is_scoped:
+        allowed_stream_ids = set(scope.visible_stream_ids)
+
+    results = []
+    for _level, class_level, stream in _iter_listed_streams(school=school):
+        if allowed_stream_ids is not None and stream.id not in allowed_stream_ids:
+            continue
+
+        stream_student_ids = students_by_stream.get(stream.id, set())
+        for class_subject in subjects_by_level.get(class_level.id, []):
+            groups = list(class_subject.groups.all())
+            slots = groups or [None]
+            for group in slots:
+                assignment = _resolve_pairing_teacher(
+                    class_subject_id=class_subject.id,
+                    stream_id=stream.id,
+                    subject_group_id=group.id if group else None,
+                    by_group=by_group,
+                    by_stream_subject=by_stream_subject,
+                    by_whole_subject=by_whole_subject,
+                )
+                if group:
+                    students_count = len(
+                        stream_student_ids & students_by_group.get(group.id, set())
+                    )
+                    subject_name = class_subject.subject.name
+                    group_name = group.name
+                    name = f'{subject_name} ({group_name})'
+                    kind = 'subject_group'
+                    row_id = f'{stream.id}:{class_subject.id}:{group.id}'
+                else:
+                    students_count = len(stream_student_ids)
+                    subject_name = class_subject.subject.name
+                    group_name = None
+                    name = subject_name
+                    kind = 'class_subject'
+                    row_id = f'{stream.id}:{class_subject.id}'
+
+                teacher = assignment['teacher'] if assignment else None
+                if search_term:
+                    teacher_name = (teacher or {}).get('full_name', '')
+                    haystack = ' '.join(
+                        part
+                        for part in (
+                            subject_name,
+                            group_name,
+                            stream.full_name,
+                            teacher_name,
+                        )
+                        if part
+                    ).lower()
+                    if search_term not in haystack:
+                        continue
+
+                results.append({
+                    'id': row_id,
+                    'stream_id': stream.id,
+                    'class_name': stream.full_name,
+                    'kind': kind,
+                    'class_subject_id': class_subject.id,
+                    'subject_group_id': group.id if group else None,
+                    'subject_name': subject_name,
+                    'group_name': group_name,
+                    'name': name,
+                    'students_count': students_count,
+                    'teacher': teacher,
+                    'teaching_assignment_id': (
+                        assignment['teaching_assignment_id'] if assignment else None
+                    ),
+                    'needs_attention': students_count == 0 or teacher is None,
+                })
+
+    return {
+        'term_id': term.id,
+        'results': results,
+    }
+
+
 def get_class_stats(*, school, term=None, scope=None):
     """Aggregate stats over the same stream rows shown in the class list."""
     term = term or get_active_term(
@@ -264,16 +469,23 @@ def get_class_stats(*, school, term=None, scope=None):
     }
     empty_classes = sum(1 for item in results if item['students_count'] == 0)
     classes_with_students = len(results) - empty_classes
+    total_classes = len(results)
+    unassigned_classes = sum(1 for item in results if not item['is_assigned'])
+    unassigned_class_subjects = sum(
+        item['unassigned_subjects_count'] for item in results
+    )
+    total_class_subjects = sum(item['subjects_count'] for item in results)
 
     return {
         'term_id': term.id,
-        'total_classes': len(results),
+        'total_classes': total_classes,
         'total_students': sum(item['students_count'] for item in results),
         'total_teachers_assigned': len(assigned_teacher_ids),
-        'unassigned_classes': sum(1 for item in results if not item['is_assigned']),
-        'unassigned_class_subjects': sum(
-            item['unassigned_subjects_count'] for item in results
-        ),
+        'unassigned_classes': unassigned_classes,
+        'assigned_classes': total_classes - unassigned_classes,
+        'unassigned_class_subjects': unassigned_class_subjects,
+        'total_class_subjects': total_class_subjects,
+        'assigned_class_subjects': max(total_class_subjects - unassigned_class_subjects, 0),
         'empty_classes': empty_classes,
         'classes_with_students': classes_with_students,
     }

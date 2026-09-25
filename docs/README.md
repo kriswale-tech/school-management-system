@@ -15,4 +15,4 @@ Project status and reference docs for the SMS monorepo (`sms-backend` + `sms-fro
 
 Related backend-only notes live under [`sms-backend/docs/`](../sms-backend/docs/) (e.g. teacher bulk import).
 
-**Last reviewed:** 2026-09-11
+**Last reviewed:** 2026-09-25

@@ -52,19 +52,26 @@ class StaffDeskRowSerializer(serializers.Serializer):
 
 
 class StaffDeskStatsSerializer(serializers.Serializer):
-    """Filter-aware staff counts for the directory stats cards."""
+    """School-wide staff counts for the directory stats cards.
+
+    These counts ignore search and role filters. The directory table is
+    filtered separately.
+    """
 
     total_staff = serializers.IntegerField(
-        help_text='Total memberships matching the current search/role filters.',
+        help_text='Every membership the requester can manage in this school.',
     )
     teachers = serializers.IntegerField(
-        help_text='Teachers within the filtered set.',
+        help_text='Memberships with the teacher role.',
     )
     accountants = serializers.IntegerField(
-        help_text='Accountants within the filtered set.',
+        help_text='Memberships with the accountant role.',
     )
     admins = serializers.IntegerField(
-        help_text='Admins within the filtered set.',
+        help_text='Memberships with the admin role.',
+    )
+    staff = serializers.IntegerField(
+        help_text='Memberships with the staff role.',
     )
 
 

@@ -5,13 +5,17 @@ from academics.models import ClassLevel, Level
 from academics.serializers import (
     AllClassesSerializer,
     AssignClassTeacherSerializer,
+    AssignLevelSubjectTeacherSerializer,
     AssignSubjectTeacherSerializer,
     ClassDetailSerializer,
     ClassListSerializer,
     ClassStatsSerializer,
     ClassStudentListSerializer,
+    LevelAssignableSubjectListSerializer,
+    LevelSubjectTeacherAssignResultSerializer,
     ClassSubjectListSerializer,
     ClassTeacherOptionListSerializer,
+    SubjectClassListSerializer,
     SubjectGroupCandidateListSerializer,
     SubjectGroupStudentIdsSerializer,
     TeachingAssignmentDetailSerializer,
@@ -19,13 +23,19 @@ from academics.serializers import (
 from academics.services.all_classes import get_all_classes
 from academics.services.class_detail import (
     assign_class_teacher,
+    assign_level_subject_teacher,
     assign_subject_teacher,
     get_class_detail,
     get_class_students,
     get_class_subjects,
     get_class_teacher_options,
+    list_level_assignable_subjects,
 )
-from academics.services.classes import get_class_list, get_class_stats
+from academics.services.classes import (
+    get_class_list,
+    get_class_stats,
+    get_subject_class_list,
+)
 from academics.services.teaching_assignments import (
     assign_students_to_subject_group,
     get_teaching_assignment_detail,
@@ -191,6 +201,45 @@ class ClassListView(SchoolScopedAPIView):
 
 @extend_schema(
     tags=['Academics'],
+    summary='Subject and class pairings',
+    description=(
+        'Returns one row per subject or subject group taught in a class stream. '
+        'needs_attention is true when the pairing has no students or no subject teacher.'
+    ),
+    parameters=[
+        OpenApiParameter(
+            name='term',
+            type=str,
+            description='Optional term UUID. Defaults to the school active term.',
+        ),
+        OpenApiParameter(
+            name='search',
+            type=str,
+            description=(
+                'Optional search against subject name, group name, class name, '
+                'or subject teacher.'
+            ),
+        ),
+    ],
+    responses={200: SubjectClassListSerializer},
+)
+class SubjectClassListView(SchoolScopedAPIView):
+    def get(self, request):
+        term = resolve_term(
+            self.school,
+            request.query_params.get('term'),
+        )
+        payload = get_subject_class_list(
+            school=self.school,
+            term=term,
+            search=request.query_params.get('search'),
+            scope=resolve_access_scope(self.membership),
+        )
+        return Response(SubjectClassListSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Academics'],
     summary='Class statistics',
     description=(
         'Returns summary counts for class streams in the active term: '
@@ -225,7 +274,10 @@ class ClassStatsView(SchoolScopedAPIView):
     summary='Teacher options for class assignment',
     description=(
         'Returns active teachers with class-teacher and teaching assignment '
-        'summaries for the active term. Used by class/subject teacher pickers.'
+        'summaries for the active term. Used by class/subject teacher pickers. '
+        'A teaching summary uses the level name when the teacher covers that '
+        'subject in every listed class of the level. Search still matches the '
+        'individual class names.'
     ),
     parameters=[
         OpenApiParameter(
@@ -236,7 +288,11 @@ class ClassStatsView(SchoolScopedAPIView):
         OpenApiParameter(
             name='search',
             type=str,
-            description='Optional search against teacher name or assignment summary.',
+            description=(
+                'Optional search against teacher name, class-teacher summary, '
+                'or teaching summary. Class names still match when the summary '
+                'is collapsed to a level.'
+            ),
         ),
     ],
     responses={200: ClassTeacherOptionListSerializer},
@@ -397,6 +453,62 @@ class ClassSubjectTeacherAssignView(SchoolScopedAPIView):
             **serializer.validated_data,
         )
         return Response(ClassSubjectListSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Academics'],
+    summary='Subjects assignable across a level',
+    description=(
+        'Lists subjects a teacher can take for every class in this level. '
+        'A subject is included when at least one listed class stream offers it '
+        'without subject groups. Grouped subjects (for example Ghanaian '
+        'Language) are omitted and must be assigned class by class. '
+        'classes_count is the number of listed streams that offer the subject. '
+        'assigned_classes_count is how many of those streams already have a '
+        'subject teacher in the active term.'
+    ),
+    responses={200: LevelAssignableSubjectListSerializer},
+)
+class LevelAssignableSubjectsView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.CLASSES_MANAGE
+
+    def get(self, request, level_id):
+        payload = list_level_assignable_subjects(
+            school=self.school,
+            level_id=level_id,
+        )
+        return Response(LevelAssignableSubjectListSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Academics'],
+    summary='Assign subject teacher across a level',
+    description=(
+        'Assigns one teacher to a subject on every listed class stream in this '
+        'level that offers it without subject groups. Each stream gets its own '
+        'teaching assignment, same as assigning class by class. Streams that '
+        'do not offer the subject are skipped. Classes where the subject is '
+        'split into groups are left unchanged and returned in '
+        'skipped_grouped_classes. Existing teachers on the affected slots are '
+        'replaced. The fan-out runs in one transaction.'
+    ),
+    request=AssignLevelSubjectTeacherSerializer,
+    responses={200: LevelSubjectTeacherAssignResultSerializer},
+)
+class LevelSubjectTeacherAssignView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.CLASSES_MANAGE
+
+    def put(self, request, level_id):
+        serializer = AssignLevelSubjectTeacherSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = assign_level_subject_teacher(
+            school=self.school,
+            level_id=level_id,
+            **serializer.validated_data,
+        )
+        return Response(LevelSubjectTeacherAssignResultSerializer(payload).data)
 
 
 @extend_schema(

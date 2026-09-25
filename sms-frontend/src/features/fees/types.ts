@@ -74,6 +74,7 @@ export type FeeDeskQueryParams = {
   class_level?: string
   stream?: string
   term?: string
+  debtors?: boolean
 } & Record<string, QueryParamValue>
 
 export type PaymentMethod =

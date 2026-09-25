@@ -189,6 +189,13 @@ One-time guided configuration for a new school (see steps above).
 - Assign class teachers / subject teachers  
 - Manage curriculum after setup (`/classes/manage`)  
 
+**Subject teachers.** From a teacher’s staff page, Assign Subject has two modes:
+
+- **By class** — one class stream and one subject or subject group. Replaces the teacher already on that slot.
+- **By level** — one level and one subject. Creates a teaching assignment for every listed class stream in that level that offers the subject. Classes that do not offer it are skipped. Subjects split into groups (for example Ghanaian Language) are not offered here; assign those class by class. Existing teachers on the affected classes are replaced. The write runs in one transaction.
+
+The teacher picker on class detail shows a teaching summary. When a teacher covers a subject in every listed class of a level that offers it without groups, the line uses the level name (`teaches Mathematics in Lower Primary`). A missing class keeps the class names. Search still matches those class names. Group assignments are never folded into the level name.  
+
 ### Fees
 
 - Fee catalog for a term (settings)  
@@ -201,6 +208,7 @@ Deeper detail: [fees.md](./fees.md).
 ### Staff
 
 - Directory of people in the school (teachers, staff, etc.)  
+- Stats cards (Total, Teachers, Staff, Accountants, Admins) count the whole directory. Search and the role filter change only the table.  
 - Add / edit / deactivate via accounts APIs  
 - Teacher assignments also appear under setup and classes  
 

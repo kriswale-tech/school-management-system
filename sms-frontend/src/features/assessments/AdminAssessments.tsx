@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { useQuery } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import ActionBar from '@/components/shared/ActionBar'
 import StatsCard from '@/components/shared/StatsCard'
-import { Button } from '@/components/ui'
+import { ActionButton } from '@/components/ui'
 import FilterComponent, { type FilterSelection } from '@/components/ui/FilterComponent'
 import SearchComponent from '@/components/ui/SearchComponent'
 import {
@@ -17,11 +17,56 @@ import CorrectionsInbox from './components/CorrectionsInbox'
 
 const FILTERS_QUERY_KEY = ['assessments', 'admin', 'filters'] as const
 
+const STATUS_FILTER_OPTIONS = [
+  { value: 'with_class_teacher', label: 'With class teachers' },
+  { value: 'ready_for_you', label: 'Ready for you' },
+  { value: 'released', label: 'Released' },
+] as const
+
+type StatusFilter = (typeof STATUS_FILTER_OPTIONS)[number]['value']
+
+const statusFromParam = (value: string | null): FilterSelection => {
+  if (
+    value === 'with_class_teacher' ||
+    value === 'ready_for_you' ||
+    value === 'released'
+  ) {
+    return value
+  }
+  return ''
+}
+
 const AdminAssessments = () => {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const [termSelection, setTermSelection] = useState<FilterSelection | undefined>(undefined)
-  const [inboxOpen, setInboxOpen] = useState(false)
+  const [page, setPage] = useState(1)
+  const [inboxOpen, setInboxOpen] = useState(searchParams.get('inbox') === '1')
+
+  const statusFilter = statusFromParam(searchParams.get('status'))
+
+  const setStatusFilter = (value: FilterSelection) => {
+    const next = new URLSearchParams(searchParams)
+    if (typeof value === 'string' && value !== '') next.set('status', value)
+    else next.delete('status')
+    setSearchParams(next, { replace: true })
+    setPage(1)
+  }
+
+  useEffect(() => {
+    if (searchParams.get('inbox') === '1') {
+      setInboxOpen(true)
+    }
+  }, [searchParams])
+
+  const handleInboxOpenChange = (open: boolean) => {
+    setInboxOpen(open)
+    const next = new URLSearchParams(searchParams)
+    if (open) next.set('inbox', '1')
+    else next.delete('inbox')
+    setSearchParams(next, { replace: true })
+  }
 
   const { data: filters, isLoading: filtersLoading } = useQuery({
     queryKey: FILTERS_QUERY_KEY,
@@ -31,35 +76,24 @@ const AdminAssessments = () => {
   const defaultTermId = filters?.active_term_id ?? filters?.terms[0]?.id ?? ''
   const term: FilterSelection = termSelection !== undefined ? termSelection : defaultTermId
   const termId = term === '' ? undefined : String(term)
+  const status =
+    typeof statusFilter === 'string' && statusFilter !== ''
+      ? (statusFilter as StatusFilter)
+      : undefined
+
+  const queryParams = {
+    termId,
+    search: search.trim() || undefined,
+    status,
+    page,
+  }
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['assessments', 'admin', 'classes', termId],
-    queryFn: () => getAdminAssessmentOverview(termId),
+    queryKey: ['assessments', 'admin', 'classes', queryParams],
+    queryFn: () => getAdminAssessmentOverview(queryParams),
     enabled: Boolean(filters) && Boolean(termId),
   })
 
-  const rows = useMemo(() => {
-    const termText = search.trim().toLowerCase()
-    return (data?.results ?? []).filter((row) => {
-      if (
-        row.ready_for_you_count === 0 &&
-        row.released_count === 0 &&
-        (row.needs_correction_count ?? 0) === 0
-      ) {
-        return false
-      }
-      if (!termText) return true
-      const teacher = row.class_teacher_name?.toLowerCase() ?? ''
-      return row.display_name.toLowerCase().includes(termText) || teacher.includes(termText)
-    })
-  }, [data?.results, search])
-
-  const classCount = rows.length
-  const studentCount = rows.reduce(
-    (total, row) =>
-      total + row.ready_for_you_count + row.released_count + (row.needs_correction_count ?? 0),
-    0,
-  )
   const fullyReady = data?.classes_fully_ready_count ?? 0
   const readyDescription =
     fullyReady === 0
@@ -74,28 +108,47 @@ const AdminAssessments = () => {
   }))
   const inbox = data?.corrections_inbox ?? []
   const inboxCount = data?.corrections_inbox_count ?? inbox.length
+  const classCount = data?.count ?? 0
+  const studentCount = data?.filtered_students_count ?? 0
 
   return (
     <div className="space-y-6">
       <ActionBar title="Assessments">
-        <SearchComponent value={search} onChange={setSearch} placeholder="Search classes" />
+        <SearchComponent
+          value={search}
+          onChange={(value) => {
+            setSearch(value)
+            setPage(1)
+          }}
+          placeholder="Search classes"
+        />
         <FilterComponent
           filterName="Academic year and term"
           filterKey="term"
           options={termOptions}
           value={term}
           placeholder={filtersLoading ? 'Loading…' : 'Academic year & term'}
-          onChange={setTermSelection}
+          onChange={(value) => {
+            setTermSelection(value)
+            setPage(1)
+          }}
         />
-        <Button
-          type="button"
-          variant="outline"
-          className="py-2 text-sm max-w-fit"
+        <FilterComponent
+          filterName="Status"
+          filterKey="status"
+          options={[...STATUS_FILTER_OPTIONS]}
+          value={statusFilter}
+          placeholder="All statuses"
+          onChange={(value) => {
+            setStatusFilter(value)
+          }}
+        />
+        <ActionButton
+          icon="hugeicons:settings-02"
+          label="Assessment Settings"
+          tooltipSide="bottom"
           onClick={() => navigate('/assessments/settings')}
-        >
-          <Icon icon="hugeicons:settings-02" className="size-4" />
-          Assessment Settings
-        </Button>
+        />
       </ActionBar>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -122,7 +175,7 @@ const AdminAssessments = () => {
             <h2 className="text-base font-medium text-slate-900">Classes</h2>
             <button
               type="button"
-              onClick={() => setInboxOpen(true)}
+              onClick={() => handleInboxOpenChange(true)}
               className="rounded-full bg-orange-50 px-3 py-1 text-xs font-medium text-orange-800 hover:bg-orange-100 cursor-pointer"
             >
               Reopen requests {inboxCount}
@@ -146,7 +199,7 @@ const AdminAssessments = () => {
 
         <CorrectionsInbox
           open={inboxOpen}
-          onClose={() => setInboxOpen(false)}
+          onClose={() => handleInboxOpenChange(false)}
           items={inbox}
           title="Reopen requests"
           emptyLabel="No reopen requests from class teachers right now."
@@ -164,8 +217,10 @@ const AdminAssessments = () => {
           <p className="text-sm text-slate-500 py-6">Set an academic year and term first.</p>
         ) : (
           <AdminAssessmentsTable
-            rows={rows}
+            rows={data?.results ?? []}
             isLoading={isLoading}
+            pagination={data ?? null}
+            onPageChange={setPage}
             onViewClass={(row) => {
               const query = termId ? `?term=${termId}` : ''
               navigate(`/assessments/classes/${row.id}${query}`)

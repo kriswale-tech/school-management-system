@@ -60,7 +60,10 @@ export type ClassStats = {
   total_students: number
   total_teachers_assigned: number
   unassigned_classes: number
+  assigned_classes: number
   unassigned_class_subjects: number
+  total_class_subjects: number
+  assigned_class_subjects: number
   empty_classes: number
   classes_with_students: number
 }
@@ -116,6 +119,32 @@ export type ClassSubjectListResponse = {
   results: ClassSubjectRow[]
 }
 
+export type SubjectClassPairing = {
+  id: string
+  stream_id: string
+  class_name: string
+  kind: ClassSubjectKind
+  class_subject_id: string
+  subject_group_id: string | null
+  subject_name: string
+  group_name: string | null
+  name: string
+  students_count: number
+  teacher: ClassTeacherSummary | null
+  teaching_assignment_id: string | null
+  needs_attention: boolean
+}
+
+export type SubjectClassListResponse = {
+  term_id: string
+  results: SubjectClassPairing[]
+}
+
+export type SubjectClassListQueryParams = {
+  term?: string
+  search?: string
+}
+
 export type ClassTeacherOption = {
   id: string
   full_name: string
@@ -136,6 +165,35 @@ export type AssignSubjectTeacherPayload = {
   teacher_id: string
   class_subject_id: string
   subject_group_id?: string | null
+}
+
+export type LevelAssignableSubject = {
+  subject_id: string
+  name: string
+  classes_count: number
+  assigned_classes_count: number
+}
+
+export type LevelAssignableSubjectList = {
+  level_id: string
+  level_name: string
+  results: LevelAssignableSubject[]
+}
+
+export type AssignLevelSubjectTeacherPayload = {
+  teacher_id: string
+  subject_id: string
+}
+
+export type LevelSubjectTeacherAssignResult = {
+  term_id: string
+  level_id: string
+  level_name: string
+  subject_id: string
+  subject_name: string
+  assigned_count: number
+  replaced_count: number
+  skipped_grouped_classes: string[]
 }
 
 export type TeachingAssignmentDetail = {

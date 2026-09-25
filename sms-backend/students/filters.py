@@ -1,5 +1,5 @@
 import django_filters
-from django.db.models import Q
+from django.db.models import F, Q
 
 from students.models import ClassEnrollment, Parent
 
@@ -11,10 +11,14 @@ class StudentEnrollmentFilter(django_filters.FilterSet):
     )
     class_level = django_filters.UUIDFilter(field_name='class_level_id')
     stream = django_filters.UUIDFilter(field_name='stream_id')
+    debtors = django_filters.BooleanFilter(
+        method='filter_debtors',
+        help_text='When true, only students with an outstanding balance.',
+    )
 
     class Meta:
         model = ClassEnrollment
-        fields = ['class_level', 'stream']
+        fields = ['class_level', 'stream', 'debtors']
 
     def filter_search(self, queryset, name, value):
         term = value.strip()
@@ -27,6 +31,13 @@ class StudentEnrollmentFilter(django_filters.FilterSet):
             | Q(student__last_name__icontains=term)
             | Q(student__other_names__icontains=term),
         )
+
+    def filter_debtors(self, queryset, name, value):
+        if value is True:
+            return queryset.filter(total_billed__gt=F('total_paid'))
+        if value is False:
+            return queryset.filter(total_billed__lte=F('total_paid'))
+        return queryset
 
 
 class ParentFilter(django_filters.FilterSet):

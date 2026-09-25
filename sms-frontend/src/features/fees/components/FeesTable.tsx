@@ -63,7 +63,13 @@ const FeesTable = ({
                 <Table.Cell>{formatFeeAmount(row.amount_paid)}</Table.Cell>
                 <Table.Cell>
                   <div className="space-y-1">
-                    <p>{formatFeeAmount(row.remaining_balance)}</p>
+                    <p
+                      className={
+                        Number(row.remaining_balance) > 0 ? 'font-medium text-red-600' : undefined
+                      }
+                    >
+                      {formatFeeAmount(row.remaining_balance)}
+                    </p>
                     {Number(row.advance_balance) > 0 ? (
                       <p className="text-xs font-medium text-emerald-700">
                         Advance {formatFeeAmount(row.advance_balance)}

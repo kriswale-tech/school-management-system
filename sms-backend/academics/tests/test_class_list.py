@@ -10,13 +10,15 @@ from academics.models import (
     ClassSubject,
     Level,
     LevelSubject,
+    StudentSubjectGroup,
     Subject,
+    SubjectGroup,
 )
 from accounts.models import User
 from accounts.tests.factories import create_user, set_client_auth_cookies, user_school
 from schools.models import AcademicYear, Term
 from students.tests.factories import create_student, enroll_student, ensure_default_stream
-from teachers.models import ClassTeacher
+from teachers.models import ClassTeacher, TeachingAssignment
 
 
 class ClassListAndStatsViewTests(APITestCase):
@@ -109,6 +111,7 @@ class ClassListAndStatsViewTests(APITestCase):
 
         self.list_url = reverse('academics-classes')
         self.stats_url = reverse('academics-classes-stats')
+        self.subjects_url = reverse('academics-classes-subjects')
 
     def test_class_list_returns_stream_rows(self):
         response = self.client.get(self.list_url)
@@ -161,3 +164,96 @@ class ClassListAndStatsViewTests(APITestCase):
         self.assertEqual(response.data['unassigned_class_subjects'], 2)
         self.assertEqual(response.data['empty_classes'], 2)
         self.assertEqual(response.data['classes_with_students'], 1)
+
+    def test_subject_class_pairings(self):
+        language = Subject.objects.create(
+            school=self.school,
+            name='Ghanaian Language',
+            is_system_generated=False,
+        )
+        LevelSubject.objects.create(
+            school=self.school,
+            level=self.level,
+            subject=language,
+            is_system_generated=False,
+        )
+        language_class_subject = ClassSubject.objects.create(
+            school=self.school,
+            class_level=self.class_default_only,
+            subject=language,
+            is_system_generated=False,
+        )
+        group_twi = SubjectGroup.objects.create(
+            class_subject=language_class_subject,
+            name='Twi',
+        )
+        SubjectGroup.objects.create(
+            class_subject=language_class_subject,
+            name='Ga',
+        )
+        nursery_student = create_student(
+            school=self.school,
+            student_id='X-2',
+            first_name='Kojo',
+        )
+        enroll_student(
+            student=nursery_student,
+            term=self.term,
+            stream=self.default_only_stream,
+        )
+        StudentSubjectGroup.objects.create(
+            student=nursery_student,
+            class_subject=language_class_subject,
+            subject_group=group_twi,
+            academic_year=self.academic_year,
+        )
+        TeachingAssignment.objects.create(
+            teacher=self.teacher,
+            class_subject=language_class_subject,
+            subject_group=group_twi,
+            term=self.term,
+        )
+
+        response = self.client.get(self.subjects_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        by_key = {
+            (item['subject_name'], item['group_name'], item['class_name']): item
+            for item in response.data['results']
+        }
+        self.assertEqual(
+            set(by_key),
+            {
+                ('Literacy', None, 'Nursery 1 A'),
+                ('Literacy', None, 'Nursery 1 B'),
+                ('Ghanaian Language', 'Ga', 'Nursery 2'),
+                ('Ghanaian Language', 'Twi', 'Nursery 2'),
+            },
+        )
+
+        literacy_a = by_key[('Literacy', None, 'Nursery 1 A')]
+        self.assertEqual(literacy_a['students_count'], 1)
+        self.assertIsNone(literacy_a['teacher'])
+        self.assertTrue(literacy_a['needs_attention'])
+        self.assertEqual(literacy_a['kind'], 'class_subject')
+
+        literacy_b = by_key[('Literacy', None, 'Nursery 1 B')]
+        self.assertEqual(literacy_b['students_count'], 0)
+        self.assertTrue(literacy_b['needs_attention'])
+
+        twi = by_key[('Ghanaian Language', 'Twi', 'Nursery 2')]
+        self.assertEqual(twi['students_count'], 1)
+        self.assertEqual(twi['teacher']['full_name'], 'Jane Doe')
+        self.assertFalse(twi['needs_attention'])
+        self.assertEqual(twi['kind'], 'subject_group')
+
+        ga = by_key[('Ghanaian Language', 'Ga', 'Nursery 2')]
+        self.assertEqual(ga['students_count'], 0)
+        self.assertIsNone(ga['teacher'])
+        self.assertTrue(ga['needs_attention'])
+
+        search = self.client.get(self.subjects_url, {'search': 'Twi'})
+        self.assertEqual(
+            [item['group_name'] for item in search.data['results']],
+            ['Twi'],
+        )

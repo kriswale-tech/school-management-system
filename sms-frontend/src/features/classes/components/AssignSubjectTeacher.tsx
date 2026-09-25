@@ -6,10 +6,16 @@ import { getApiErrorMessage, mergeClasses } from '@/utils'
 import { assignSubjectTeacher, getClassTeacherOptions } from '../services'
 import type { ClassSubjectRow } from '../types'
 
+type AssignableSubject = Pick<
+  ClassSubjectRow,
+  'name' | 'class_subject_id' | 'subject_group_id' | 'teacher'
+>
+
 type AssignSubjectTeacherProps = {
   open: boolean
   streamId: string
-  subject: ClassSubjectRow | null
+  subject: AssignableSubject | null
+  classLabel?: string
   onClose: () => void
   onAssigned?: () => void
 }
@@ -18,6 +24,7 @@ const AssignSubjectTeacher = ({
   open,
   streamId,
   subject,
+  classLabel,
   onClose,
   onAssigned,
 }: AssignSubjectTeacherProps) => {
@@ -27,6 +34,7 @@ const AssignSubjectTeacher = ({
     <AssignSubjectTeacherContent
       streamId={streamId}
       subject={subject}
+      classLabel={classLabel}
       onClose={onClose}
       onAssigned={onAssigned}
     />
@@ -35,7 +43,8 @@ const AssignSubjectTeacher = ({
 
 type AssignSubjectTeacherContentProps = {
   streamId: string
-  subject: ClassSubjectRow
+  subject: AssignableSubject
+  classLabel?: string
   onClose: () => void
   onAssigned?: () => void
 }
@@ -43,6 +52,7 @@ type AssignSubjectTeacherContentProps = {
 const AssignSubjectTeacherContent = ({
   streamId,
   subject,
+  classLabel,
   onClose,
   onAssigned,
 }: AssignSubjectTeacherContentProps) => {
@@ -82,7 +92,7 @@ const AssignSubjectTeacherContent = ({
   return (
     <Modal
       open
-      title="Change Subject Teacher"
+      title={subject.teacher ? 'Reassign Subject Teacher' : 'Assign Subject Teacher'}
       onClose={onClose}
       scrollable
       className="max-w-lg"
@@ -91,6 +101,7 @@ const AssignSubjectTeacherContent = ({
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Subject</p>
           <p className="mt-1 text-base font-medium text-slate-900">{subject.name}</p>
+          {classLabel ? <p className="text-sm text-slate-500">{classLabel}</p> : null}
         </div>
 
         <SearchComponent

@@ -45,6 +45,7 @@ Checklist by domain. Status values:
 | List classes / stats | Yes | Yes | Done |
 | Class detail (students, subjects) | Yes | Yes | Done |
 | Assign class / subject teacher | Yes | Yes | Done |
+| Assign one subject teacher across a level | Yes | Yes (staff Assign Subject → By level) | Done |
 | Manage curriculum post-setup | Setup/academics APIs reused | `/classes/manage` | Done |
 | Timetable | — | — | Not started |
 | Attendance | — | — | Not started |

@@ -1,10 +1,11 @@
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.response import Response
 
 from accounts.capabilities import Capability
 from accounts.permissions import HasActiveSchool, HasCapability
 from assessments.serializers import (
+    AdminAssessmentClassRowSerializer,
     AdminAssessmentDetailSerializer,
     AdminAssessmentFilterOptionsSerializer,
     AdminAssessmentOverviewSerializer,
@@ -38,6 +39,7 @@ from assessments.services.corrections import (
 )
 from assessments.services.report import get_student_report_preview
 from assessments.services.report_pdf import generate_student_report, get_stored_student_report
+from core.pagination import StandardResultsSetPagination
 from assessments.services.class_overview import (
     approve_class_students,
     get_class_teacher_assessment_detail,
@@ -262,18 +264,56 @@ class AssessmentSettingsLevelView(SchoolScopedAPIView):
 @extend_schema(
     tags=['Assessments'],
     summary='Admin assessment overview by class',
+    description=(
+        'Paginated class rows for the assessments desk, with term-wide summary counts. '
+        'Supports search and status filters.'
+    ),
+    parameters=[
+        OpenApiParameter(
+            name='term_id',
+            type=str,
+            description='Term UUID. Defaults to the school active term.',
+        ),
+        OpenApiParameter(
+            name='search',
+            type=str,
+            description='Search class name or class teacher name.',
+        ),
+        OpenApiParameter(
+            name='status',
+            type=str,
+            description='with_class_teacher, ready_for_you, or released.',
+        ),
+        OpenApiParameter(name='page', type=int, description='Page number.'),
+        OpenApiParameter(name='page_size', type=int, description='Page size (max 100).'),
+    ],
     responses={200: AdminAssessmentOverviewSerializer},
 )
 class AdminAssessmentOverviewView(SchoolScopedAPIView):
     permission_classes = [HasActiveSchool, HasCapability]
     required_capability = Capability.ASSESSMENTS_RELEASE
+    pagination_class = StandardResultsSetPagination
 
     def get(self, request):
         payload = list_admin_assessment_overview(
             school=self.school,
             term_id=request.query_params.get('term_id') or None,
+            search=request.query_params.get('search') or None,
+            status=request.query_params.get('status') or None,
+            for_list=True,
         )
-        return Response(AdminAssessmentOverviewSerializer(payload).data)
+        rows = payload.pop('results')
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(rows, request) or []
+        paginated = paginator.get_paginated_response(
+            AdminAssessmentClassRowSerializer(page, many=True).data,
+        )
+        return Response(
+            AdminAssessmentOverviewSerializer({
+                **payload,
+                **paginated.data,
+            }).data,
+        )
 
 
 @extend_schema(

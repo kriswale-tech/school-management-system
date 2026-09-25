@@ -47,6 +47,8 @@ Frontend mirrors these steps under `/setup/:step`. Staff UI in setup talks to `/
 - Master curriculum templates + per-school levels, classes, streams, subjects, subject groups
 - Post-setup class list, stats, class detail (students, subjects)
 - Assign class teacher and subject teacher (API + UI)
+- Assign one teacher to a subject across every class in a level (`PUT /academics/levels/<id>/subject-teacher/`). Grouped subjects stay class-by-class.
+- Teacher picker summaries collapse to the level name when that teacher covers the subject in every listed class of the level. Search still matches class names.
 - Manage curriculum after setup (`/classes/manage`)
 
 ### Students (done)

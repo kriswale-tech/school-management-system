@@ -4,6 +4,7 @@ import type {
   AllClassesQueryParams,
   AllClassesResponse,
   AssignClassTeacherPayload,
+  AssignLevelSubjectTeacherPayload,
   AssignSubjectTeacherPayload,
   ClassDetail,
   ClassListQueryParams,
@@ -12,6 +13,10 @@ import type {
   ClassStudentListResponse,
   ClassSubjectListResponse,
   ClassTeacherOptionListResponse,
+  LevelAssignableSubjectList,
+  LevelSubjectTeacherAssignResult,
+  SubjectClassListQueryParams,
+  SubjectClassListResponse,
   SubjectGroupCandidateList,
   TeachingAssignmentDetail,
 } from './types'
@@ -53,6 +58,14 @@ export const getClassList = async (
 ): Promise<ClassListResponse> => {
   const url = getQueryUrl<ClassListQueryParams>('/academics/classes/', params)
   const response = await api.get<ClassListResponse>(url)
+  return response.data
+}
+
+export const getSubjectClassList = async (
+  params: SubjectClassListQueryParams = {},
+): Promise<SubjectClassListResponse> => {
+  const url = getQueryUrl<SubjectClassListQueryParams>('/academics/classes/subjects/', params)
+  const response = await api.get<SubjectClassListResponse>(url)
   return response.data
 }
 
@@ -107,6 +120,26 @@ export const assignSubjectTeacher = async (
 ): Promise<ClassSubjectListResponse> => {
   const response = await api.put<ClassSubjectListResponse>(
     `/academics/classes/${streamId}/subject-teacher/`,
+    payload,
+  )
+  return response.data
+}
+
+export const getLevelAssignableSubjects = async (
+  levelId: string,
+): Promise<LevelAssignableSubjectList> => {
+  const response = await api.get<LevelAssignableSubjectList>(
+    `/academics/levels/${levelId}/assignable-subjects/`,
+  )
+  return response.data
+}
+
+export const assignLevelSubjectTeacher = async (
+  levelId: string,
+  payload: AssignLevelSubjectTeacherPayload,
+): Promise<LevelSubjectTeacherAssignResult> => {
+  const response = await api.put<LevelSubjectTeacherAssignResult>(
+    `/academics/levels/${levelId}/subject-teacher/`,
     payload,
   )
   return response.data
@@ -236,21 +269,31 @@ export const unpublishTeachingAssignmentStudents = async (
   return response.data
 }
 
-export const getAdminAssessmentFilterOptions =
-  async (): Promise<AdminAssessmentFilterOptions> => {
-    const response = await api.get<AdminAssessmentFilterOptions>(
-      '/academics/assessments/admin/filter-options/',
-    )
-    return response.data
-  }
+export const getAdminAssessmentFilterOptions = async (): Promise<AdminAssessmentFilterOptions> => {
+  const response = await api.get<AdminAssessmentFilterOptions>(
+    '/academics/assessments/admin/filter-options/',
+  )
+  return response.data
+}
 
 export const getAdminAssessmentOverview = async (
-  termId?: string,
+  params: {
+    termId?: string
+    search?: string
+    status?: 'with_class_teacher' | 'ready_for_you' | 'released'
+    page?: number
+    pageSize?: number
+  } = {},
 ): Promise<AdminAssessmentOverview> => {
-  const response = await api.get<AdminAssessmentOverview>(
-    '/academics/assessments/admin/classes/',
-    { params: termId ? { term_id: termId } : undefined },
-  )
+  const response = await api.get<AdminAssessmentOverview>('/academics/assessments/admin/classes/', {
+    params: {
+      term_id: params.termId,
+      search: params.search,
+      status: params.status,
+      page: params.page,
+      page_size: params.pageSize,
+    },
+  })
   return response.data
 }
 

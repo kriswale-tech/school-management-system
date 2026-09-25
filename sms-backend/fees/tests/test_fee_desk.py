@@ -161,3 +161,44 @@ class FeeDeskViewTests(APITestCase):
         self.assertEqual(stats_response.data['total_students'], 1)
         self.assertEqual(stats_response.data['debtors_count'], 0)
         self.assertEqual(Decimal(stats_response.data['total_collected']), Decimal('500.00'))
+
+    def test_debtors_filter_limits_list_and_stats(self):
+        self._apply_tuition()
+        Payment.objects.create(
+            student=self.student_a,
+            term=self.first_term,
+            amount=Decimal('500.00'),
+            payment_method=Payment.PaymentMethod.CASH,
+            recorded_by=self.user,
+        )
+        Payment.objects.create(
+            student=self.student_b,
+            term=self.first_term,
+            amount=Decimal('100.00'),
+            payment_method=Payment.PaymentMethod.CASH,
+            recorded_by=self.user,
+        )
+
+        params = {'debtors': 'true'}
+        list_response = self.client.get(reverse('fee-desk-list'), params)
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(list_response.data['count'], 1)
+        self.assertEqual(list_response.data['results'][0]['student_id'], 'TA-0002')
+
+        stats_response = self.client.get(reverse('fee-desk-stats'), params)
+        self.assertEqual(stats_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(stats_response.data['total_students'], 1)
+        self.assertEqual(stats_response.data['debtors_count'], 1)
+        self.assertEqual(Decimal(stats_response.data['outstanding']), Decimal('400.00'))
+
+        paid_params = {'debtors': 'false'}
+        paid_list = self.client.get(reverse('fee-desk-list'), paid_params)
+        self.assertEqual(paid_list.status_code, status.HTTP_200_OK)
+        self.assertEqual(paid_list.data['count'], 1)
+        self.assertEqual(paid_list.data['results'][0]['student_id'], 'TA-0001')
+
+        paid_stats = self.client.get(reverse('fee-desk-stats'), paid_params)
+        self.assertEqual(paid_stats.status_code, status.HTTP_200_OK)
+        self.assertEqual(paid_stats.data['total_students'], 1)
+        self.assertEqual(paid_stats.data['debtors_count'], 0)
+        self.assertEqual(Decimal(paid_stats.data['outstanding']), Decimal('0.00'))

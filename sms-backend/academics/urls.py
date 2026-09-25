@@ -8,8 +8,11 @@ from academics.views import (
     ClassListView,
     ClassStatsView,
     ClassStudentsView,
+    SubjectClassListView,
     ClassSubjectTeacherAssignView,
     ClassSubjectsView,
+    LevelAssignableSubjectsView,
+    LevelSubjectTeacherAssignView,
     ClassTeacherAssignView,
     ClassTeacherOptionsView,
     SubjectGroupAssignStudentsView,
@@ -51,11 +54,26 @@ urlpatterns = [
         name='academics-levels-all-classes',
     ),
     path(
+        'levels/<uuid:level_id>/assignable-subjects/',
+        LevelAssignableSubjectsView.as_view(),
+        name='academics-level-assignable-subjects',
+    ),
+    path(
+        'levels/<uuid:level_id>/subject-teacher/',
+        LevelSubjectTeacherAssignView.as_view(),
+        name='academics-level-subject-teacher-assign',
+    ),
+    path(
         'class-levels/',
         ActiveClassLevelListView.as_view(),
         name='academics-class-levels',
     ),
     path('classes/stats/', ClassStatsView.as_view(), name='academics-classes-stats'),
+    path(
+        'classes/subjects/',
+        SubjectClassListView.as_view(),
+        name='academics-classes-subjects',
+    ),
     path(
         'classes/teachers/',
         ClassTeacherOptionsView.as_view(),

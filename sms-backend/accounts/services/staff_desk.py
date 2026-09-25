@@ -64,23 +64,25 @@ def get_staff_desk_membership(actor, user_id):
 
 
 def get_staff_desk_stats(queryset) -> dict:
-    """Role breakdown for a (possibly filtered) staff queryset.
+    """Role breakdown for the staff directory cards.
 
-    Search and role filters on the desk list also apply here so the cards match
-    the table. `total_staff` counts every matching membership; role buckets only
-    count their respective roles within that same filtered set.
+    Counts the queryset as given. The stats view passes every membership the
+    actor can manage, with no search or role filter, so the cards stay fixed
+    while the table is filtered.
     """
     aggregates = queryset.aggregate(
         total_staff=Count('id'),
         teachers=Count('id', filter=Q(role=User.RoleChoices.TEACHER)),
         accountants=Count('id', filter=Q(role=User.RoleChoices.ACCOUNTANT)),
         admins=Count('id', filter=Q(role=User.RoleChoices.ADMIN)),
+        staff=Count('id', filter=Q(role=User.RoleChoices.STAFF)),
     )
     return {
         'total_staff': aggregates['total_staff'] or 0,
         'teachers': aggregates['teachers'] or 0,
         'accountants': aggregates['accountants'] or 0,
         'admins': aggregates['admins'] or 0,
+        'staff': aggregates['staff'] or 0,
     }
 
 

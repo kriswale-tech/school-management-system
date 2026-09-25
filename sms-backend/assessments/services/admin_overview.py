@@ -26,6 +26,12 @@ ADMIN_READY = 'ready_for_you'
 ADMIN_RELEASED = 'released'
 ADMIN_NEEDS_CORRECTION = 'needs_correction'
 
+ADMIN_LIST_STATUS_FILTERS = frozenset({
+    ADMIN_WITH_CLASS_TEACHER,
+    ADMIN_READY,
+    ADMIN_RELEASED,
+})
+
 
 def get_admin_assessment_filter_options(*, school) -> dict:
     years = (
@@ -54,7 +60,27 @@ def get_admin_assessment_filter_options(*, school) -> dict:
     }
 
 
-def list_admin_assessment_overview(*, school, term_id=None) -> dict:
+def list_admin_assessment_overview(
+    *,
+    school,
+    term_id=None,
+    search=None,
+    status=None,
+    for_list=False,
+) -> dict:
+    """Build admin assessment class rows and term-wide summary counts.
+
+    When ``for_list`` is True (assessments desk), apply search/status filters and
+    the default "waiting on admin" visibility. Dashboard callers leave
+    ``for_list`` False to receive every class row.
+    """
+    if status is not None and status not in ADMIN_LIST_STATUS_FILTERS:
+        raise ValidationError({
+            'status': (
+                'Invalid status. Use with_class_teacher, ready_for_you, or released.'
+            ),
+        })
+
     term = resolve_term(school, term_id)
     class_entries = _class_entries(school)
     teachers_by_key = _class_teachers_by_key(school=school, term=term)
@@ -102,6 +128,9 @@ def list_admin_assessment_overview(*, school, term_id=None) -> dict:
             **counts,
         })
 
+    if for_list:
+        rows = _filter_admin_overview_rows(rows, search=search, status=status)
+
     from assessments.models import CorrectionRequest
     from assessments.services.corrections import list_corrections_inbox
 
@@ -122,8 +151,65 @@ def list_admin_assessment_overview(*, school, term_id=None) -> dict:
         'classes_fully_ready_count': classes_fully_ready,
         'corrections_inbox_count': len(inbox),
         'corrections_inbox': inbox,
+        'filtered_students_count': sum(
+            _filtered_students_for_row(row, status=status) for row in rows
+        ),
         'results': rows,
     }
+
+
+def _filter_admin_overview_rows(rows, *, search=None, status=None):
+    search_term = (search or '').strip().lower()
+    filtered = []
+    for row in rows:
+        if status is None:
+            if not _row_visible_by_default(row):
+                continue
+        elif not _row_matches_status(row, status):
+            continue
+
+        if search_term and not _row_matches_search(row, search_term):
+            continue
+
+        filtered.append(row)
+    return filtered
+
+
+def _row_visible_by_default(row) -> bool:
+    return (
+        row['ready_for_you_count'] > 0
+        or row['released_count'] > 0
+        or row['needs_correction_count'] > 0
+    )
+
+
+def _row_matches_status(row, status: str) -> bool:
+    if status == ADMIN_WITH_CLASS_TEACHER:
+        return row['with_class_teacher_count'] > 0
+    if status == ADMIN_READY:
+        return row['ready_for_you_count'] > 0
+    if status == ADMIN_RELEASED:
+        return row['released_count'] > 0
+    return False
+
+
+def _row_matches_search(row, search_term: str) -> bool:
+    teacher = (row.get('class_teacher_name') or '').lower()
+    return search_term in row['display_name'].lower() or search_term in teacher
+
+
+def _filtered_students_for_row(row, *, status=None) -> int:
+    if status == ADMIN_WITH_CLASS_TEACHER:
+        return row['with_class_teacher_count']
+    if status == ADMIN_READY:
+        return row['ready_for_you_count']
+    if status == ADMIN_RELEASED:
+        return row['released_count']
+    return (
+        row['ready_for_you_count']
+        + row['released_count']
+        + row['needs_correction_count']
+    )
 
 
 def _class_entries(school) -> list[dict]:

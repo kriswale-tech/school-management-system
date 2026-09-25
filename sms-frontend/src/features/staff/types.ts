@@ -11,7 +11,7 @@ export type StaffQueryParams = {
   exclude?: string
 }
 
-/** Query params for the staff directory list and filter-aware stats. */
+/** Query params for the staff directory list. Stats ignore these filters. */
 export type StaffDeskQueryParams = {
   page?: number
   page_size?: number
@@ -94,9 +94,11 @@ export interface StaffDeskRow {
 }
 
 /** Response from GET /accounts/staff/stats/ */
+/** School-wide counts from GET /accounts/staff/stats/. Search and role do not change these. */
 export interface StaffDeskStats {
   total_staff: number
   teachers: number
+  staff: number
   accountants: number
   admins: number
 }

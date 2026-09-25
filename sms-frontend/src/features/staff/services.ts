@@ -42,12 +42,9 @@ export const getStaffDeskList = async (
   return response.data
 }
 
-/** Filter-aware stats — GET /accounts/staff/stats/ */
-export const getStaffDeskStats = async (
-  params: Omit<StaffDeskQueryParams, 'page' | 'page_size'>,
-): Promise<StaffDeskStats> => {
-  const url = getQueryUrl('/accounts/staff/stats/', params)
-  const response = await api.get<StaffDeskStats>(url)
+/** School-wide directory counts — GET /accounts/staff/stats/. Not affected by search or role. */
+export const getStaffDeskStats = async (): Promise<StaffDeskStats> => {
+  const response = await api.get<StaffDeskStats>('/accounts/staff/stats/')
   return response.data
 }
 

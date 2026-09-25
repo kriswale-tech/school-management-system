@@ -754,7 +754,7 @@ class UserDetailView(APIView):
 
 
 def _filtered_staff_desk_queryset(request):
-    """Apply the same search/role filters to staff list and stats."""
+    """Apply search and role filters to the staff directory table."""
     queryset = list_staff_desk_memberships(request.membership)
     filterset = SchoolMemberFilter(request.query_params, queryset=queryset)
     if not filterset.is_valid():
@@ -816,7 +816,11 @@ class StaffDeskListView(APIView):
 
 
 class StaffDeskStatsView(APIView):
-    """Filter-aware staff counts for the directory stats cards."""
+    """School-wide staff counts for the directory stats cards.
+
+    Search and role filters apply to the list only. Query params on this
+    endpoint are ignored so the cards do not follow the table.
+    """
 
     permission_classes = [HasActiveSchool, CanManageUser]
 
@@ -824,36 +828,15 @@ class StaffDeskStatsView(APIView):
         tags=['Accounts'],
         summary='Staff directory statistics',
         description=(
-            'Role breakdown for memberships matching the same filters as the '
-            'staff directory list (search, role, is_active, exclude).'
+            'Role breakdown for every membership in the selected school that '
+            'the requester can manage. Counts do not change with the directory '
+            'search or role filter. Includes total, teachers, staff, '
+            'accountants, and admins.'
         ),
-        parameters=[
-            OpenApiParameter(
-                name='role',
-                type=str,
-                enum=[choice[0] for choice in User.RoleChoices.choices],
-                description='Filter by role in this school.',
-            ),
-            OpenApiParameter(
-                name='is_active',
-                type=bool,
-                description='Filter by active status in this school.',
-            ),
-            OpenApiParameter(
-                name='exclude',
-                type=str,
-                description='Exclude role(s), comma-separated.',
-            ),
-            OpenApiParameter(
-                name='search',
-                type=str,
-                description='Search first name, last name, email, or phone number.',
-            ),
-        ],
         responses={200: StaffDeskStatsSerializer},
     )
     def get(self, request):
-        queryset = _filtered_staff_desk_queryset(request)
+        queryset = list_staff_desk_memberships(request.membership)
         stats = get_staff_desk_stats(queryset)
         return Response(StaffDeskStatsSerializer(stats).data)
 

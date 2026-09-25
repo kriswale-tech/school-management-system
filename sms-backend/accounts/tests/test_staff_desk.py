@@ -92,25 +92,35 @@ class StaffDeskAPITests(APITestCase):
         self.assertEqual(teacher_row['phone_number'], '+233244567891')
         self.assertIn('date_added', teacher_row)
 
-    def test_stats_match_filters(self):
+    def test_stats_ignore_search_and_role_filters(self):
+        create_user(
+            phone_number='+233244567893',
+            email='office@test.com',
+            school=self.school,
+            role=User.RoleChoices.STAFF,
+            is_active=True,
+            first_name='Esi',
+            last_name='Office',
+        )
+
         unfiltered = self.client.get(self.stats_url)
         self.assertEqual(unfiltered.status_code, status.HTTP_200_OK)
-        self.assertGreaterEqual(unfiltered.data['total_staff'], 3)
+        self.assertGreaterEqual(unfiltered.data['total_staff'], 4)
         self.assertEqual(unfiltered.data['teachers'], 1)
         self.assertEqual(unfiltered.data['accountants'], 1)
+        self.assertEqual(unfiltered.data['staff'], 1)
         self.assertGreaterEqual(unfiltered.data['admins'], 1)
+        total = unfiltered.data['total_staff']
 
-        filtered = self.client.get(self.stats_url, {'role': 'teacher'})
+        filtered = self.client.get(self.stats_url, {'role': 'teacher', 'search': 'Books'})
         self.assertEqual(filtered.status_code, status.HTTP_200_OK)
-        self.assertEqual(filtered.data['total_staff'], 1)
-        self.assertEqual(filtered.data['teachers'], 1)
-        self.assertEqual(filtered.data['accountants'], 0)
-        self.assertEqual(filtered.data['admins'], 0)
+        self.assertEqual(filtered.data, unfiltered.data)
+        self.assertEqual(filtered.data['total_staff'], total)
 
-        searched = self.client.get(self.stats_url, {'search': 'Books'})
-        self.assertEqual(searched.status_code, status.HTTP_200_OK)
-        self.assertEqual(searched.data['total_staff'], 1)
-        self.assertEqual(searched.data['accountants'], 1)
+        listed = self.client.get(self.list_url, {'role': 'teacher', 'search': 'Ama'})
+        self.assertEqual(listed.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(listed.data['results']), 1)
+        self.assertEqual(listed.data['results'][0]['role'], User.RoleChoices.TEACHER)
 
     def test_detail_returns_profile_and_assignments(self):
         url = reverse('staff-desk-detail', kwargs={'pk': self.teacher.id})
