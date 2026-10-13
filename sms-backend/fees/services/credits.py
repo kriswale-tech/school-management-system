@@ -25,7 +25,7 @@ def create_credit_from_excess(*, school, student, amount, source_payment):
     if amount is None or amount <= 0:
         return None
 
-    return StudentFeeCredit.objects.create(
+    credit = StudentFeeCredit.objects.create(
         student=student,
         school=school,
         amount=amount,
@@ -34,6 +34,34 @@ def create_credit_from_excess(*, school, student, amount, source_payment):
         source_payment=source_payment,
         notes='Excess payment held as advance.',
     )
+    from activities.models import Activity
+    from activities.services import record_activity
+
+    from students.models import ClassEnrollment
+
+    name = ' '.join(
+        part for part in (student.first_name, student.other_names, student.last_name) if part
+    ).strip()
+    term = getattr(source_payment, 'term', None)
+    enrollment = (
+        ClassEnrollment.objects.filter(student=student, term=term)
+        .select_related('stream')
+        .first()
+        if term is not None
+        else None
+    )
+    record_activity(
+        school=school,
+        actor=getattr(source_payment, 'recorded_by', None),
+        verb=Activity.Verb.ADVANCE_CREATED,
+        summary=f'GHS {amount} held as advance for {name}.',
+        href=f'/fees/{student.id}',
+        term=term,
+        stream=enrollment.stream if enrollment is not None else None,
+        target_kind='student_fee_credit',
+        target_id=credit.id,
+    )
+    return credit
 
 
 @transaction.atomic

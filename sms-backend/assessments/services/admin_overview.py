@@ -603,6 +603,7 @@ def release_admin_students(
 
     now = timezone.now()
     note = (remarks or '').strip()
+    released_count = 0
     for student_id in ids:
         result_row = _result_row(
             student_id=student_id,
@@ -616,6 +617,7 @@ def release_admin_students(
             raise ValidationError({
                 'detail': 'Only students the class teacher has approved can be released.',
             })
+        released_count += 1
         result_row.status = StudentResult.Status.RELEASED
         result_row.head_teacher_remarks = note
         result_row.released_at = now
@@ -628,6 +630,25 @@ def release_admin_students(
                 'released_by',
                 'updated_at',
             ]
+        )
+
+    if released_count:
+        from activities.models import Activity
+        from activities.services import record_activity
+
+        record_activity(
+            school=school,
+            actor=membership.user,
+            verb=Activity.Verb.REPORTS_RELEASED,
+            summary=(
+                f'{membership.user.get_full_name()} released {released_count} '
+                f'report{"s" if released_count != 1 else ""} for {stream.full_name}.'
+            ),
+            href=f'/assessments/classes/{stream.id}',
+            term=term,
+            target_kind='stream',
+            target_id=stream.id,
+            stream=stream,
         )
 
     return get_admin_assessment_detail(

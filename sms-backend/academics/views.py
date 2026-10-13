@@ -425,6 +425,7 @@ class ClassTeacherAssignView(SchoolScopedAPIView):
             school=self.school,
             stream_id=stream_id,
             teacher_id=serializer.validated_data['teacher_id'],
+            actor=request.user,
         )
         return Response(ClassDetailSerializer(payload).data)
 
@@ -450,6 +451,7 @@ class ClassSubjectTeacherAssignView(SchoolScopedAPIView):
         payload = assign_subject_teacher(
             school=self.school,
             stream_id=stream_id,
+            actor=request.user,
             **serializer.validated_data,
         )
         return Response(ClassSubjectListSerializer(payload).data)

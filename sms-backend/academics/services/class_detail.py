@@ -625,7 +625,7 @@ def get_class_teacher_options(*, school, term=None, search=None):
     }
 
 
-def assign_class_teacher(*, school, stream_id, teacher_id):
+def assign_class_teacher(*, school, stream_id, teacher_id, actor=None):
     """Assign a class teacher to a stream for the active term.
 
     Replaces any existing stream-specific assignment and any whole-class
@@ -649,6 +649,22 @@ def assign_class_teacher(*, school, stream_id, teacher_id):
         class_level_id=stream.class_level_id,
         stream_id=stream.id,
     )
+    from activities.models import Activity
+    from activities.services import record_activity
+
+    teacher = User.objects.filter(id=teacher_id).first()
+    teacher_name = teacher.get_full_name().strip() if teacher else 'A teacher'
+    record_activity(
+        school=school,
+        actor=actor,
+        verb=Activity.Verb.CLASS_TEACHER_ASSIGNED,
+        summary=f'{teacher_name} assigned as class teacher for {stream.full_name}.',
+        href=f'/classes/{stream.id}',
+        term=term,
+        target_kind='stream',
+        target_id=stream.id,
+        stream=stream,
+    )
     return get_class_detail(school=school, stream_id=stream.id, term=term)
 
 
@@ -659,6 +675,7 @@ def assign_subject_teacher(
     teacher_id,
     class_subject_id,
     subject_group_id=None,
+    actor=None,
 ):
     term = get_active_term(
         school,
@@ -719,6 +736,46 @@ def assign_subject_teacher(
             subject_group_id=None,
         )
 
+    from activities.models import Activity
+    from activities.services import record_activity
+
+    teacher = User.objects.filter(id=teacher_id).first()
+    teacher_name = teacher.get_full_name().strip() if teacher else 'A teacher'
+    subject_name = class_subject.subject.name
+    if subject_group_id:
+        group_name = SubjectGroup.objects.filter(id=subject_group_id).values_list(
+            'name',
+            flat=True,
+        ).first()
+        if group_name:
+            subject_name = f'{subject_name} ({group_name})'
+    created_qs = TeachingAssignment.objects.filter(
+        teacher_id=teacher_id,
+        term=term,
+        class_subject=class_subject,
+        subject_group_id=subject_group_id,
+    )
+    if subject_group_id:
+        created_qs = created_qs.filter(stream__isnull=True)
+    else:
+        created_qs = created_qs.filter(stream=stream)
+    created_assignment = created_qs.first()
+    record_activity(
+        school=school,
+        actor=actor,
+        verb=Activity.Verb.SUBJECT_TEACHER_ASSIGNED,
+        summary=f'{teacher_name} assigned to teach {subject_name} in {stream.full_name}.',
+        href=(
+            f'/classes/subjects/{created_assignment.id}'
+            if created_assignment is not None
+            else f'/classes/{stream.id}?tab=subjects'
+        ),
+        term=term,
+        target_kind='teaching_assignment' if created_assignment is not None else 'stream',
+        target_id=created_assignment.id if created_assignment is not None else stream.id,
+        stream=stream,
+        teaching_assignment=created_assignment,
+    )
     return get_class_subjects(school=school, stream_id=stream.id, term=term)
 
 

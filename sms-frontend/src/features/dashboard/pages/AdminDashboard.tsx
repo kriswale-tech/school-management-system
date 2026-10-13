@@ -7,14 +7,16 @@ import NeedsAttentionCard from '../components/NeedsAttentionCard'
 import OverviewCard from '../components/OverviewCard'
 import SetupHealthCard, { isSetupHealthIncomplete } from '../components/SetupHealthCard'
 import TopDebtorsCard from '../components/TopDebtorsCard'
+import RecentActivitiesCard from '../components/RecentActivitiesCard'
 import WelcomeBanner from '../components/WelcomeBanner'
-import { getAdminDashboard } from '../services'
+import { getAdminDashboard, getRecentActivities } from '../services'
 import type { OverviewMetric } from '../types'
 import {
   ADMIN_DASHBOARD_QUERY_KEY,
   formatCompactFeeAmount,
   formatDashboardCount,
   padDashboardCount,
+  RECENT_ACTIVITIES_QUERY_KEY,
 } from '../utils'
 
 const AdminDashboard = () => {
@@ -23,6 +25,11 @@ const AdminDashboard = () => {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: [ADMIN_DASHBOARD_QUERY_KEY],
     queryFn: getAdminDashboard,
+  })
+
+  const { data: activities = [], isLoading: activitiesLoading } = useQuery({
+    queryKey: [RECENT_ACTIVITIES_QUERY_KEY],
+    queryFn: getRecentActivities,
   })
 
   const schoolMetrics = useMemo<OverviewMetric[]>(() => {
@@ -150,8 +157,9 @@ const AdminDashboard = () => {
             <SetupHealthCard health={data.setup_health} />
           ) : null}
         </div>
-        <div>
+        <div className="space-y-4">
           <TopDebtorsCard debtors={data?.top_debtors ?? []} />
+          <RecentActivitiesCard activities={activities} isLoading={activitiesLoading} />
         </div>
       </div>
     </div>

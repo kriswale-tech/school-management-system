@@ -346,6 +346,19 @@ def _update_profile(user: User, profile_data: dict) -> None:
     profile.save(update_fields=[*profile_data, 'updated_at'])
 
 
+@transaction.atomic
+def update_current_user(user: User, validated_data: dict) -> User:
+    """Self-service profile update. Does not change login phone, role, or membership."""
+    profile_data = {
+        field: validated_data.pop(field)
+        for field in PROFILE_FIELDS
+        if field in validated_data
+    }
+    _update_identity(user, validated_data)
+    _update_profile(user, profile_data)
+    return user
+
+
 @dataclass
 class RemoveMemberResult:
     hard_deleted: bool

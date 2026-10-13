@@ -13,7 +13,7 @@ interface TabComponentProps {
 
 const TabComponent = ({ tabs, activeTab }: TabComponentProps) => {
   return (
-    <div className="flex items-center gap-4 border-b border-slate-200">
+    <div className="flex flex-wrap items-center gap-4 border-b border-slate-200">
       {tabs.map((tab) => (
         <button
           key={tab.label}

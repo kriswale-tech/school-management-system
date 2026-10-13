@@ -26,7 +26,11 @@ import {
   removeSubjectFromClass,
 } from './services'
 
-const ManageClasses = () => {
+type ManageClassesProps = {
+  embedded?: boolean
+}
+
+const ManageClasses = ({ embedded = false }: ManageClassesProps) => {
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
@@ -219,7 +223,7 @@ const ManageClasses = () => {
 
   return (
     <div className="space-y-6">
-      <ActionBar title="Manage Classes" back />
+      {embedded ? null : <ActionBar title="Manage Classes" back />}
 
       {isLoading ? (
         <LoadingSpinner className="mx-auto" />

@@ -29,6 +29,7 @@ from accounts.serializers import (
     SchoolMembershipSerializer,
     SchoolMemberSerializer,
     SelectSchoolSerializer,
+    MeUpdateSerializer,
     UpdateUserResponseSerializer,
     UpdateUserSerializer,
     UserSerializer,
@@ -172,6 +173,8 @@ def _resend_otp_response(resend_fn, phone_number):
 
 
 class MeView(APIView):
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
     @extend_schema(
         tags=['Accounts'],
         summary='Get current user',
@@ -191,6 +194,37 @@ class MeView(APIView):
             },
         )
         return Response(serializer.data)
+
+    @extend_schema(
+        tags=['Accounts'],
+        summary='Update my profile',
+        description=(
+            'Updates the signed-in user\'s name, email, and profile fields. '
+            'Login phone, role, and school membership cannot be changed here. '
+            'Send multipart/form-data when updating profile_picture.'
+        ),
+        request=MeUpdateSerializer,
+        responses={200: UserSerializer},
+    )
+    def patch(self, request):
+        serializer = MeUpdateSerializer(
+            request.user,
+            data=request.data,
+            partial=True,
+            context={'request': request},
+        )
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        user.refresh_from_db()
+        return Response(
+            UserSerializer(
+                user,
+                context={
+                    'membership': request.membership,
+                    'memberships': list(active_memberships(user)),
+                },
+            ).data,
+        )
 
 
 class MeTeachingView(APIView):

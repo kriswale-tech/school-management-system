@@ -42,7 +42,9 @@ School-Management-System/
 | `students` | Students, parents, enrollments, onboard, bulk import, fee *read* APIs |
 | `teachers` | Class teacher & teaching assignment models (APIs mostly via schools setup + academics) |
 | `fees` | Fee structures, student fees, payments, receipts — **services**, minimal views |
-| `assessments` | Assessment config + grade bands; scoring models **stubbed** |
+| `assessments` | Assessment config, markbook, approvals, releases, corrections |
+| `dashboard` | Admin and teacher home aggregations (read-only) |
+| `activities` | School activity feed. Domain services write via `record_activity`; dashboards read |
 | `shared` | `BaseModel`, helpers, shared exceptions/services |
 
 ## Frontend feature modules

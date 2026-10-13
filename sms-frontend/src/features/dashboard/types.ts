@@ -85,3 +85,63 @@ export type OverviewMetric = {
   label: string
   value: string
 }
+
+export type TeacherClassRow = {
+  id: string
+  display_name: string
+  students_count: number
+  view_stream_id: string | null
+  pending_count: number
+  awaiting_approval_count: number
+  approved_count: number
+  needs_correction_count: number
+  href: string
+}
+
+export type TeacherSubjectRow = {
+  id: string
+  subject_name: string
+  display_class_name: string
+  subject_group_name: string | null
+  students_count: number
+  published_count: number
+  is_open: boolean
+  needs_correction_count: number
+  href: string
+}
+
+export type TeacherDashboard = {
+  is_class_teacher: boolean
+  is_subject_teacher: boolean
+  show_academic_widgets: boolean
+  classes_overview: {
+    classes_count: number
+    students_count: number
+  }
+  subjects_overview: {
+    subjects_count: number
+    students_count: number
+  }
+  academic_overview: {
+    pending_reports: number
+    awaiting_approval: number
+    approved_reports: number
+    subjects_to_publish: number
+    subjects_published: number
+    corrections_count: number
+  }
+  needs_attention: AdminDashboardNeedsAttentionItem[]
+  classes: TeacherClassRow[]
+  subjects: TeacherSubjectRow[]
+  activities: ActivityItem[]
+}
+
+export type ActivityItem = {
+  id: string
+  verb: string
+  summary: string
+  href: string
+  actor_name: string
+  created_at: string
+  target_kind: string
+}

@@ -31,7 +31,11 @@ const statusClassName = (status: string) => {
   return 'text-slate-700 bg-slate-100 border-slate-200'
 }
 
-const FeeSettings = () => {
+type FeeSettingsProps = {
+  embedded?: boolean
+}
+
+const FeeSettings = ({ embedded = false }: FeeSettingsProps) => {
   const queryClient = useQueryClient()
   const [termSelection, setTermSelection] = useState<FilterSelection | undefined>(undefined)
   const [applyOpen, setApplyOpen] = useState(false)
@@ -97,27 +101,37 @@ const FeeSettings = () => {
   const locked = Boolean(structure?.is_locked)
   const termEnded = Boolean(structure?.term_ended || selectedTermMeta?.is_ended)
 
+  const termControls = (
+    <>
+      <FilterComponent
+        filterName="Term"
+        filterKey="term"
+        options={termOptions}
+        value={term}
+        placeholder={filtersLoading ? 'Loading…' : 'Academic Year & Term'}
+        onChange={setTermSelection}
+      />
+      {structure?.can_apply ? (
+        <Button
+          type="button"
+          className="py-2 text-sm max-w-fit"
+          onClick={() => setApplyOpen(true)}
+        >
+          Apply to enrolled students
+        </Button>
+      ) : null}
+    </>
+  )
+
   return (
     <div className="space-y-6">
-      <ActionBar back title="Fees Settings">
-        <FilterComponent
-          filterName="Term"
-          filterKey="term"
-          options={termOptions}
-          value={term}
-          placeholder={filtersLoading ? 'Loading…' : 'Academic Year & Term'}
-          onChange={setTermSelection}
-        />
-        {structure?.can_apply ? (
-          <Button
-            type="button"
-            className="py-2 text-sm max-w-fit"
-            onClick={() => setApplyOpen(true)}
-          >
-            Apply to enrolled students
-          </Button>
-        ) : null}
-      </ActionBar>
+      {embedded ? (
+        <div className="flex flex-wrap items-center justify-end gap-3">{termControls}</div>
+      ) : (
+        <ActionBar back title="Fees Settings">
+          {termControls}
+        </ActionBar>
+      )}
 
       {!filterOptions || (Boolean(termId) && isLoading) ? (
         <LoadingSpinner className="mx-auto" />
@@ -128,7 +142,7 @@ const FeeSettings = () => {
       ) : !data || !structure ? (
         <p className="text-sm text-slate-500">Select a term to manage fee items.</p>
       ) : (
-        <div className="bg-white p-4 custom-shadow-md space-y-6">
+        <div className={embedded ? 'space-y-6' : 'bg-white p-4 custom-shadow-md space-y-6'}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-lg text-slate-900">{structure.name}</h2>

@@ -158,6 +158,15 @@ def record_student_payment(
             source_payment=payment,
         )
 
+    _record_payment_activity(
+        school=school,
+        student=student,
+        amount=amount,
+        term=term,
+        recorded_by=recorded_by,
+        payment=payment,
+    )
+
     return {
         'payment_id': payment.id,
         'receipt_id': receipt.id,
@@ -172,3 +181,32 @@ def record_student_payment(
         'credit_id': credit.id if credit else None,
         'paid_at': payment.paid_at,
     }
+
+
+def _record_payment_activity(*, school, student, amount, term, recorded_by, payment):
+    from activities.models import Activity
+    from activities.services import record_activity
+
+    from students.models import ClassEnrollment
+
+    name = ' '.join(
+        part for part in (student.first_name, student.other_names, student.last_name) if part
+    ).strip()
+    enrollment = (
+        ClassEnrollment.objects.filter(student=student, term=term)
+        .select_related('stream')
+        .first()
+        if term is not None
+        else None
+    )
+    record_activity(
+        school=school,
+        actor=recorded_by,
+        verb=Activity.Verb.PAYMENT_RECORDED,
+        summary=f'Payment of GHS {amount} recorded for {name}.',
+        href=f'/fees/{student.id}',
+        term=term,
+        stream=enrollment.stream if enrollment is not None else None,
+        target_kind='payment',
+        target_id=payment.id,
+    )

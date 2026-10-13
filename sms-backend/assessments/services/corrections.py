@@ -16,6 +16,7 @@ from assessments.models import (
     StudentResult,
     SubjectScore,
 )
+from activities.models import Activity
 from assessments.services.admin_overview import (
     _load_stream,
     _result_row,
@@ -558,6 +559,24 @@ def reject_or_reopen_student(
         actor=actor,
         request=request,
     )
+    _record_assessment_activity(
+        school=school,
+        actor=actor,
+        verb=(
+            Activity.Verb.CORRECTION_SENT
+            if kind == CorrectionRequest.Kind.REJECT
+            else Activity.Verb.CORRECTION_APPLIED
+        ),
+        student_id=student_id,
+        stream=stream,
+        term=term,
+        action=(
+            'sent {name} back for correction in {subject} ({class_name})'
+            if kind == CorrectionRequest.Kind.REJECT
+            else 'reopened the report for {name} in {subject} ({class_name})'
+        ),
+        assignments=assignments,
+    )
     return {
         'correction': serialize_correction_request(
             CorrectionRequest.objects.prefetch_related('subjects').get(pk=request.pk)
@@ -633,6 +652,16 @@ def request_reopen_student(
         actor=membership.user,
         status=CorrectionRequest.Status.OPEN,
     )
+    _record_assessment_activity(
+        school=school,
+        actor=membership.user,
+        verb=Activity.Verb.REOPEN_REQUESTED,
+        student_id=student_id,
+        stream=stream,
+        term=term,
+        action='requested a reopen for {name} in {subject} ({class_name})',
+        assignments=assignments,
+    )
     return {
         'correction': serialize_correction_request(
             CorrectionRequest.objects.prefetch_related('subjects').get(pk=request.pk)
@@ -681,6 +710,19 @@ def review_reopen_request(
         request.status = CorrectionRequest.Status.DECLINED
         request.save(update_fields=['status', 'reviewed_by', 'reviewed_at', 'updated_at'])
         _add_event(request=request, event_type='declined', actor=actor, detail={})
+        _record_assessment_activity(
+            school=school,
+            actor=actor,
+            verb=Activity.Verb.REOPEN_DECLINED,
+            student_id=request.student_id,
+            stream=stream,
+            term=term,
+            action='declined a reopen request for {name} in {subject} ({class_name})',
+            assignments=[
+                row.teaching_assignment
+                for row in request.subjects.all()
+            ],
+        )
         return {
             'correction': serialize_correction_request(request),
             'detail': get_admin_assessment_detail(
@@ -709,6 +751,16 @@ def review_reopen_request(
         assignments=assignments,
         actor=actor,
         request=request,
+    )
+    _record_assessment_activity(
+        school=school,
+        actor=actor,
+        verb=Activity.Verb.CORRECTION_APPLIED,
+        student_id=request.student_id,
+        stream=stream,
+        term=term,
+        action='approved a reopen for {name} in {subject} ({class_name})',
+        assignments=assignments,
     )
     return {
         'correction': serialize_correction_request(
@@ -795,6 +847,16 @@ def reject_class_teacher_student(
         actor=membership.user,
         request=request,
     )
+    _record_assessment_activity(
+        school=school,
+        actor=membership.user,
+        verb=Activity.Verb.STUDENT_REJECTED,
+        student_id=student_id,
+        stream=stream,
+        term=term,
+        action='rejected {name} in {subject} ({class_name})',
+        assignments=assignments,
+    )
     return {
         'correction': serialize_correction_request(
             CorrectionRequest.objects.prefetch_related('subjects').get(pk=request.pk)
@@ -805,3 +867,58 @@ def reject_class_teacher_student(
             class_teacher_id=class_teacher.id,
         ),
     }
+
+
+def _subject_activity_label(assignment):
+    class_subject = getattr(assignment, 'class_subject', None)
+    subject = getattr(class_subject, 'subject', None) if class_subject is not None else None
+    name = subject.name if subject is not None else 'a subject'
+    group = getattr(assignment, 'subject_group', None)
+    if group is not None:
+        return f'{name} ({group.name})'
+    return name
+
+
+def _record_assessment_activity(
+    *,
+    school,
+    actor,
+    verb,
+    student_id,
+    stream,
+    term,
+    action,
+    assignments=None,
+):
+    from activities.services import record_activity
+    from students.models import Student
+
+    student = Student.objects.filter(id=student_id).first()
+    if student is None:
+        name = 'a student'
+    else:
+        name = ' '.join(
+            part for part in (student.first_name, student.other_names, student.last_name) if part
+        ).strip() or 'a student'
+    actor_name = (actor.get_full_name() or '').strip() or 'Someone'
+    targets = list(assignments or [None])
+    for assignment in targets:
+        subject = _subject_activity_label(assignment) if assignment is not None else 'the class'
+        record_activity(
+            school=school,
+            actor=actor,
+            verb=verb,
+            summary=(
+                f'{actor_name} {action.format(name=name, class_name=stream.full_name, subject=subject)}.'
+            ),
+            href=(
+                f'/classes/subjects/{assignment.id}'
+                if assignment is not None
+                else f'/assessments/classes/{stream.id}'
+            ),
+            term=term,
+            target_kind='teaching_assignment' if assignment is not None else 'student',
+            target_id=assignment.id if assignment is not None else student_id,
+            stream=stream,
+            teaching_assignment=assignment,
+        )

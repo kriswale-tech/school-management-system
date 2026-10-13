@@ -1,12 +1,23 @@
 from django.contrib import admin
 
-from schools.models import AcademicYear, School, SchoolSetup, Term
+from schools.models import AcademicYear, School, SchoolSettings, SchoolSetup, Term
 
 
 @admin.register(School)
 class SchoolAdmin(admin.ModelAdmin):
     list_display = ['name', 'phone_number', 'email', 'setup_completed']
     search_fields = ['name', 'phone_number', 'email']
+
+
+@admin.register(SchoolSettings)
+class SchoolSettingsAdmin(admin.ModelAdmin):
+    list_display = [
+        'school',
+        'fees_alert_enabled',
+        'fees_alert_threshold',
+        'results_alert_enabled',
+        'enrollments_alert_enabled',
+    ]
 
 
 @admin.register(SchoolSetup)

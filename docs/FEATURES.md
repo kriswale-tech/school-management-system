@@ -16,8 +16,9 @@ Checklist by domain. Status values:
 | Admin signup + OTP | Yes | Yes | Done |
 | Login + OTP | Yes | Yes | Done |
 | Resend OTP / cooldown | Yes | Yes | Done |
+| Update my profile | `PATCH /accounts/me/` | `/profile` | Done |
 | SMS delivery of OTP | Arkesel client unused; DEBUG print only | — | Partial |
-| Update school profile (post-setup) | GET only; PATCH stub | Via setup / limited | Partial |
+| Update school profile (post-setup) | `GET`/`PATCH /schools/school/` | Settings → School profile | Done |
 | Create school / multi-school | Yes | Yes | Done |
 | Select active school | Yes | Yes | Done |
 | Me / refresh / logout | Yes | Yes | Done |
@@ -28,7 +29,7 @@ Checklist by domain. Status values:
 | Step | Backend | Frontend | Status |
 | --- | --- | --- | --- |
 | School profile | Yes | Yes | Done |
-| Academic year & term | Yes | Yes | Done |
+| Academic year & term | Yes (creates the first active year) | Yes | Done |
 | Classes & subjects (+ streams, groups, custom) | Yes | Yes | Done |
 | Assessment config | Yes | Yes | Done |
 | Fees items for term | Yes | Yes | Done |
@@ -73,7 +74,7 @@ Checklist by domain. Status values:
 | Teaching / class-teacher assignments | Models + setup + academics | Setup + class detail | Done |
 | Main `/staff` page | Same APIs | Placeholder | Stub |
 | Teacher markbook / portal | — | — | Not started |
-| Profile page (`/profile`) | Partial (Profile model) | Link only, no route | Stub |
+| Profile page (`/profile`) | `GET`/`PATCH /accounts/me/` | `/profile` | Done (see [profile.md](./profile.md)) |
 
 ## Fees
 
@@ -100,13 +101,34 @@ Checklist by domain. Status values:
 | Assessments nav page | No APIs | Placeholder | Stub |
 | Report card generation | Yes (R2 PDF; released only) | Assessments report page + student Reports tab (inline) | Done |
 
+## School settings (admin, after setup)
+
+Signup setup is unchanged. These screens edit the school after the wizard, under `/settings/:tab` (admin only).
+
+| Feature | Backend | Frontend | Status |
+| --- | --- | --- | --- |
+| School profile + student ID prefix | `GET`/`PATCH /schools/school/` | `/settings/school-profile` | Done |
+| Year calendar | `GET`/`POST /schools/settings/academic-years/`, `PATCH …/<year_id>/` | `/settings/academic-year` | Done |
+| Switch current term | `GET …/terms/<term_id>/switch/`, `POST …/activate/` | Make this the current term | Done |
+| In-app alerts | `GET`/`PATCH /schools/settings/`, `GET /schools/alerts/` | `/settings/alerts` + navbar bell | Done |
+| Fee catalog | Same as `/fees/settings` | `/settings/fees` and `/fees/settings` | Done |
+| Assessment structure | Same as `/assessments/settings` | `/settings/assessments` and `/assessments/settings` | Done |
+| Classes and subjects | Same as `/classes/manage` | `/settings/classes` and `/classes/manage` | Done |
+
+The calendar lists every year. Past years are view-only. **Add** saves the next year’s three terms and leaves the current term active. Assessment settings are copied onto any new term that does not have them yet.
+
+**Make this the current term** runs checks, then turns that term (and its year) on and turns the previous ones off. It only allows the immediate next term. It blocks a skip, a jump backward, and a next term that starts before the current one ends. It warns when today is still before the start date, fees are missing or not applied, or reports on the current term are unreleased. It does not roll students forward or bill the next term. If the new term has no assessment setup, the previous term’s setup is copied onto it.
+
+Alerts are in-app only: outstanding fees (admin and accountant), unreleased results (admin and class teachers), and new enrollments (admin).
+
 ## Dashboard & shell
 
 | Feature | Backend | Frontend | Status |
 | --- | --- | --- | --- |
 | App shell (nav, auth gates) | — | Yes | Done |
-| Dashboard widgets | No | Lorem stub | Stub |
-| Notifications | No | Icon only | Stub |
+| Dashboard widgets | Yes (`/dashboard/admin/`, `/dashboard/teacher/`) | Yes | Done (see [dashboard.md](./dashboard.md)) |
+| Activity feed | Yes (`activities` app, `GET /activities/`) | Recent Activities card | Done |
+| In-app alerts | Yes (`GET /schools/alerts/`) | Navbar bell | Done |
 
 ## Cross-cutting
 
@@ -125,3 +147,4 @@ Checklist by domain. Status values:
 
 - Teacher bulk import (frontend contract): [`sms-backend/docs/frontend-teacher-bulk-import.md`](../sms-backend/docs/frontend-teacher-bulk-import.md)
 - Assessment structure per term: [assessment-config.md](./assessment-config.md)
+- Admin and teacher dashboards, activity feed: [dashboard.md](./dashboard.md)

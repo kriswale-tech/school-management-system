@@ -7,6 +7,7 @@ export interface SchoolProfileFormData {
   phone_number: string
   phone_number_alt?: string
   email: string
+  student_id_prefix?: string
 }
 
 export interface SchoolProfile {
@@ -22,6 +23,7 @@ export interface SchoolProfile {
   email: string
   logo: string
   motto: string
+  student_id_prefix?: string
   setup_completed: boolean
   setup_completed_at: string
 }

@@ -37,7 +37,15 @@ from schools.setup_views import (
     TeacherBulkImportUploadView,
     TeacherBulkImportFailuresDownloadView,
 )
-from schools.views import SchoolView
+from schools.views import (
+    AcademicYearDetailView,
+    AcademicYearListCreateView,
+    SchoolAlertListView,
+    TermActivateView,
+    TermSwitchPreviewView,
+    SchoolSettingsView,
+    SchoolView,
+)
 
 urlpatterns = [
     path('setup/', SchoolSetupView.as_view(), name='school-setup'),
@@ -207,4 +215,26 @@ urlpatterns = [
         name='school-setup-complete',
     ),
     path('school/', SchoolView.as_view(), name='school'),
+    path(
+        'settings/academic-years/',
+        AcademicYearListCreateView.as_view(),
+        name='school-academic-year-list',
+    ),
+    path(
+        'settings/academic-years/<uuid:year_id>/',
+        AcademicYearDetailView.as_view(),
+        name='school-academic-year-detail',
+    ),
+    path(
+        'settings/academic-years/terms/<uuid:term_id>/switch/',
+        TermSwitchPreviewView.as_view(),
+        name='school-term-switch-preview',
+    ),
+    path(
+        'settings/academic-years/terms/<uuid:term_id>/activate/',
+        TermActivateView.as_view(),
+        name='school-term-activate',
+    ),
+    path('settings/', SchoolSettingsView.as_view(), name='school-settings'),
+    path('alerts/', SchoolAlertListView.as_view(), name='school-alerts'),
 ]

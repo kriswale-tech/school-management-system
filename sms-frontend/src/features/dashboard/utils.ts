@@ -1,4 +1,6 @@
 export const ADMIN_DASHBOARD_QUERY_KEY = 'admin-dashboard' as const
+export const RECENT_ACTIVITIES_QUERY_KEY = 'recent-activities' as const
+export const TEACHER_DASHBOARD_QUERY_KEY = 'teacher-dashboard' as const
 
 /** Compact GHS display for overview cards (e.g. GHS 25K). */
 export const formatCompactFeeAmount = (amount: string | number) => {

@@ -12,7 +12,9 @@ Project status and reference docs for the SMS monorepo (`sms-backend` + `sms-fro
 | [fees-backlog.md](./fees-backlog.md) | Deferred fees work (Excel, receipts, end-of-term, refunds) |
 | [subject-groups-backlog.md](./subject-groups-backlog.md) | Subject-group student placement rules + deferred assessment lock |
 | [subject-assessment-workspace.md](./subject-assessment-workspace.md) | Subject markbook + class-teacher Assessments page |
+| [dashboard.md](./dashboard.md) | Admin and teacher dashboards, plus the activity feed |
+| [profile.md](./profile.md) | Personal profile page, self-service fields, and `/accounts/me/` PATCH |
 
 Related backend-only notes live under [`sms-backend/docs/`](../sms-backend/docs/) (e.g. teacher bulk import).
 
-**Last reviewed:** 2026-09-25
+**Last reviewed:** 2026-10-13

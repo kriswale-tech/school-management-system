@@ -12,6 +12,7 @@ from accounts.services.users import (
     add_school_member,
     email_taken,
     manageable_roles,
+    update_current_user,
     update_school_member,
 )
 
@@ -157,6 +158,7 @@ class UserSerializer(serializers.ModelSerializer):
     requires_school_selection = serializers.SerializerMethodField()
     capabilities = serializers.SerializerMethodField()
     access = serializers.SerializerMethodField()
+    last_active_at = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -165,7 +167,7 @@ class UserSerializer(serializers.ModelSerializer):
             'phone_number', 'email', 'role', 'is_active', 'profile',
             'school_setup_completed', 'school_id',
             'schools', 'requires_school_selection',
-            'capabilities', 'access',
+            'capabilities', 'access', 'last_active_at',
         ]
 
     @property
@@ -228,6 +230,58 @@ class UserSerializer(serializers.ModelSerializer):
             'is_class_teacher': scope.is_class_teacher,
             'is_subject_teacher': scope.is_subject_teacher,
         }
+
+    @extend_schema_field(serializers.DateTimeField(allow_null=True))
+    def get_last_active_at(self, obj):
+        membership = self._membership
+        return membership.last_active_at if membership else None
+
+
+class MeUpdateSerializer(serializers.Serializer):
+    first_name = serializers.CharField(max_length=255, required=False)
+    last_name = serializers.CharField(max_length=255, required=False)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    profile_picture = serializers.ImageField(required=False, allow_null=True)
+    bio = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    date_of_birth = serializers.DateField(required=False, allow_null=True)
+    gender = serializers.ChoiceField(
+        choices=GENDER_CHOICES,
+        required=False,
+        allow_null=True,
+    )
+    address = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    phone_number_alt = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        max_length=15,
+    )
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        if request is not None:
+            for forbidden in ('role', 'phone_number', 'is_active'):
+                if forbidden in request.data:
+                    raise serializers.ValidationError({
+                        forbidden: 'This field cannot be changed on your profile.',
+                    })
+        return attrs
+
+    def validate_email(self, value):
+        if not value:
+            return value
+        user = self.context['request'].user
+        if email_taken(value, exclude_user=user):
+            raise serializers.ValidationError('Email already exists')
+        return value
+
+    def validate_phone_number_alt(self, value):
+        if not value:
+            return value
+        return _formatted_phone(value)
+
+    def update(self, instance, validated_data):
+        return update_current_user(instance, validated_data)
 
 
 class SchoolMemberSerializer(serializers.Serializer):

@@ -60,16 +60,41 @@ def _format_box_address(school) -> str:
     return box
 
 
+def _report_field_visibility(school) -> dict:
+    from schools.models import SchoolSettings
+
+    try:
+        preferences = school.school_settings
+    except SchoolSettings.DoesNotExist:
+        preferences = None
+
+    if preferences is None:
+        return {
+            'logo': True,
+            'address': True,
+            'phones': True,
+            'email': True,
+        }
+
+    return {
+        'logo': preferences.report_show_logo,
+        'address': preferences.report_show_address,
+        'phones': preferences.report_show_phones,
+        'email': preferences.report_show_email,
+    }
+
+
 def _serialize_school(school) -> dict:
+    visibility = _report_field_visibility(school)
     return {
         'name': school.name,
-        'box_address': _format_box_address(school),
-        'address': (school.address or '').strip(),
-        'phone_number': (school.phone_number or '').strip(),
-        'phone_number_alt': (school.phone_number_alt or '').strip(),
-        'email': (school.email or '').strip(),
+        'box_address': _format_box_address(school) if visibility['address'] else '',
+        'address': (school.address or '').strip() if visibility['address'] else '',
+        'phone_number': (school.phone_number or '').strip() if visibility['phones'] else '',
+        'phone_number_alt': (school.phone_number_alt or '').strip() if visibility['phones'] else '',
+        'email': (school.email or '').strip() if visibility['email'] else '',
         'motto': school.motto or '',
-        'logo_url': school.logo.url if school.logo else None,
+        'logo_url': school.logo.url if school.logo and visibility['logo'] else None,
     }
 
 

@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { ConfirmDialog } from '@/components/shared'
 import { Capability } from '@/features/auth/capabilities'
 import { useCan } from '@/features/auth/hooks/useCan'
-import { useLogoutConfirm } from '@/features/auth/hooks'
+import { useAuth, useLogoutConfirm } from '@/features/auth/hooks'
 
 const navItems = [
   {
@@ -54,6 +54,7 @@ const isNavItemActive = (path: string, pathname: string) => {
 
 const SideNav = () => {
   const location = useLocation()
+  const { user } = useAuth()
   const { open, isLoading, requestLogout, cancelLogout, confirmLogout } = useLogoutConfirm()
   const canDashboard = useCan(Capability.NAV_DASHBOARD)
   const canStudents = useCan(Capability.NAV_STUDENTS)
@@ -107,6 +108,37 @@ const SideNav = () => {
             </NavLink>
           )
         })}
+        {user?.role === 'admin' ? (
+          <NavLink to="/settings" className="group shrink-0">
+            <div className="flex flex-col items-center m-auto gap-y-1 ">
+              <div
+                className={`rounded-xl size-9 flex items-center justify-center transition-colors duration-150 ${
+                  isNavItemActive('/settings', location.pathname)
+                    ? 'bg-sky-100'
+                    : 'bg-slate-100 group-hover:bg-sky-50'
+                }`}
+              >
+                <Icon
+                  icon="hugeicons:settings-01"
+                  className={`text-xl transition-colors duration-150 ${
+                    isNavItemActive('/settings', location.pathname)
+                      ? 'text-sky-700'
+                      : 'group-hover:text-sky-700'
+                  }`}
+                />
+              </div>
+              <span
+                className={`text-sm transition-colors duration-150 ${
+                  isNavItemActive('/settings', location.pathname)
+                    ? 'text-sky-700'
+                    : 'text-slate-700 group-hover:text-sky-700'
+                }`}
+              >
+                Settings
+              </span>
+            </div>
+          </NavLink>
+        ) : null}
       </div>
 
       {/* Logout */}

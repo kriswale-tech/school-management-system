@@ -170,6 +170,24 @@ def apply_fee_structure(fee_structure):
     fee_structure.status = FeeStructure.Status.APPLIED
     fee_structure.applied_at = timezone.now()
     fee_structure.save(update_fields=['status', 'applied_at', 'updated_at'])
+
+    from activities.models import Activity
+    from activities.services import record_activity
+
+    term = fee_structure.term
+    record_activity(
+        school=fee_structure.school,
+        actor=fee_structure.created_by,
+        verb=Activity.Verb.FEE_STRUCTURE_APPLIED,
+        summary=(
+            f'Fee structure applied for {term.academic_year.academic_year} '
+            f'{term.get_term_display()}.'
+        ),
+        href='/fees',
+        term=term,
+        target_kind='fee_structure',
+        target_id=fee_structure.id,
+    )
     return fee_structure
 
 

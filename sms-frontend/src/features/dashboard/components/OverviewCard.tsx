@@ -9,7 +9,7 @@ const OverviewCard = ({ title, metrics }: OverviewCardProps) => {
   return (
     <div className="bg-white p-4 custom-shadow-md">
       <h3 className="text-xl font-semibold text-slate-800 mb-4">{title}</h3>
-      <div className="grid grid-cols-3">
+      <div className={metrics.length === 2 ? 'grid grid-cols-2' : 'grid grid-cols-3'}>
         {metrics.map((metric, index) => (
           <div
             key={metric.label}

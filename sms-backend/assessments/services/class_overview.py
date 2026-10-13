@@ -349,6 +349,7 @@ def approve_class_students(
         raise ValidationError({'student_ids': 'One or more students are not in this class.'})
 
     now = timezone.now()
+    approved_count = 0
     for student_id in ids:
         bucket = _class_bucket_for_student(
             student_id=student_id,
@@ -357,6 +358,7 @@ def approve_class_students(
         )
         if bucket == CLASS_STATUS_APPROVED:
             continue
+        approved_count += 1
         if bucket not in (CLASS_STATUS_AWAITING, CLASS_STATUS_NEEDS_CORRECTION):
             raise ValidationError({
                 'detail': (
@@ -418,6 +420,26 @@ def approve_class_students(
                 stream=None,
                 defaults=defaults,
             )
+
+    if approved_count:
+        from activities.models import Activity
+        from activities.services import record_activity
+
+        class_name = class_teacher.stream.full_name if class_teacher.stream_id else class_teacher.class_level.name
+        record_activity(
+            school=school,
+            actor=membership.user,
+            verb=Activity.Verb.STUDENTS_APPROVED,
+            summary=(
+                f'{membership.user.get_full_name()} approved {approved_count} '
+                f'student{"s" if approved_count != 1 else ""} in {class_name}.'
+            ),
+            href=f'/assessments/{class_teacher.id}',
+            term=term,
+            target_kind='class_teacher',
+            target_id=class_teacher.id,
+            stream=class_teacher.stream,
+        )
 
     return get_class_teacher_assessment_detail(
         school=school,

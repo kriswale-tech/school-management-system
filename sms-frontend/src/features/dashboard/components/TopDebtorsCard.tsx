@@ -5,22 +5,25 @@ import type { AdminDashboardTopDebtor } from '../types'
 
 type TopDebtorsCardProps = {
   debtors: AdminDashboardTopDebtor[]
+  showViewAll?: boolean
 }
 
-const TopDebtorsCard = ({ debtors }: TopDebtorsCardProps) => {
+const TopDebtorsCard = ({ debtors, showViewAll = true }: TopDebtorsCardProps) => {
   const navigate = useNavigate()
 
   return (
     <div className="bg-white p-4 custom-shadow-md flex flex-col max-h-80 h-full">
       <div className="flex items-center justify-between gap-3 mb-4 shrink-0">
         <h3 className="text-sm font-medium text-slate-800">Top Debtors</h3>
-        <button
-          type="button"
-          onClick={() => navigate('/fees?debtors=true')}
-          className="cursor-pointer text-xs font-medium text-slate-500 transition-colors hover:text-slate-800"
-        >
-          View all
-        </button>
+        {showViewAll ? (
+          <button
+            type="button"
+            onClick={() => navigate('/fees?debtors=true')}
+            className="cursor-pointer text-xs font-medium text-slate-500 transition-colors hover:text-slate-800"
+          >
+            View all
+          </button>
+        ) : null}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">

@@ -76,6 +76,28 @@ Logged-in users with a finished school use the sidebar:
 - Assessments  
 - Fees  
 - Staff  
+- Settings (admins only)  
+
+### 6. Settings (admins, after setup)
+
+`/settings` opens on School profile. Each tab has its own URL, so a refresh keeps the tab:
+
+| Tab | URL | What it does |
+| --- | --- | --- |
+| School profile | `/settings/school-profile` | Name, contact, logo, and the prefix on new student IDs |
+| Academic year | `/settings/academic-year` | Every year and its terms. The current term is marked |
+| Alerts | `/settings/alerts` | Which in-app alerts are on, and the fee balance that counts as owing |
+| Fees | `/settings/fees` | The same fee catalog as Fees → Settings |
+| Assessments | `/settings/assessments` | The same assessment structure as Assessments → Settings |
+| Classes | `/settings/classes` | The same classes and subjects screen as Manage Classes |
+
+`/fees/settings`, `/assessments/settings`, and `/classes/manage` still open those same screens on their own, with a title and a back button.
+
+The year list is the school’s own years, not a generated dropdown. Past years are view-only. **Add** the next year saves its three term dates and leaves the current term in place, so fees and assessment settings can be prepared against it first. Saving a year here does not advance setup and does not turn that year on.
+
+**Make this the current term** is a separate step. It shows checks, then **Switch term** makes that term the one students, fees, and assessments open on. Only the next term in order can be chosen. Marks, bills, and class lists already recorded stay on the term you leave. Students are not placed in next term’s classes, and next term’s fees are not billed.
+
+The navbar bell reads the same alert rules: outstanding fees, unreleased results, and new enrollments, limited to what that role should see.
 
 ---
 
@@ -173,7 +195,15 @@ Most school APIs require:
 
 ### Setup (`schools` setup APIs / frontend `setup`)
 
-One-time guided configuration for a new school (see steps above).
+One-time guided configuration for a new school (see steps above). The academic-year step creates the first year and marks the chosen term active. Later years are added from Settings, which uses a different save and does not mark them active.
+
+### Settings (frontend `settings` / `schools` settings APIs)
+
+Admin-only, after setup. School profile, the year calendar, the term switch, and in-app alert rules.
+
+### Profile (frontend `profile` / `PATCH /accounts/me/`)
+
+Every role opens **`/profile`** from the header. You can update photo, name, email, and personal details. Login phone, role, and memberships are read-only. **Last active** shows when you last used the current school. Detail: [profile.md](./profile.md).
 
 ### Students
 
@@ -221,7 +251,9 @@ Deeper detail: [fees.md](./fees.md).
 
 ### Dashboard
 
-- App home shell exists; rich widgets are still mostly placeholder
+Admins get a school overview (coverage, fees, report progress, debtors, recent activity). Teachers get their classes and subjects for the active term, an academic overview, and a short list of work that is actually waiting. Staff and accountants still see a placeholder.
+
+Detail: [dashboard.md](./dashboard.md).
 
 ---
 
@@ -250,9 +282,13 @@ Everything under a school stays **school-scoped**. Changing active school change
 | Signup / login / OTP | `sms-backend/accounts/` | `sms-frontend/src/features/auth/` |
 | Memberships & roles | `accounts/models.py`, `permissions.py` | Auth store + layouts |
 | Setup wizard | `sms-backend/schools/setup_views/` | `sms-frontend/src/features/setup/` |
+| Settings | `sms-backend/schools/services/academic_calendar.py`, `alerts.py` | `sms-frontend/src/features/settings/` |
+| Profile | `sms-backend/accounts/services/users.py` (`update_current_user`) | `sms-frontend/src/features/profile/` |
 | Students | `sms-backend/students/` | `sms-frontend/src/features/students/` |
 | Classes / curriculum | `sms-backend/academics/` | `sms-frontend/src/features/classes/` |
 | Fees | `sms-backend/fees/` | `sms-frontend/src/features/fees/` |
+| Dashboard | `sms-backend/dashboard/` | `sms-frontend/src/features/dashboard/` |
+| Activity feed | `sms-backend/activities/` | Recent Activities card on the dashboard |
 | Staff desk | `accounts` staff APIs | `sms-frontend/src/features/staff/` |
 
 ---
@@ -263,5 +299,7 @@ Everything under a school stays **school-scoped**. Changing active school change
 - [FEATURES.md](./FEATURES.md) — what is done vs stubbed  
 - [STATUS.md](./STATUS.md) — project snapshot  
 - [fees.md](./fees.md) — fees in more detail  
+- [dashboard.md](./dashboard.md) — admin and teacher dashboards, activity feed  
+- [profile.md](./profile.md) — personal profile page and self-service API  
 
-**Last reviewed:** 2026-09-09
+**Last reviewed:** 2026-10-13

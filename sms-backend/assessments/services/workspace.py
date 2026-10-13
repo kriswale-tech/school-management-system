@@ -478,6 +478,29 @@ def publish_students(*, school, membership, assignment_id, student_ids: list) ->
             },
         )
 
+    from activities.models import Activity
+    from activities.services import record_activity
+
+    subject_name = assignment.class_subject.subject.name
+    class_name = assignment.class_subject.class_level.name
+    if assignment.stream_id and not assignment.stream.is_default:
+        class_name = f'{class_name} {assignment.stream.name}'
+    record_activity(
+        school=school,
+        actor=membership.user,
+        verb=Activity.Verb.SCORES_PUBLISHED,
+        summary=(
+            f'{membership.user.get_full_name()} published {subject_name} scores '
+            f'for {class_name} ({len(ids)} students).'
+        ),
+        href=f'/classes/subjects/{assignment.id}',
+        term=assignment.term,
+        target_kind='teaching_assignment',
+        target_id=assignment.id,
+        stream=assignment.stream,
+        teaching_assignment=assignment,
+    )
+
     return get_workspace(
         school=school,
         membership=membership,

@@ -24,11 +24,19 @@ const schema = z.object({
     .string()
     .min(1, { message: 'Email is required' })
     .email({ message: 'Invalid email address' }),
+  student_id_prefix: z
+    .string()
+    .optional()
+    .refine((value) => !value || /^[A-Za-z0-9]{2,12}$/.test(value), {
+      message: 'Prefix must be 2–12 letters or numbers',
+    }),
 })
 
 interface SchoolProfileFormProps {
   onSubmit: (_data: SchoolProfileFormData) => void
   schoolProfile?: SchoolProfile
+  submitLabel?: string
+  showStudentIdPrefix?: boolean
 }
 
 function toFormData(profile?: SchoolProfile): SchoolProfileFormData {
@@ -41,10 +49,16 @@ function toFormData(profile?: SchoolProfile): SchoolProfileFormData {
     phone_number: profile?.phone_number ?? '',
     phone_number_alt: profile?.phone_number_alt ?? '',
     email: profile?.email ?? '',
+    student_id_prefix: profile?.student_id_prefix ?? '',
   }
 }
 
-const SchoolProfileForm = ({ onSubmit, schoolProfile }: SchoolProfileFormProps) => {
+const SchoolProfileForm = ({
+  onSubmit,
+  schoolProfile,
+  submitLabel = 'Proceed to Next Step',
+  showStudentIdPrefix = false,
+}: SchoolProfileFormProps) => {
   const {
     register,
     handleSubmit,
@@ -130,6 +144,21 @@ const SchoolProfileForm = ({ onSubmit, schoolProfile }: SchoolProfileFormProps) 
         />
       </div>
 
+      {showStudentIdPrefix ? (
+        <div className="space-y-2">
+          <FormLabel
+            label="Student ID prefix"
+            className="font-normal text-base"
+            helperText="New students use this prefix. Leave blank to keep using the school name."
+          />
+          <InputField
+            placeholder="e.g. SCH"
+            error={errors.student_id_prefix?.message}
+            {...register('student_id_prefix')}
+          />
+        </div>
+      ) : null}
+
       <div className="space-y-2">
         <FormLabel label="School Email" className="font-normal text-base" required />
         <InputField
@@ -147,7 +176,7 @@ const SchoolProfileForm = ({ onSubmit, schoolProfile }: SchoolProfileFormProps) 
         loadingText="Saving..."
         disabled={!isDirty}
       >
-        Proceed to Next Step
+        {submitLabel}
       </Button>
     </form>
   )

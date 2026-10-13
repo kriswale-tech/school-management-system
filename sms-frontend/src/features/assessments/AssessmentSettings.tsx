@@ -8,7 +8,11 @@ import AssessmentSetupForm from '@/features/setup/assessment/components/Assessme
 import { getAssessmentSettings } from '@/features/setup/assessment/services'
 import { getApiErrorMessage } from '@/utils'
 
-const AssessmentSettings = () => {
+type AssessmentSettingsProps = {
+  embedded?: boolean
+}
+
+const AssessmentSettings = ({ embedded = false }: AssessmentSettingsProps) => {
   const [termSelection, setTermSelection] = useState<FilterSelection | undefined>(undefined)
 
   const { data, isLoading, isError, error } = useQuery({
@@ -36,20 +40,28 @@ const AssessmentSettings = () => {
     [terms],
   )
 
+  const termFilter = (
+    <FilterComponent
+      filterName="Academic year and term"
+      filterKey="term"
+      options={termOptions}
+      value={term}
+      placeholder={isLoading ? 'Loading…' : 'Academic year & term'}
+      onChange={setTermSelection}
+    />
+  )
+
   return (
     <div className="space-y-6">
-      <ActionBar back title="Assessment Settings">
-        <FilterComponent
-          filterName="Academic year and term"
-          filterKey="term"
-          options={termOptions}
-          value={term}
-          placeholder={isLoading ? 'Loading…' : 'Academic year & term'}
-          onChange={setTermSelection}
-        />
-      </ActionBar>
+      {embedded ? (
+        <div className="flex flex-wrap items-center justify-end gap-3">{termFilter}</div>
+      ) : (
+        <ActionBar back title="Assessment Settings">
+          {termFilter}
+        </ActionBar>
+      )}
 
-      <div className="bg-white p-4 custom-shadow-md">
+      <div className={embedded ? undefined : 'bg-white p-4 custom-shadow-md'}>
         <div className="mb-6">
           <h2 className="text-lg text-slate-900">Assessment Structure</h2>
           <div className="flex justify-between gap-2 items-center">

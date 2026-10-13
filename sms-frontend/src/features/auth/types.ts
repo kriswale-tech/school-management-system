@@ -51,6 +51,8 @@ export interface User {
   school_setup_completed: boolean | null
   /** Null while the session is identity-only (school not selected). */
   school_id: string | null
+  /** Last time you used the active school; null when no school is selected. */
+  last_active_at: string | null
   schools: SchoolMembership[]
   requires_school_selection: boolean
   /** Capability codes for the active school session (empty when unscoped). */

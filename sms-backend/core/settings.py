@@ -84,6 +84,7 @@ INSTALLED_APPS = [
     'assessments',
     'fees',
     'dashboard',
+    'activities',
 ]
 
 MIDDLEWARE = [

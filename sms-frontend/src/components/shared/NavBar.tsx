@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import { Icon } from '@iconify/react'
 import { AppLogo } from '.'
 import { useAuth } from '@/features/auth/hooks'
 import { getAcademicYearAndTerm } from '@/features/setup/academic-year-and-term/services'
 import type { TermApiKey } from '@/features/setup/academic-year-and-term/types'
 import ProfileComponent from './ProfileComponent'
+import AlertsMenu from '@/features/settings/components/AlertsMenu'
 
 const TERM_LABELS: Record<TermApiKey, string> = {
   first_term: 'First Term',
@@ -58,9 +58,7 @@ const NavBar = () => {
 
       {/* Notification and Profile */}
       <div className="flex items-center ">
-        <div className="flex items-center justify-center bg-slate-100 rounded-full p-2">
-          <Icon icon="hugeicons:notification-01" className="text-xl" />
-        </div>
+        <AlertsMenu />
         <ProfileComponent />
       </div>
     </nav>

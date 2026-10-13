@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.conf import settings
 from django.db import models
 
@@ -14,6 +16,12 @@ class School(BaseModel):
     email = models.EmailField(null=True, blank=True)
     logo = models.ImageField(upload_to=f'{settings.PARENT_CLOUDINARY_FOLDER}/school-logos/', null=True, blank=True)
     motto = models.TextField(null=True, blank=True)
+    student_id_prefix = models.CharField(
+        max_length=12,
+        blank=True,
+        default='',
+        help_text='Used for new student IDs. Blank keeps a prefix from the school name.',
+    )
 
     setup_completed = models.BooleanField(default=False)
     setup_completed_at = models.DateTimeField(null=True, blank=True)
@@ -122,3 +130,29 @@ class Term(BaseModel):
 
     def __str__(self):
         return f'{self.get_term_display()} ({self.academic_year.academic_year})'
+
+
+class SchoolSettings(BaseModel):
+    """In-app alert rules and report-card fields for one school."""
+
+    school = models.OneToOneField(
+        'School',
+        on_delete=models.CASCADE,
+        related_name='school_settings',
+    )
+    fees_alert_enabled = models.BooleanField(default=True)
+    fees_alert_threshold = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('1.00'),
+        help_text='Alert when a student owes at least this amount on the active term.',
+    )
+    results_alert_enabled = models.BooleanField(default=True)
+    enrollments_alert_enabled = models.BooleanField(default=True)
+    report_show_logo = models.BooleanField(default=True)
+    report_show_address = models.BooleanField(default=True)
+    report_show_phones = models.BooleanField(default=True)
+    report_show_email = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f'Settings for {self.school.name}'

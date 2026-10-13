@@ -56,8 +56,15 @@ def school_initials(name: str) -> str:
     return initials[:6] or 'SCH'
 
 
+def student_id_prefix_for(school) -> str:
+    prefix = (getattr(school, 'student_id_prefix', '') or '').strip().upper()
+    if prefix:
+        return prefix
+    return school_initials(school.name)
+
+
 def generate_student_id(*, school) -> str:
-    prefix = school_initials(school.name)
+    prefix = student_id_prefix_for(school)
     pattern = f'{prefix}-'
     existing = (
         Student.objects.select_for_update()
@@ -279,7 +286,6 @@ def onboard_student(
     )
     return get_enrollment_for_student(school=school, term=term, student=student)
 
-
 def create_class_enrollment(*, student, term, stream, is_new_student=False):
     enrollment = ClassEnrollment.objects.create(
         student=student,
@@ -290,6 +296,25 @@ def create_class_enrollment(*, student, term, stream, is_new_student=False):
     from fees.services.fees import ensure_enrollment_fees
 
     ensure_enrollment_fees(enrollment)
+
+    from activities.models import Activity
+    from activities.services import record_activity
+
+    name = ' '.join(
+        part
+        for part in (student.first_name, student.other_names, student.last_name)
+        if part
+    ).strip()
+    record_activity(
+        school=student.school,
+        verb=Activity.Verb.STUDENT_ENROLLED,
+        summary=f'{name} enrolled in {stream.full_name}.',
+        href=f'/students/{student.id}',
+        term=term,
+        target_kind='student',
+        target_id=student.id,
+        stream=stream,
+    )
     return enrollment
 
 

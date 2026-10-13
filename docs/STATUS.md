@@ -6,7 +6,7 @@ Snapshot of the School Management System as of **2026-08-25**.
 
 **Core onboarding and day-to-day school administration for students and classes is largely in place.** Auth, multi-school membership, guided school setup, curriculum, students (including bulk import), class management, and teacher/staff user management are real end-to-end features.
 
-**Assessments (scoring/reports), operational fees (collect payments, fee desk UI), dashboard, and several runtime APIs are still missing or stubbed.** Data models and some fee/assessment *setup* exist; operational use does not.
+**The admin and teacher dashboards are in place** ([dashboard.md](./dashboard.md)). Parts of this snapshot are older than the assessments and fees work: scoring, the fees desk, and payments are further along than the sections below still say. Staff and accountant home screens are still placeholders.
 
 ---
 
@@ -41,6 +41,16 @@ Guided multi-step setup with progress tracking (`SchoolSetup`):
 8. Complete setup (also publishes/applies active-term fees)
 
 Frontend mirrors these steps under `/setup/:step`. Staff UI in setup talks to `/accounts/users/` (there is no dedicated staff setup API; `schools/setup_views/staff.py` is empty).
+
+### School settings (done, admin)
+
+After setup, admins use `/settings` (tabs keep the selection in the URL). Signup still uses the wizard and `POST /schools/setup/academic-year-term/`, which creates the first year and marks it active.
+
+- **School profile** — name, contact, logo, and the prefix used on new student IDs (`GET`/`PATCH /schools/school/`). Existing student IDs stay as they are.
+- **Academic year** — every year and its three terms. The current term is marked. Past years are view-only. Adding the next year saves dates only; the current term stays current. New terms with no assessment setup receive a copy of the latest previous setup.
+- **Switch term** — **Make this the current term** checks first, then sets that term and its year active. Only the immediate next term is allowed (first → second → third → first term of the next year). A skip, a jump backward, or dates that start before the current term ends are blocked. Warnings cover an early date, a missing or unapplied fee catalog, and unreleased reports. Students are not moved, and next term’s fees are not billed.
+- **Alerts** — in-app rules for outstanding fees, unreleased results, and new enrollments. The navbar bell lists the ones that apply to the signed-in role.
+- **Fees, assessments, and classes** — the same screens as `/fees/settings`, `/assessments/settings`, and `/classes/manage`, also opened from `/settings/fees`, `/settings/assessments`, and `/settings/classes`. Those original routes stay in place.
 
 ### Academics / curriculum (done)
 
@@ -99,20 +109,18 @@ Runtime scoring, class/admin assessment, and the student **Reports & Assessment*
 
 | Area | Gap |
 | --- | --- |
-| **Dashboard** | Placeholder lorem content only |
+| **Dashboard** | Built for admin and teacher. See [dashboard.md](./dashboard.md). Staff and accountant home is still a placeholder. |
 | **Assessments (runtime)** | Enter CA/exam scores, compute grades/positions, report cards, correction flow |
 | **Fees (operations)** | Record payments, issue receipts, fee desk list/filters, publish/apply fee structures after setup, arrears reporting |
 | **Staff main page** | Reuse setup staff components for `/staff` instead of placeholder |
-| **Profile** | Nav links to `/profile` but no route/page |
+| **Profile** | Done — see [profile.md](./profile.md). School settings are separate (school record, admin only). |
 
 ### Medium — incomplete or scaffolded
 
 | Area | Gap |
 | --- | --- |
 | **OTP delivery** | Wire existing Arkesel client into `send_otp` (or another SMS provider) |
-| **School profile update** | `GET /schools/school/` only; PATCH/update still stubbed |
 | **Fine-grained permissions** | `Permission` / `RolePermission` unused; access is coarse role flags |
-| **Notifications** | Bell icon in navbar with no backend/UI |
 | **Fees/Assessments apps** | Empty `views.py`; no dedicated URL includes under `core/urls.py` |
 | **Celery / Redis** | Commented out in Compose — needed if async bulk jobs / SMS queues are planned |
 | **Teacher portal UX** | Teacher role exists; no dedicated teacher-facing flows (mark entry, own classes) |
@@ -120,7 +128,7 @@ Runtime scoring, class/admin assessment, and the student **Reports & Assessment*
 ### Lower / polish
 
 - Parent/guardian portal (parents are data records only today)
-- Term promotion / year rollover UX (beyond fee carry-forward service)
+- Enrollment roll-forward and billing the next term when a term closes (the Settings switch only changes which term is current; see [fees.md](./fees.md))
 - Receipt numbering / PDF download
 - Attendance, timetable, messaging, inventory — not started
 - Frontend tests (backend has solid coverage for built areas)
@@ -134,14 +142,15 @@ Runtime scoring, class/admin assessment, and the student **Reports & Assessment*
 | --- | --- |
 | `/auth/*` | Done |
 | `/setup/:step` | Done |
-| `/dashboard` | Stub |
+| `/dashboard` | Admin and teacher dashboards (see [dashboard.md](./dashboard.md)). Other roles: placeholder |
 | `/students`, `/students/:id` | Done (assessment tab stub) |
 | `/classes`, `/classes/:id`, `/classes/manage` | Done |
 | `/assessments` | Stub |
 | `/fees` | Desk list (stats + table); record/settings UI-only |
 | `/fees/:studentId` | Detail (reuses student fee breakdown) |
 | `/staff` | Stub |
-| `/profile` | Missing |
+| `/settings`, `/settings/:tab` | Admin: school profile, academic year, alerts, plus fees, assessments, and classes (same screens as their own routes) |
+| `/profile` | Personal profile for all roles (see [profile.md](./profile.md)) |
 
 ---
 
@@ -150,7 +159,7 @@ Runtime scoring, class/admin assessment, and the student **Reports & Assessment*
 Under `/api/v1/`:
 
 - `accounts/` — auth, me, schools, users  
-- `schools/` — setup wizard + school profile  
+- `schools/` — setup wizard, school profile, settings (year calendar, term switch, alerts)  
 - `academics/` — levels, classes, teachers assignment  
 - `students/` — CRUD-ish list/detail, onboard, guardians, fees read, bulk import  
 - `fees/` — desk list, stats, filter options  
@@ -163,8 +172,8 @@ Under `/api/v1/`:
 
 1. Fees operations API + `/fees` UI (record payment → receipt → student balance stays correct)  
 2. Assessment scoring models/APIs + teacher/admin UI + student reports tab  
-3. Real dashboard (counts, owing fees, unassigned teachers, active term)  
-4. Promote `/staff` and `/profile` from stubs  
+3. ~~Real dashboard~~ Done for admin and teacher ([dashboard.md](./dashboard.md))  
+4. Promote `/staff` from stub  
 5. SMS OTP provider + optional Celery for bulk/async work  
 
 See also [FEATURES.md](./FEATURES.md) for a domain-by-domain checklist and [ARCHITECTURE.md](./ARCHITECTURE.md) for how the pieces fit.

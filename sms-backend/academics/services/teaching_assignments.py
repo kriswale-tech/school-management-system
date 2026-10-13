@@ -329,6 +329,27 @@ def assign_students_to_subject_group(
         for student_id in to_create
     ])
 
+    if to_create:
+        from activities.models import Activity
+        from activities.services import record_activity
+
+        count = len(to_create)
+        record_activity(
+            school=school,
+            actor=membership.user,
+            verb=Activity.Verb.SUBJECT_GROUP_PLACED,
+            summary=(
+                f'{count} student{"s" if count != 1 else ""} placed in '
+                f'{assignment.subject_group.name}.'
+            ),
+            href=f'/classes/subjects/{assignment.id}',
+            term=assignment.term,
+            target_kind='subject_group',
+            target_id=assignment.subject_group_id,
+            stream=assignment.stream,
+            teaching_assignment=assignment,
+        )
+
     return serialize_teaching_assignment(assignment)
 
 

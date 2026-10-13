@@ -86,11 +86,13 @@ const schema = z
 interface AcademicYearAndTermFormProps {
   onSubmit: (_data: AcademicYearAndTermFormData) => void
   academicYearAndTerm?: AcademicYearAndTerm
+  submitLabel?: string
 }
 
 const AcademicYearAndTermForm = ({
   onSubmit,
   academicYearAndTerm,
+  submitLabel = 'Proceed to Next Step',
 }: AcademicYearAndTermFormProps) => {
   const academicYearOptions = getAcademicYearOptions(5)
   const skipGuessRef = useRef(true)
@@ -196,7 +198,7 @@ const AcademicYearAndTermForm = ({
         loadingText="Saving..."
         disabled={!isDirty}
       >
-        Proceed to Next Step
+        {submitLabel}
       </Button>
     </form>
   )

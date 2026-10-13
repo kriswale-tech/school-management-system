@@ -19,4 +19,5 @@ urlpatterns = [
     path(f'{v1_path}students/', include('students.urls')),
     path(f'{v1_path}fees/', include('fees.urls')),
     path(f'{v1_path}dashboard/', include('dashboard.urls')),
+    path(f'{v1_path}activities/', include('activities.urls')),
 ]

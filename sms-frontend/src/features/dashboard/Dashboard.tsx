@@ -1,11 +1,16 @@
 import { useAuthStore } from '@/features/auth/store'
 import AdminDashboard from './pages/AdminDashboard'
+import TeacherDashboard from './pages/TeacherDashboard'
 
 const Dashboard = () => {
   const role = useAuthStore((state) => state.user?.role)
 
   if (role === 'admin') {
     return <AdminDashboard />
+  }
+
+  if (role === 'teacher') {
+    return <TeacherDashboard />
   }
 
   return (
