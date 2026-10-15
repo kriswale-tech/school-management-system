@@ -10,6 +10,7 @@ from assessments.services.report_pdf import (
     generate_student_profile_report,
     get_student_profile_report,
 )
+from accounts.permissions import HasActiveSchool, IsAdmin
 from fees.services import get_student_fee_history, get_student_fees, list_student_payments
 from shared.views import SchoolScopedAPIView
 from students.filters import ParentFilter, StudentEnrollmentFilter
@@ -30,6 +31,7 @@ from students.serializers import (
 from students.services import (
     add_student_guardian,
     build_student_detail,
+    clear_student_graduation,
     get_student,
     get_student_stats,
     list_enrollments_for_term,
@@ -207,6 +209,23 @@ class StudentDetailView(SchoolScopedAPIView):
             student_id=student_id,
             **serializer.validated_data,
         )
+        return Response(StudentDetailSerializer(detail).data)
+
+
+class StudentClearGraduationView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, IsAdmin]
+
+    @extend_schema(
+        tags=['Students'],
+        summary='Clear graduation',
+        description=(
+            'Marks a graduated student as not graduated. Does not enroll them in a class.'
+        ),
+        request=None,
+        responses={200: StudentDetailSerializer},
+    )
+    def post(self, request, student_id):
+        detail = clear_student_graduation(school=self.school, student_id=student_id)
         return Response(StudentDetailSerializer(detail).data)
 
 

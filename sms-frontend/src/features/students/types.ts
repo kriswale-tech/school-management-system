@@ -143,6 +143,7 @@ export type StudentDetail = {
   admission_date: string
   address: string
   is_active: boolean
+  is_graduated: boolean
   is_new_student: boolean | null
   class_assignment: StudentClassAssignment | null
   guardians: StudentGuardian[]

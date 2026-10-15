@@ -5,6 +5,9 @@ import { getAcademicYearAndTerm } from '@/features/setup/academic-year-and-term/
 import type { TermApiKey } from '@/features/setup/academic-year-and-term/types'
 import ProfileComponent from './ProfileComponent'
 import AlertsMenu from '@/features/settings/components/AlertsMenu'
+import { useTransitionWizard } from '@/features/settings/components/TransitionProvider'
+import { getTransitionStatus, TRANSITION_STATUS_QUERY_KEY } from '@/features/settings/services'
+import { mergeClasses } from '@/utils'
 
 const TERM_LABELS: Record<TermApiKey, string> = {
   first_term: 'First Term',
@@ -14,6 +17,14 @@ const TERM_LABELS: Record<TermApiKey, string> = {
 
 const NavBar = () => {
   const { user } = useAuth()
+  const transitionWizard = useTransitionWizard()
+  const isAdmin = user?.role === 'admin'
+  const { data: transition } = useQuery({
+    queryKey: [TRANSITION_STATUS_QUERY_KEY],
+    queryFn: getTransitionStatus,
+    enabled: Boolean(user?.school_id) && isAdmin,
+    staleTime: 60_000,
+  })
   const activeSchool = user?.schools.find((school) => school.school_id === user.school_id)
   const schoolLogo = activeSchool?.school_logo
 
@@ -57,7 +68,21 @@ const NavBar = () => {
       </div>
 
       {/* Notification and Profile */}
-      <div className="flex items-center ">
+      <div className="flex items-center gap-2">
+        {isAdmin && transitionWizard && transition?.visible ? (
+          <button
+            type="button"
+            onClick={transitionWizard.openWizard}
+            className={mergeClasses(
+              'rounded-full px-3 py-1.5 text-sm font-medium',
+              transition.urgency === 'red'
+                ? 'bg-red-600 text-white'
+                : 'bg-amber-100 text-amber-950',
+            )}
+          >
+            Transition
+          </button>
+        ) : null}
         <AlertsMenu />
         <ProfileComponent />
       </div>

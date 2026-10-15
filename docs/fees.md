@@ -112,52 +112,18 @@ Refunding unused advance is **not built yet** (see backlog).
 
 ---
 
-## End of term flow (planned — not built)
+## Opening the next term
 
-Closing a term cleanly spans **calendar**, **enrollment**, and **fees**. Today these are mostly manual / incomplete. Target flow for a later feature:
+The transition wizard places pupils and then applies the next term’s catalog. Full flow: [term-transition.md](./term-transition.md).
 
-### Goals
+Fees behavior inside that wizard:
 
-- Mark the current term as finished and activate the next term.  
-- Place every continuing student into the next term’s class/stream (promotion / roll-forward).  
-- Ensure the next term’s fee catalog is ready and **applied** so bills exist.  
-- Carry **arrears** (still owing on previous terms) and **advances** into ongoing collection.  
-- Keep past term catalogs **read-only**.
+- The fees step shows the items that will be billed, and who each one covers.
+- If the next term has no catalog, confirm copies the current term’s items, then publishes (if still a draft) and applies.
+- If the next term already has a catalog, that catalog is applied, unless it is already applied. Newly placed pupils are then billed from the locked list.
+- Class and level fees stay on the class or level they were written for. Movers who no longer match are not billed for that item.
+- Apply locks the catalog. Edit the list in Fees settings before opening the term.
+- Arrears stay on the old term. Advances apply when the next catalog is applied, as they do for any apply.
+- Past terms stay read-only.
 
-### Proposed steps
-
-1. **Prep next catalog** (can happen mid-term today via Settings)  
-   - Select next term → review/edit items → optionally leave as draft until close.
-
-2. **Close current term** (new guided flow)  
-   - Confirm outstanding / advances summary for the closing term.  
-   - Set current term inactive; set next term `is_active`.  
-   - Freeze further edits on the closed term’s fee structure (already true once applied + ended).
-
-3. **Roll enrollments**  
-   - Create next-term enrollments from current (same class or promotion map).  
-   - Mark `is_new_student` only for true admissions.
-
-4. **Bill next term**  
-   - Publish + **Apply** next structure (or auto-apply as part of close if catalog is ready).  
-   - Advances from prior overpayments apply automatically on apply / late enroll.  
-   - Prior-term balances remain on those terms; record payment still targets earliest owing term.
-
-5. **Ops follow-up**  
-   - Desk filter on new active term.  
-   - Arrears report / debtors across terms (not built).  
-   - Optional: remind to apply if close ran without a ready catalog.
-
-### Out of scope for v1 close (likely)
-
-- Changing applied amounts on the closed term  
-- Automatic write-off of arrears  
-- Refund of leftover advance (separate backlog item)
-
-### Implementation notes (when building)
-
-- Prefer an explicit **“End term”** wizard over silent cron, unless ops later request scheduled rollover (Celery exists but unused).  
-- Reuse: term activate APIs, `get_or_create_fee_structure` / carry-forward, `apply_fee_structure`, `ensure_enrollment_fees`, advance apply-on-bill.  
-- New work: enrollment roll-forward / promotion, guided UI, validation that next catalog exists before close completes, reporting snapshot.
-
-Track delivery in [fees-backlog.md](./fees-backlog.md).
+Still not built: an arrears report across terms, writing off arrears, and refunding leftover advance ([fees-backlog.md](./fees-backlog.md)).

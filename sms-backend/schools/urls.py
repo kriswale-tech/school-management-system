@@ -43,6 +43,9 @@ from schools.views import (
     SchoolAlertListView,
     TermActivateView,
     TermSwitchPreviewView,
+    TermTransitionConfirmView,
+    TermTransitionPreviewView,
+    TermTransitionStatusView,
     SchoolSettingsView,
     SchoolView,
 )
@@ -234,6 +237,17 @@ urlpatterns = [
         'settings/academic-years/terms/<uuid:term_id>/activate/',
         TermActivateView.as_view(),
         name='school-term-activate',
+    ),
+    path('transition/', TermTransitionStatusView.as_view(), name='school-transition-status'),
+    path(
+        'transition/preview/',
+        TermTransitionPreviewView.as_view(),
+        name='school-transition-preview',
+    ),
+    path(
+        'transition/confirm/',
+        TermTransitionConfirmView.as_view(),
+        name='school-transition-confirm',
     ),
     path('settings/', SchoolSettingsView.as_view(), name='school-settings'),
     path('alerts/', SchoolAlertListView.as_view(), name='school-alerts'),

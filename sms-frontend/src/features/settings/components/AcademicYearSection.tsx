@@ -6,14 +6,13 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { getApiErrorMessage, mergeClasses } from '@/utils'
 import {
   ACADEMIC_CALENDAR_QUERY_KEY,
-  activateTerm,
   createNextAcademicYear,
   getAcademicYearCalendar,
   updateAcademicYearDates,
 } from '../services'
 import type { AcademicYearCalendar, AcademicYearStatus, CalendarYear, TermKey } from '../types'
 import SettingsSection from './SettingsSection'
-import SwitchTermDialog from './SwitchTermDialog'
+import { useTransitionWizard } from './TransitionProvider'
 
 const STATUS_LABEL: Record<AcademicYearStatus, string> = {
   past: 'Past',
@@ -98,7 +97,8 @@ const AcademicYearSection = () => {
   const [adding, setAdding] = useState(false)
   const [drafts, setDrafts] = useState<DraftTerm[]>([])
   const [draftSource, setDraftSource] = useState<string | null>(null)
-  const [switchTermId, setSwitchTermId] = useState<string | null>(null)
+  const transitionWizard = useTransitionWizard()
+  const openWizard = transitionWizard?.openWizard ?? (() => undefined)
 
   const selectedYear =
     data?.years.find((year) => year.id === selectedId) ??
@@ -131,20 +131,6 @@ const AcademicYearSection = () => {
     },
     onError: (error) => {
       toast.error(getApiErrorMessage(error, 'Unable to save academic year'))
-    },
-  })
-
-  const { mutate: switchTerm, isPending: isSwitching } = useMutation({
-    mutationFn: activateTerm,
-    onSuccess: (calendar) => {
-      storeCalendar(calendar)
-      setSwitchTermId(null)
-      const activeYear = calendar.years.find((year) => year.is_active)
-      if (activeYear) setSelectedId(activeYear.id)
-      toast.success('Current term updated')
-    },
-    onError: (error) => {
-      toast.error(getApiErrorMessage(error, 'Unable to switch term'))
     },
   })
 
@@ -213,7 +199,7 @@ const AcademicYearSection = () => {
               }
               drafts={drafts}
               onChange={updateDraft}
-              onSwitch={setSwitchTermId}
+              onSwitch={openWizard}
             />
           ) : (
             <p className="text-sm text-slate-500">Finish school setup to add the first academic year.</p>
@@ -251,7 +237,7 @@ const AcademicYearSection = () => {
             label={data.next_year_label ?? ''}
             drafts={drafts}
             onChange={updateDraft}
-            onSwitch={setSwitchTermId}
+            onSwitch={openWizard}
           />
           <div className="space-y-3">
             <Button
@@ -275,14 +261,6 @@ const AcademicYearSection = () => {
         </div>
       ) : null}
 
-      <SwitchTermDialog
-        termId={switchTermId}
-        isSwitching={isSwitching}
-        onClose={() => setSwitchTermId(null)}
-        onConfirm={() => {
-          if (switchTermId) switchTerm(switchTermId)
-        }}
-      />
     </SettingsSection>
   )
 }
@@ -292,7 +270,7 @@ type YearTermsProps = {
   note?: string
   drafts: DraftTerm[]
   onChange: (_index: number, _field: 'start_date' | 'end_date', _value: string) => void
-  onSwitch: (_termId: string) => void
+  onSwitch: () => void
 }
 
 const YearTerms = ({ label, note, drafts, onChange, onSwitch }: YearTermsProps) => {
@@ -341,9 +319,9 @@ const YearTerms = ({ label, note, drafts, onChange, onSwitch }: YearTermsProps) 
               type="button"
               className="mt-4 w-auto"
               variant="outline"
-              onClick={() => onSwitch(term.id as string)}
+              onClick={onSwitch}
             >
-              Make this the current term
+              Open transition
             </Button>
           ) : null}
         </div>

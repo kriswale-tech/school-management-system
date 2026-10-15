@@ -109,7 +109,7 @@ Signup setup is unchanged. These screens edit the school after the wizard, under
 | --- | --- | --- | --- |
 | School profile + student ID prefix | `GET`/`PATCH /schools/school/` | `/settings/school-profile` | Done |
 | Year calendar | `GET`/`POST /schools/settings/academic-years/`, `PATCH …/<year_id>/` | `/settings/academic-year` | Done |
-| Switch current term | `GET …/terms/<term_id>/switch/`, `POST …/activate/` | Make this the current term | Done |
+| Open the next term | `GET /schools/transition/`, `GET …/preview/`, `POST …/confirm/` | Navbar, dashboard, Academic year wizard | Done (see [term-transition.md](./term-transition.md)) |
 | In-app alerts | `GET`/`PATCH /schools/settings/`, `GET /schools/alerts/` | `/settings/alerts` + navbar bell | Done |
 | Fee catalog | Same as `/fees/settings` | `/settings/fees` and `/fees/settings` | Done |
 | Assessment structure | Same as `/assessments/settings` | `/settings/assessments` and `/assessments/settings` | Done |
@@ -117,9 +117,9 @@ Signup setup is unchanged. These screens edit the school after the wizard, under
 
 The calendar lists every year. Past years are view-only. **Add** saves the next year’s three terms and leaves the current term active. Assessment settings are copied onto any new term that does not have them yet.
 
-**Make this the current term** runs checks, then turns that term (and its year) on and turns the previous ones off. It only allows the immediate next term. It blocks a skip, a jump backward, and a next term that starts before the current one ends. It warns when today is still before the start date, fees are missing or not applied, or reports on the current term are unreleased. It does not roll students forward or bill the next term. If the new term has no assessment setup, the previous term’s setup is copied onto it.
+**Open the next term** places continuing pupils, marks the last class graduated at year end, copies teachers, applies the next fee catalog, and then turns that term on. See [term-transition.md](./term-transition.md). `POST …/terms/<term_id>/activate/` remains a low-level calendar switch and does not place pupils or bill fees.
 
-Alerts are in-app only: outstanding fees (admin and accountant), unreleased results (admin and class teachers), and new enrollments (admin).
+Alerts are in-app only: outstanding fees (admin and accountant), unreleased results (admin and class teachers), and new enrollments (admin). The transition popup on the dashboard has its own checkbox.
 
 ## Dashboard & shell
 

@@ -149,6 +149,10 @@ class SchoolSettings(BaseModel):
     )
     results_alert_enabled = models.BooleanField(default=True)
     enrollments_alert_enabled = models.BooleanField(default=True)
+    transition_popup_enabled = models.BooleanField(
+        default=True,
+        help_text='Show a popup on the dashboard while opening the next term still needs action.',
+    )
     report_show_logo = models.BooleanField(default=True)
     report_show_address = models.BooleanField(default=True)
     report_show_phones = models.BooleanField(default=True)

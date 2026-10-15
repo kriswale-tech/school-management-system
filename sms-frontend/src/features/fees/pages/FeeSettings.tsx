@@ -2,6 +2,7 @@ import toast from 'react-hot-toast'
 import { Icon } from '@iconify/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import ActionBar from '@/components/shared/ActionBar'
 import { ConfirmDialog } from '@/components/shared'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -37,6 +38,7 @@ type FeeSettingsProps = {
 
 const FeeSettings = ({ embedded = false }: FeeSettingsProps) => {
   const queryClient = useQueryClient()
+  const [searchParams] = useSearchParams()
   const [termSelection, setTermSelection] = useState<FilterSelection | undefined>(undefined)
   const [applyOpen, setApplyOpen] = useState(false)
 
@@ -53,11 +55,14 @@ const FeeSettings = ({ embedded = false }: FeeSettingsProps) => {
     [filterOptions?.terms],
   )
 
+  const requestedTermId = searchParams.get('term')
   const defaultTermId =
-    filterOptions?.active_term_id &&
-    settingsTerms.some((item) => item.id === filterOptions.active_term_id)
-      ? filterOptions.active_term_id
-      : (settingsTerms[0]?.id ?? '')
+    requestedTermId && settingsTerms.some((item) => item.id === requestedTermId)
+      ? requestedTermId
+      : filterOptions?.active_term_id &&
+          settingsTerms.some((item) => item.id === filterOptions.active_term_id)
+        ? filterOptions.active_term_id
+        : (settingsTerms[0]?.id ?? '')
 
   const term: FilterSelection = termSelection !== undefined ? termSelection : defaultTermId
   const termId = term === '' ? undefined : String(term)

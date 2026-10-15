@@ -14,6 +14,7 @@ from schools.serializers import (
     SchoolSettingsSerializer,
     TermSwitchPreviewSerializer,
     TermSwitchSerializer,
+    TransitionConfirmSerializer,
 )
 from schools.services.academic_calendar import (
     activate_term,
@@ -24,6 +25,11 @@ from schools.services.academic_calendar import (
 )
 from schools.services.alerts import list_school_alerts
 from schools.services.settings import get_school_settings
+from schools.services.term_transition import (
+    build_transition_preview,
+    confirm_transition,
+    transition_status,
+)
 from shared.exceptions import cloudinary_error_detail
 from shared.views import SchoolScopedAPIView
 
@@ -196,6 +202,62 @@ class SchoolSettingsView(SchoolScopedAPIView):
     description='Alerts for the signed-in role on the active term.',
     responses={200: SchoolAlertSerializer(many=True)},
 )
+@extend_schema(
+    summary='Term transition status',
+    description='Checklist shown before the current term ends. Admins only.',
+)
+class TermTransitionStatusView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, IsAdmin]
+
+    def get(self, request):
+        return Response(transition_status(self.school))
+
+
+@extend_schema(
+    summary='Preview the next term transition',
+    description=(
+        'Where each class goes, which streams need a choice, and the fees '
+        'that will be applied on the next term. Does not change data.'
+    ),
+)
+class TermTransitionPreviewView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, IsAdmin]
+
+    def get(self, request):
+        return Response(build_transition_preview(self.school))
+
+
+@extend_schema(
+    summary='Open the next term',
+    description=(
+        'Places continuing pupils, marks leavers graduated, copies teachers, '
+        'applies the next term’s fees, and makes that term current.'
+    ),
+    request=TransitionConfirmSerializer,
+    responses={200: AcademicYearCalendarSerializer},
+)
+class TermTransitionConfirmView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, IsAdmin]
+
+    def post(self, request):
+        serializer = TransitionConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        calendar = confirm_transition(
+            self.school,
+            request.user,
+            stream_choices=[
+                {
+                    'source_stream_id': str(item['source_stream_id']),
+                    'destination_stream_id': str(item['destination_stream_id']),
+                }
+                for item in data['stream_choices']
+            ],
+            acknowledge_warnings=data['acknowledge_warnings'],
+        )
+        return Response(AcademicYearCalendarSerializer(calendar).data)
+
+
 class SchoolAlertListView(SchoolScopedAPIView):
     def get(self, request):
         alerts = list_school_alerts(school=self.school, membership=self.membership)

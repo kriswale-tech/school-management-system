@@ -48,8 +48,8 @@ After setup, admins use `/settings` (tabs keep the selection in the URL). Signup
 
 - **School profile** — name, contact, logo, and the prefix used on new student IDs (`GET`/`PATCH /schools/school/`). Existing student IDs stay as they are.
 - **Academic year** — every year and its three terms. The current term is marked. Past years are view-only. Adding the next year saves dates only; the current term stays current. New terms with no assessment setup receive a copy of the latest previous setup.
-- **Switch term** — **Make this the current term** checks first, then sets that term and its year active. Only the immediate next term is allowed (first → second → third → first term of the next year). A skip, a jump backward, or dates that start before the current term ends are blocked. Warnings cover an early date, a missing or unapplied fee catalog, and unreleased reports. Students are not moved, and next term’s fees are not billed.
-- **Alerts** — in-app rules for outstanding fees, unreleased results, and new enrollments. The navbar bell lists the ones that apply to the signed-in role.
+- **Open the next term** — wizard from the navbar, the admin dashboard, and Academic year. Places pupils, marks leavers graduated, copies teachers, applies the next fee catalog, then makes that term current. See [term-transition.md](./term-transition.md).
+- **Alerts** — in-app rules for outstanding fees, unreleased results, and new enrollments. The navbar bell lists the ones that apply to the signed-in role. One more switch controls the dashboard popup while opening the next term still needs action.
 - **Fees, assessments, and classes** — the same screens as `/fees/settings`, `/assessments/settings`, and `/classes/manage`, also opened from `/settings/fees`, `/settings/assessments`, and `/settings/classes`. Those original routes stay in place.
 
 ### Academics / curriculum (done)
@@ -128,7 +128,6 @@ Runtime scoring, class/admin assessment, and the student **Reports & Assessment*
 ### Lower / polish
 
 - Parent/guardian portal (parents are data records only today)
-- Enrollment roll-forward and billing the next term when a term closes (the Settings switch only changes which term is current; see [fees.md](./fees.md))
 - Receipt numbering / PDF download
 - Attendance, timetable, messaging, inventory — not started
 - Frontend tests (backend has solid coverage for built areas)
@@ -159,7 +158,7 @@ Runtime scoring, class/admin assessment, and the student **Reports & Assessment*
 Under `/api/v1/`:
 
 - `accounts/` — auth, me, schools, users  
-- `schools/` — setup wizard, school profile, settings (year calendar, term switch, alerts)  
+- `schools/` — setup wizard, school profile, settings (year calendar, term transition, alerts)  
 - `academics/` — levels, classes, teachers assignment  
 - `students/` — CRUD-ish list/detail, onboard, guardians, fees read, bulk import  
 - `fees/` — desk list, stats, filter options  

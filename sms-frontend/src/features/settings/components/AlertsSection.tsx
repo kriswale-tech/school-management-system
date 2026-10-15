@@ -7,6 +7,7 @@ import { getApiErrorMessage } from '@/utils'
 import {
   SCHOOL_ALERTS_QUERY_KEY,
   SCHOOL_SETTINGS_QUERY_KEY,
+  TRANSITION_STATUS_QUERY_KEY,
   getSchoolSettings,
   updateSchoolSettings,
 } from '../services'
@@ -31,6 +32,7 @@ const AlertsSection = () => {
       toast.success('Alert settings saved')
       queryClient.setQueryData([SCHOOL_SETTINGS_QUERY_KEY], saved)
       void queryClient.invalidateQueries({ queryKey: [SCHOOL_ALERTS_QUERY_KEY] })
+      void queryClient.invalidateQueries({ queryKey: [TRANSITION_STATUS_QUERY_KEY] })
     },
     onError: (error) => {
       toast.error(getApiErrorMessage(error, 'Unable to save alert settings'))
@@ -54,6 +56,7 @@ const AlertsSection = () => {
               fees_alert_threshold: draft.fees_alert_threshold,
               results_alert_enabled: draft.results_alert_enabled,
               enrollments_alert_enabled: draft.enrollments_alert_enabled,
+              transition_popup_enabled: draft.transition_popup_enabled,
             })
           }}
         >
@@ -96,6 +99,14 @@ const AlertsSection = () => {
             }
           >
             New enrollments for admins
+          </CheckboxField>
+          <CheckboxField
+            checked={draft.transition_popup_enabled}
+            onChange={(event) =>
+              setDraft({ ...draft, transition_popup_enabled: event.target.checked })
+            }
+          >
+            Popup on the dashboard while opening the next term still needs action
           </CheckboxField>
           <Button type="submit" variant="outline" loading={isPending} loadingText="Saving...">
             Save alerts

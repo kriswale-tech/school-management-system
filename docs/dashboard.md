@@ -44,6 +44,8 @@ The page uses `public/images/dashboard-banner.png` full-bleed against the main v
 
 The active term is not repeated on the page. The navbar already shows it.
 
+From 7 days before the current term ends, admins also get a **Transition** action in the navbar and a popup on this dashboard while opening the next term still needs action. Dismissing the popup lasts for that visit. The alert checkbox controls the popup only. Detail: [term-transition.md](./term-transition.md).
+
 ---
 
 ## Teacher dashboard

@@ -38,6 +38,7 @@ class SchoolSettingsSerializer(serializers.ModelSerializer):
             'fees_alert_threshold',
             'results_alert_enabled',
             'enrollments_alert_enabled',
+            'transition_popup_enabled',
             'report_show_logo',
             'report_show_address',
             'report_show_phones',
@@ -120,6 +121,16 @@ class TermSwitchPreviewSerializer(serializers.Serializer):
     warnings = serializers.ListField(child=serializers.CharField())
     term_id = serializers.UUIDField()
     term_label = serializers.CharField()
+
+
+class TransitionStreamChoiceSerializer(serializers.Serializer):
+    source_stream_id = serializers.UUIDField()
+    destination_stream_id = serializers.UUIDField()
+
+
+class TransitionConfirmSerializer(serializers.Serializer):
+    acknowledge_warnings = serializers.BooleanField(required=False, default=False)
+    stream_choices = TransitionStreamChoiceSerializer(many=True, required=False, default=list)
 
 
 class SchoolAlertSerializer(serializers.Serializer):

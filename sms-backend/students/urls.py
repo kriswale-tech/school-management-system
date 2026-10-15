@@ -10,6 +10,7 @@ from students.views import (
     StudentAssessmentReportGenerateView,
     StudentAssessmentReportView,
     StudentAssessmentView,
+    StudentClearGraduationView,
     StudentCurrentYearFeesView,
     StudentDetailView,
     StudentFeeHistoryView,
@@ -30,6 +31,11 @@ urlpatterns = [
         '<uuid:student_id>/',
         StudentDetailView.as_view(),
         name='student-detail',
+    ),
+    path(
+        '<uuid:student_id>/clear-graduation/',
+        StudentClearGraduationView.as_view(),
+        name='student-clear-graduation',
     ),
     path(
         '<uuid:student_id>/assessments/',

@@ -95,9 +95,9 @@ Logged-in users with a finished school use the sidebar:
 
 The year list is the school’s own years, not a generated dropdown. Past years are view-only. **Add** the next year saves its three term dates and leaves the current term in place, so fees and assessment settings can be prepared against it first. Saving a year here does not advance setup and does not turn that year on.
 
-**Make this the current term** is a separate step. It shows checks, then **Switch term** makes that term the one students, fees, and assessments open on. Only the next term in order can be chosen. Marks, bills, and class lists already recorded stay on the term you leave. Students are not placed in next term’s classes, and next term’s fees are not billed.
+**Open transition** places pupils on the next term, marks leavers graduated, copies teachers, applies the next fee list, and makes that term current. It is also in the navbar from 7 days before the current term ends. Detail: [term-transition.md](./term-transition.md).
 
-The navbar bell reads the same alert rules: outstanding fees, unreleased results, and new enrollments, limited to what that role should see.
+The navbar bell reads the same alert rules: outstanding fees, unreleased results, and new enrollments, limited to what that role should see. Alerts also hold the switch for the dashboard popup that reminds an admin to open the next term.
 
 ---
 
@@ -199,7 +199,7 @@ One-time guided configuration for a new school (see steps above). The academic-y
 
 ### Settings (frontend `settings` / `schools` settings APIs)
 
-Admin-only, after setup. School profile, the year calendar, the term switch, and in-app alert rules.
+Admin-only, after setup. School profile, the year calendar, opening the next term, and in-app alert rules. Detail: [term-transition.md](./term-transition.md).
 
 ### Profile (frontend `profile` / `PATCH /accounts/me/`)
 
@@ -282,7 +282,7 @@ Everything under a school stays **school-scoped**. Changing active school change
 | Signup / login / OTP | `sms-backend/accounts/` | `sms-frontend/src/features/auth/` |
 | Memberships & roles | `accounts/models.py`, `permissions.py` | Auth store + layouts |
 | Setup wizard | `sms-backend/schools/setup_views/` | `sms-frontend/src/features/setup/` |
-| Settings | `sms-backend/schools/services/academic_calendar.py`, `alerts.py` | `sms-frontend/src/features/settings/` |
+| Settings | `sms-backend/schools/services/academic_calendar.py`, `term_transition.py`, `alerts.py` | `sms-frontend/src/features/settings/` |
 | Profile | `sms-backend/accounts/services/users.py` (`update_current_user`) | `sms-frontend/src/features/profile/` |
 | Students | `sms-backend/students/` | `sms-frontend/src/features/students/` |
 | Classes / curriculum | `sms-backend/academics/` | `sms-frontend/src/features/classes/` |
@@ -301,5 +301,6 @@ Everything under a school stays **school-scoped**. Changing active school change
 - [fees.md](./fees.md) — fees in more detail  
 - [dashboard.md](./dashboard.md) — admin and teacher dashboards, activity feed  
 - [profile.md](./profile.md) — personal profile page and self-service API  
+- [term-transition.md](./term-transition.md) — opening the next term  
 
-**Last reviewed:** 2026-10-13
+**Last reviewed:** 2026-10-15

@@ -8,7 +8,7 @@ Deferred fees work. How the live product works: [fees.md](./fees.md).
 | --- | --- |
 | **Payment history Excel export** | Download modal UI exists on student fees → Payment History. Scope filters: All time, Academic year, Term. Generate `.xlsx` and wire the Download Excel button. |
 | **Receipt view / PDF** | Payment history receipt column shows an eye when a receipt exists (UI-only for now). Add receipt detail view and/or PDF download. |
-| **End of term flow** | Guided close: activate next term, roll/promote enrollments, apply next fee catalog, carry arrears/advances. Spec in [fees.md](./fees.md#end-of-term-flow-planned--not-built). |
+| **Arrears report across terms** | Balances stay on the term where they were billed. There is no single report of debtors across every past term. |
 | **Advance refund flow** | Credit model supports `refunded` status, but there is no UI/API yet to refund unused advance back to a parent (e.g. withdrawal, overpayment return). Add later: refund action, ledger entry, and indicators. |
 | **Pay with no outstanding (pure advance)** | Today you can only record a payment when there is an owing term; excess becomes advance. Recording a payment when fully paid (to top up advance only) is not supported yet. |
 
@@ -25,6 +25,7 @@ Deferred fees work. How the live product works: [fees.md](./fees.md).
 | **Record Payment** | Record Fees slider + `POST /fees/payments/` (receipt auto-issued) |
 | **Advance / excess credit** | Excess payment creates `StudentFeeCredit`. Auto-applied when next term fees are applied. Shown on desk rows, fee detail header, and record form. |
 | **Fees Settings** | `/fees/settings` + `/api/v1/fees/structures/`. Term catalogs, item CRUD, Apply (locks). Late enrollments auto-billed from applied catalogs. |
+| **Open the next term** | Wizard places pupils, then applies and locks the next catalog. Class and level fees are not retargeted. See [term-transition.md](./term-transition.md). |
 
 ## Related current surface
 

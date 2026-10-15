@@ -287,6 +287,10 @@ def onboard_student(
     return get_enrollment_for_student(school=school, term=term, student=student)
 
 def create_class_enrollment(*, student, term, stream, is_new_student=False):
+    if student.is_graduated:
+        raise ValidationError({
+            'student': 'This student has graduated. Clear graduation before enrolling them.',
+        })
     enrollment = ClassEnrollment.objects.create(
         student=student,
         term=term,
@@ -410,6 +414,7 @@ def build_student_detail(*, school, student, term=None):
         'admission_date': student.admission_date,
         'address': student.address,
         'is_active': student.is_active,
+        'is_graduated': student.is_graduated,
         'is_new_student': is_new_student,
         'class_assignment': class_payload,
         'guardians': guardians,
@@ -439,6 +444,19 @@ def update_student(*, school, student_id, **fields):
         updates.append(key)
     if updates:
         student.save(update_fields=[*updates, 'updated_at'])
+    return build_student_detail(
+        school=school,
+        student=get_student(school=school, student_id=student.id),
+    )
+
+
+@transaction.atomic
+def clear_student_graduation(*, school, student_id):
+    student = get_student(school=school, student_id=student_id)
+    if not student.is_graduated:
+        raise ValidationError({'student': 'This student has not graduated.'})
+    student.is_graduated = False
+    student.save(update_fields=['is_graduated', 'updated_at'])
     return build_student_detail(
         school=school,
         student=get_student(school=school, student_id=student.id),

@@ -52,6 +52,11 @@ export const getStudent = async (studentId: string): Promise<StudentDetail> => {
   return response.data
 }
 
+export const clearStudentGraduation = async (studentId: string): Promise<StudentDetail> => {
+  const response = await api.post<StudentDetail>(`/students/${studentId}/clear-graduation/`)
+  return response.data
+}
+
 export const updateStudent = async (
   studentId: string,
   payload: StudentBioUpdatePayload,

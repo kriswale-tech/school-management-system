@@ -8,6 +8,7 @@ import OverviewCard from '../components/OverviewCard'
 import SetupHealthCard, { isSetupHealthIncomplete } from '../components/SetupHealthCard'
 import TopDebtorsCard from '../components/TopDebtorsCard'
 import RecentActivitiesCard from '../components/RecentActivitiesCard'
+import TransitionNotice from '../components/TransitionNotice'
 import WelcomeBanner from '../components/WelcomeBanner'
 import { getAdminDashboard, getRecentActivities } from '../services'
 import type { OverviewMetric } from '../types'
@@ -139,6 +140,7 @@ const AdminDashboard = () => {
 
   return (
     <div>
+      <TransitionNotice />
       <WelcomeBanner firstName={firstName}>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <OverviewCard title="School Overview" metrics={schoolMetrics} />

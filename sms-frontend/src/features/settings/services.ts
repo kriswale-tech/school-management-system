@@ -6,13 +6,17 @@ import type {
   AcademicYearSchedulePayload,
   SchoolAlert,
   SchoolSettings,
-  TermSwitchPreview,
+  TransitionConfirmPayload,
+  TransitionPreview,
+  TransitionStatus,
 } from './types'
 
 export const SCHOOL_PROFILE_QUERY_KEY = 'schoolProfile'
 export const ACADEMIC_CALENDAR_QUERY_KEY = 'academicYearCalendar'
 export const SCHOOL_SETTINGS_QUERY_KEY = 'schoolSettings'
 export const SCHOOL_ALERTS_QUERY_KEY = 'schoolAlerts'
+export const TRANSITION_STATUS_QUERY_KEY = 'termTransition'
+export const TRANSITION_PREVIEW_QUERY_KEY = 'termTransitionPreview'
 
 export const getSchoolProfile = async () => {
   const response = await api.get<SchoolProfile>('/schools/school/')
@@ -47,21 +51,6 @@ export const updateAcademicYearDates = async (yearId: string, payload: AcademicY
   return response.data
 }
 
-export const getTermSwitchPreview = async (termId: string) => {
-  const response = await api.get<TermSwitchPreview>(
-    `/schools/settings/academic-years/terms/${termId}/switch/`,
-  )
-  return response.data
-}
-
-export const activateTerm = async (termId: string) => {
-  const response = await api.post<AcademicYearCalendar>(
-    `/schools/settings/academic-years/terms/${termId}/activate/`,
-    { acknowledge_warnings: true },
-  )
-  return response.data
-}
-
 export const getSchoolSettings = async () => {
   const response = await api.get<SchoolSettings>('/schools/settings/')
   return response.data
@@ -74,5 +63,20 @@ export const updateSchoolSettings = async (payload: Partial<SchoolSettings>) => 
 
 export const getSchoolAlerts = async () => {
   const response = await api.get<SchoolAlert[]>('/schools/alerts/')
+  return response.data
+}
+
+export const getTransitionStatus = async () => {
+  const response = await api.get<TransitionStatus>('/schools/transition/')
+  return response.data
+}
+
+export const getTransitionPreview = async () => {
+  const response = await api.get<TransitionPreview>('/schools/transition/preview/')
+  return response.data
+}
+
+export const confirmTransition = async (payload: TransitionConfirmPayload) => {
+  const response = await api.post<AcademicYearCalendar>('/schools/transition/confirm/', payload)
   return response.data
 }

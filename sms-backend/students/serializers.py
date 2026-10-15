@@ -179,6 +179,7 @@ class StudentDetailSerializer(serializers.Serializer):
     admission_date = serializers.DateField()
     address = serializers.CharField(allow_blank=True)
     is_active = serializers.BooleanField()
+    is_graduated = serializers.BooleanField()
     is_new_student = serializers.BooleanField(allow_null=True)
     class_assignment = StudentClassAssignmentSerializer(allow_null=True)
     guardians = StudentGuardianSerializer(many=True)

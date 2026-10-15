@@ -53,6 +53,10 @@ class Student(BaseModel):
         help_text='Place of residence.',
     )
     is_active = models.BooleanField(default=True)
+    is_graduated = models.BooleanField(
+        default=False,
+        help_text='Finished the last class the school offers. Not enrolled in later years.',
+    )
     parents = models.ManyToManyField(
         'students.Parent',
         related_name='students',
