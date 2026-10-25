@@ -12,6 +12,7 @@ from assessments.models import AssessmentConfig
 from fees.models import FeeStructure
 from schools.models import AcademicYear, SchoolSetup, Term
 from schools.services.academic import save_academic_year_setup
+from schools.services.academic_calendar import activate_term
 from students.tests.factories import create_student, enroll_student, ensure_default_stream
 
 
@@ -204,7 +205,26 @@ class AcademicCalendarAPITests(APITestCase):
         self.assertEqual(first.end_date, date(2026, 12, 18))
         self.assertFalse(year.is_active)
 
-    def test_switch_moves_only_the_active_term(self):
+    def test_activate_endpoint_is_disabled(self):
+        self.client.post(self.list_url, _year_2026(), format='json')
+        target = Term.objects.get(
+            school=self.school,
+            academic_year__academic_year='2026/2027',
+            term='first_term',
+        )
+
+        response = self.client.post(
+            reverse('school-term-activate', kwargs={'term_id': target.id}),
+            {'acknowledge_warnings': True},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        target.refresh_from_db()
+        self.assertFalse(target.is_active)
+
+    def test_activate_service_moves_only_the_active_term(self):
+        """Internal activate_term (used by transition confirm) still switches terms."""
         self.client.post(self.list_url, _year_2026(), format='json')
         target = Term.objects.get(
             school=self.school,
@@ -217,23 +237,22 @@ class AcademicCalendarAPITests(APITestCase):
         self.assertTrue(preview.data['can_switch'])
         self.assertTrue(preview.data['warnings'])
 
-        response = self.client.post(
-            reverse('school-term-activate', kwargs={'term_id': target.id}),
-            {'acknowledge_warnings': True},
-            format='json',
-        )
+        activate_term(self.school, target.id, acknowledge_warnings=True)
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         target.refresh_from_db()
         self.assertTrue(target.is_active)
         self.assertTrue(target.academic_year.is_active)
-        previous = Term.objects.get(school=self.school, academic_year__academic_year='2025/2026', term='third_term')
+        previous = Term.objects.get(
+            school=self.school,
+            academic_year__academic_year='2025/2026',
+            term='third_term',
+        )
         self.assertFalse(previous.is_active)
         self.assertFalse(previous.academic_year.is_active)
         self.assertEqual(AcademicYear.objects.filter(school=self.school, is_active=True).count(), 1)
         self.assertEqual(Term.objects.filter(school=self.school, is_active=True).count(), 1)
 
-    def test_switch_refuses_to_skip_a_term(self):
+    def test_activate_service_refuses_to_skip_a_term(self):
         year = AcademicYear.objects.get(school=self.school)
         year.is_active = True
         year.save(update_fields=['is_active', 'updated_at'])
@@ -243,17 +262,13 @@ class AcademicCalendarAPITests(APITestCase):
         first.save(update_fields=['is_active', 'updated_at'])
         third = Term.objects.get(school=self.school, term='third_term')
 
-        response = self.client.post(
-            reverse('school-term-activate', kwargs={'term_id': third.id}),
-            {'acknowledge_warnings': True},
-            format='json',
-        )
+        with self.assertRaises(Exception):
+            activate_term(self.school, third.id, acknowledge_warnings=True)
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         third.refresh_from_db()
         self.assertFalse(third.is_active)
 
-    def test_switch_requires_warning_acknowledgement(self):
+    def test_activate_service_requires_warning_acknowledgement(self):
         self.client.post(self.list_url, _year_2026(), format='json')
         target = Term.objects.get(
             school=self.school,
@@ -261,13 +276,9 @@ class AcademicCalendarAPITests(APITestCase):
             term='first_term',
         )
 
-        response = self.client.post(
-            reverse('school-term-activate', kwargs={'term_id': target.id}),
-            {'acknowledge_warnings': False},
-            format='json',
-        )
+        with self.assertRaises(Exception):
+            activate_term(self.school, target.id, acknowledge_warnings=False)
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         target.refresh_from_db()
         self.assertFalse(target.is_active)
 

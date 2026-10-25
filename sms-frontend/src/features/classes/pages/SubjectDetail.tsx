@@ -1,21 +1,24 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { useParams } from 'react-router-dom'
 import ActionBar from '@/components/shared/ActionBar'
 import StatsCard from '@/components/shared/StatsCard'
-import { ButtonTabComponent, ConfirmDialog } from '@/components/shared'
+import { ConfirmDialog } from '@/components/shared'
+import TabComponent from '@/components/shared/TabComponent'
 import { Button } from '@/components/ui'
 import { Capability } from '@/features/auth/capabilities'
-import { useCan } from '@/features/auth/hooks'
+import { useAccess, useCan } from '@/features/auth/hooks'
 import { getApiErrorMessage } from '@/utils'
+import SubjectPerformancePanel from '@/features/reports/components/SubjectPerformancePanel'
 import AssignSubjectGroupStudents from '../components/AssignSubjectGroupStudents'
 import ClassStudentsTable from '../components/ClassStudentsTable'
 import PublishStudentsModal from '../components/PublishStudentsModal'
 import SubjectAssessmentWorkspace from '../components/SubjectAssessmentWorkspace'
 import {
   getTeachingAssignmentDetail,
+  getTeachingAssignmentPerformance,
   getTeachingAssignmentStudents,
   getTeachingAssignmentWorkspace,
   publishTeachingAssignmentStudents,
@@ -23,19 +26,29 @@ import {
 } from '../services'
 import type { ClassStudent } from '../types'
 
-type DetailTab = 'Workspace' | 'Students'
+type DetailTab = 'Workspace' | 'Students' | 'Performance'
 
 const SubjectDetail = () => {
   const { assignmentId } = useParams<{ assignmentId: string }>()
   const queryClient = useQueryClient()
+  const access = useAccess()
   const canRecord = useCan(Capability.ASSESSMENTS_RECORD)
+  // Workspace (marks / publish) is only for subject teachers — not admin or class-only.
+  const showWorkspace = access.is_subject_teacher && canRecord
 
-  const [activeTab, setActiveTab] = useState<DetailTab>('Workspace')
+  const defaultTab: DetailTab = showWorkspace ? 'Workspace' : 'Students'
+  const [activeTab, setActiveTab] = useState<DetailTab>(defaultTab)
   const [isRecording, setIsRecording] = useState(false)
   const [addCaOpen, setAddCaOpen] = useState(false)
   const [publishOpen, setPublishOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
   const [pendingUnassign, setPendingUnassign] = useState<ClassStudent | null>(null)
+
+  useEffect(() => {
+    if (!showWorkspace && activeTab === 'Workspace') {
+      setActiveTab('Students')
+    }
+  }, [showWorkspace, activeTab])
 
   const {
     data: subject,
@@ -57,7 +70,18 @@ const SubjectDetail = () => {
   const { data: workspace } = useQuery({
     queryKey: ['classes', 'teaching-assignment', assignmentId, 'workspace'],
     queryFn: () => getTeachingAssignmentWorkspace(assignmentId!),
-    enabled: Boolean(assignmentId) && activeTab === 'Workspace',
+    enabled: Boolean(assignmentId) && activeTab === 'Workspace' && showWorkspace,
+  })
+
+  const {
+    data: performance,
+    isLoading: isLoadingPerformance,
+    isError: isPerformanceError,
+    error: performanceError,
+  } = useQuery({
+    queryKey: ['classes', 'teaching-assignment', assignmentId, 'performance'],
+    queryFn: () => getTeachingAssignmentPerformance(assignmentId!),
+    enabled: Boolean(assignmentId) && activeTab === 'Performance',
   })
 
   const { mutate: publishStudents, isPending: isPublishing } = useMutation({
@@ -102,6 +126,15 @@ const SubjectDetail = () => {
     }
   }
 
+  const tabs: Array<{ label: DetailTab; onClick: () => void }> = []
+  if (showWorkspace) {
+    tabs.push({ label: 'Workspace', onClick: () => switchTab('Workspace') })
+  }
+  tabs.push(
+    { label: 'Students', onClick: () => switchTab('Students') },
+    { label: 'Performance', onClick: () => switchTab('Performance') },
+  )
+
   return (
     <div className="space-y-6">
       <ActionBar title="Subject Detail" back={true} />
@@ -125,48 +158,8 @@ const SubjectDetail = () => {
           </div>
 
           <div className="bg-white p-4 custom-shadow-md space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <ButtonTabComponent
-                activeTab={activeTab}
-                tabs={[
-                  { label: 'Workspace', onClick: () => switchTab('Workspace') },
-                  { label: 'Students', onClick: () => switchTab('Students') },
-                ]}
-              />
-
-              {activeTab === 'Workspace' && canRecord ? (
-                isRecording ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="max-w-fit py-2 text-sm"
-                    onClick={() => setAddCaOpen(true)}
-                  >
-                    <Icon icon="hugeicons:plus-sign" className="size-4" />
-                    Add class assessment
-                  </Button>
-                ) : (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="max-w-fit py-2 text-sm"
-                      onClick={() => setPublishOpen(true)}
-                    >
-                      <Icon icon="hugeicons:sent" className="size-4" />
-                      Publish
-                    </Button>
-                    <Button
-                      type="button"
-                      className="max-w-fit py-2 text-sm"
-                      onClick={() => setIsRecording(true)}
-                    >
-                      <Icon icon="hugeicons:edit-02" className="size-4" />
-                      Record assessment
-                    </Button>
-                  </div>
-                )
-              ) : null}
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <TabComponent tabs={tabs} activeTab={activeTab} />
 
               {activeTab === 'Students' && isGrouped && assignmentId ? (
                 <Button
@@ -195,9 +188,10 @@ const SubjectDetail = () => {
               </div>
             ) : null}
 
-            {activeTab === 'Workspace' ? (
+            {activeTab === 'Workspace' && showWorkspace ? (
               assignmentId ? (
                 <SubjectAssessmentWorkspace
+                  key={isRecording ? `recording-${assignmentId}` : `view-${assignmentId}`}
                   assignmentId={assignmentId}
                   canRecord={canRecord}
                   isRecording={isRecording}
@@ -205,11 +199,14 @@ const SubjectDetail = () => {
                     setIsRecording(false)
                     setAddCaOpen(false)
                   }}
+                  onStartRecording={() => setIsRecording(true)}
+                  onPublish={() => setPublishOpen(true)}
+                  onOpenAddCa={() => setAddCaOpen(true)}
                   addCaOpen={addCaOpen}
                   onCloseAddCa={() => setAddCaOpen(false)}
                 />
               ) : null
-            ) : (
+            ) : activeTab === 'Students' ? (
               <ClassStudentsTable
                 students={students}
                 isLoading={isLoadingStudents}
@@ -221,6 +218,17 @@ const SubjectDetail = () => {
                     : undefined
                 }
               />
+            ) : isLoadingPerformance ? (
+              <p className="text-sm text-slate-500 py-8">Loading performance…</p>
+            ) : isPerformanceError || !performance ? (
+              <p className="text-sm text-red-600 py-8" role="alert">
+                {getApiErrorMessage(
+                  performanceError,
+                  'Unable to load subject performance.',
+                )}
+              </p>
+            ) : (
+              <SubjectPerformancePanel data={performance} />
             )}
           </div>
         </>

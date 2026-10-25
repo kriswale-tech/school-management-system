@@ -11,12 +11,15 @@ class Capability:
     NAV_ASSESSMENTS = 'nav.assessments'
     NAV_FEES = 'nav.fees'
     NAV_STAFF = 'nav.staff'
+    NAV_REPORTS = 'nav.reports'
 
     CLASSES_VIEW = 'classes.view'
     CLASSES_MANAGE = 'classes.manage'
 
     STUDENTS_VIEW = 'students.view'
     STUDENTS_CREATE = 'students.create'
+    STUDENTS_MARK_LEFT = 'students.mark_left'
+    STUDENTS_REACTIVATE = 'students.reactivate'
 
     ASSESSMENTS_RECORD = 'assessments.record'
     ASSESSMENTS_APPROVE = 'assessments.approve'
@@ -29,6 +32,8 @@ class Capability:
     STAFF_VIEW = 'staff.view'
     STAFF_MANAGE = 'staff.manage'
 
+    REPORTS_VIEW = 'reports.view'
+
 
 # Full school operators (admin today; staff/accountant keep full access until
 # their packs are tightened in a later phase).
@@ -39,10 +44,13 @@ SCHOOL_WIDE_CAPABILITIES = frozenset({
     Capability.NAV_ASSESSMENTS,
     Capability.NAV_FEES,
     Capability.NAV_STAFF,
+    Capability.NAV_REPORTS,
     Capability.CLASSES_VIEW,
     Capability.CLASSES_MANAGE,
     Capability.STUDENTS_VIEW,
     Capability.STUDENTS_CREATE,
+    Capability.STUDENTS_MARK_LEFT,
+    Capability.STUDENTS_REACTIVATE,
     Capability.ASSESSMENTS_RECORD,
     Capability.ASSESSMENTS_APPROVE,
     Capability.ASSESSMENTS_RELEASE,
@@ -51,6 +59,7 @@ SCHOOL_WIDE_CAPABILITIES = frozenset({
     Capability.FEES_MANAGE_SETTINGS,
     Capability.STAFF_VIEW,
     Capability.STAFF_MANAGE,
+    Capability.REPORTS_VIEW,
 })
 
 TEACHER_BASE_CAPABILITIES = frozenset({

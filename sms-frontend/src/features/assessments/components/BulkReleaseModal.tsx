@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Button, Modal } from '@/components/ui'
 
 type BulkReleaseModalProps = {
@@ -9,23 +9,16 @@ type BulkReleaseModalProps = {
   onConfirm: (_remarks: string) => void
 }
 
-const BulkReleaseModal = ({
-  open,
+const BulkReleaseModalBody = ({
   readyCount,
   isSubmitting = false,
   onClose,
   onConfirm,
-}: BulkReleaseModalProps) => {
+}: Omit<BulkReleaseModalProps, 'open'>) => {
   const [remarks, setRemarks] = useState('')
 
-  useEffect(() => {
-    if (open) setRemarks('')
-  }, [open])
-
-  if (!open) return null
-
   return (
-    <Modal open={open} title="Release ready students" onClose={onClose} className="max-w-lg">
+    <Modal open title="Release ready students" onClose={onClose} className="max-w-lg">
       <div className="space-y-4">
         <p className="text-sm text-slate-600">
           Apply an optional shared head teacher remark and release all{' '}
@@ -69,6 +62,11 @@ const BulkReleaseModal = ({
       </div>
     </Modal>
   )
+}
+
+const BulkReleaseModal = ({ open, ...props }: BulkReleaseModalProps) => {
+  if (!open) return null
+  return <BulkReleaseModalBody {...props} />
 }
 
 export default BulkReleaseModal

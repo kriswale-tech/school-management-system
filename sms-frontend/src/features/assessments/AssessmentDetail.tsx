@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { useParams } from 'react-router-dom'
@@ -63,10 +63,9 @@ const AssessmentDetail = () => {
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
-  const [remarks, setRemarks] = useState('')
-  const [conduct, setConduct] = useState('')
-  const [attitude, setAttitude] = useState('')
-  const [interest, setInterest] = useState('')
+  const [draftByStudent, setDraftByStudent] = useState<
+    Record<string, { remarks: string; conduct: string; attitude: string; interest: string }>
+  >({})
   const [bulkOpen, setBulkOpen] = useState(false)
   const [correctionOpen, setCorrectionOpen] = useState(false)
   const [correctionMode, setCorrectionMode] = useState<'reject' | 'request_reopen'>('reject')
@@ -83,40 +82,58 @@ const AssessmentDetail = () => {
     return students.filter((student) => student.status === statusFilter)
   }, [data?.students, statusFilter])
 
-  useEffect(() => {
-    if (!filteredStudents.length) {
-      setSelectedStudentId(null)
-      return
-    }
+  const resolvedStudentId = (() => {
+    if (!filteredStudents.length) return null
     if (
       selectedStudentId &&
       filteredStudents.some((student) => student.id === selectedStudentId)
     ) {
-      return
+      return selectedStudentId
     }
     const preferred =
       filteredStudents.find((student) => student.status === 'awaiting_approval') ??
       filteredStudents[0]
-    setSelectedStudentId(preferred.id)
-  }, [filteredStudents, selectedStudentId])
+    return preferred.id
+  })()
 
-  const selectedStudent: ClassAssessmentDetailStudent | null = useMemo(() => {
-    if (!selectedStudentId) return null
-    return data?.students.find((student) => student.id === selectedStudentId) ?? null
-  }, [data?.students, selectedStudentId])
+  const selectedStudent: ClassAssessmentDetailStudent | null =
+    resolvedStudentId
+      ? (data?.students.find((student) => student.id === resolvedStudentId) ?? null)
+      : null
 
-  useEffect(() => {
-    setRemarks(selectedStudent?.class_teacher_remarks ?? '')
-    setConduct(selectedStudent?.conduct ?? '')
-    setAttitude(selectedStudent?.attitude ?? '')
-    setInterest(selectedStudent?.interest ?? '')
-  }, [
-    selectedStudent?.id,
-    selectedStudent?.class_teacher_remarks,
-    selectedStudent?.conduct,
-    selectedStudent?.attitude,
-    selectedStudent?.interest,
-  ])
+  const studentDraft = selectedStudent
+    ? (draftByStudent[selectedStudent.id] ?? {
+        remarks: selectedStudent.class_teacher_remarks ?? '',
+        conduct: selectedStudent.conduct ?? '',
+        attitude: selectedStudent.attitude ?? '',
+        interest: selectedStudent.interest ?? '',
+      })
+    : { remarks: '', conduct: '', attitude: '', interest: '' }
+
+  const remarks = studentDraft.remarks
+  const conduct = studentDraft.conduct
+  const attitude = studentDraft.attitude
+  const interest = studentDraft.interest
+
+  const patchStudentDraft = (
+    patch: Partial<{ remarks: string; conduct: string; attitude: string; interest: string }>,
+  ) => {
+    if (!selectedStudent) return
+    setDraftByStudent((current) => {
+      const base = current[selectedStudent.id] ?? {
+        remarks: selectedStudent.class_teacher_remarks ?? '',
+        conduct: selectedStudent.conduct ?? '',
+        attitude: selectedStudent.attitude ?? '',
+        interest: selectedStudent.interest ?? '',
+      }
+      return { ...current, [selectedStudent.id]: { ...base, ...patch } }
+    })
+  }
+
+  const setRemarks = (value: string) => patchStudentDraft({ remarks: value })
+  const setConduct = (value: string) => patchStudentDraft({ conduct: value })
+  const setAttitude = (value: string) => patchStudentDraft({ attitude: value })
+  const setInterest = (value: string) => patchStudentDraft({ interest: value })
 
   const { mutate: approveStudents, isPending: isApproving } = useMutation({
     mutationFn: (payload: {
@@ -138,9 +155,9 @@ const AssessmentDetail = () => {
   const { mutate: submitCorrection, isPending: isCorrecting } = useMutation({
     mutationFn: (payload: { teaching_assignment_ids: string[]; reason: string }) => {
       if (correctionMode === 'request_reopen') {
-        return classTeacherRequestReopen(classTeacherId!, selectedStudentId!, payload)
+        return classTeacherRequestReopen(classTeacherId!, resolvedStudentId!, payload)
       }
-      return classTeacherRejectStudent(classTeacherId!, selectedStudentId!, payload)
+      return classTeacherRejectStudent(classTeacherId!, resolvedStudentId!, payload)
     },
     onSuccess: (payload) => {
       toast.success(
@@ -268,7 +285,7 @@ const AssessmentDetail = () => {
                 <li className="text-sm text-slate-500 py-4">No students in this filter.</li>
               ) : (
                 filteredStudents.map((student) => {
-                  const selected = student.id === selectedStudentId
+                  const selected = student.id === resolvedStudentId
                   return (
                     <li key={student.id}>
                       <button
@@ -395,7 +412,7 @@ const AssessmentDetail = () => {
                             ) : null}
                             {data.uses_position ? (
                               <Table.Cell>
-                                {subject.position != null
+                                {subject.position !== null && subject.position !== undefined
                                   ? formatOrdinal(subject.position)
                                   : '—'}
                               </Table.Cell>
@@ -413,15 +430,18 @@ const AssessmentDetail = () => {
 
                 {data.uses_position ? (
                   <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                    {selectedStudent.overall_position != null &&
-                    selectedStudent.overall_cohort_size != null ? (
+                    {selectedStudent.overall_position !== null &&
+                    selectedStudent.overall_position !== undefined &&
+                    selectedStudent.overall_cohort_size !== null &&
+                    selectedStudent.overall_cohort_size !== undefined ? (
                       <p>
                         Overall position:{' '}
                         <span className="font-medium text-slate-900">
                           {formatOrdinal(selectedStudent.overall_position)} of{' '}
                           {selectedStudent.overall_cohort_size}
                         </span>
-                        {selectedStudent.overall_average != null ? (
+                        {selectedStudent.overall_average !== null &&
+                        selectedStudent.overall_average !== undefined ? (
                           <span className="text-slate-500">
                             {' '}
                             · Average {formatScore(selectedStudent.overall_average)}%

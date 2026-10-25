@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Icon } from '@iconify/react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -42,7 +42,7 @@ const AdminAssessments = () => {
   const [search, setSearch] = useState('')
   const [termSelection, setTermSelection] = useState<FilterSelection | undefined>(undefined)
   const [page, setPage] = useState(1)
-  const [inboxOpen, setInboxOpen] = useState(searchParams.get('inbox') === '1')
+  const inboxOpen = searchParams.get('inbox') === '1'
 
   const statusFilter = statusFromParam(searchParams.get('status'))
 
@@ -54,14 +54,7 @@ const AdminAssessments = () => {
     setPage(1)
   }
 
-  useEffect(() => {
-    if (searchParams.get('inbox') === '1') {
-      setInboxOpen(true)
-    }
-  }, [searchParams])
-
   const handleInboxOpenChange = (open: boolean) => {
-    setInboxOpen(open)
     const next = new URLSearchParams(searchParams)
     if (open) next.set('inbox', '1')
     else next.delete('inbox')

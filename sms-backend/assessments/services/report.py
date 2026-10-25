@@ -20,7 +20,7 @@ from assessments.services.admin_overview import (
     _class_teachers_by_key,
 )
 from assessments.services.scoring import compute_exam_contribution, decimal_or_none
-from schools.models import Term
+from schools.services.academic_calendar import expected_next_term
 from students.models import ClassEnrollment
 from students.services import resolve_term
 
@@ -28,15 +28,11 @@ from students.services import resolve_term
 def _format_report_date(value) -> str | None:
     if value is None:
         return None
-    return f'{value.month}/{value.day}/{value.year}'
+    return f'{_ordinal(value.day)} {value.strftime("%B")}, {value.year}'
 
 
 def _next_term_begins(*, school, term) -> str | None:
-    next_term = (
-        Term.objects.filter(school=school, start_date__gt=term.end_date)
-        .order_by('start_date')
-        .first()
-    )
+    next_term = expected_next_term(term)
     if next_term is None:
         return None
     return _format_report_date(next_term.start_date)

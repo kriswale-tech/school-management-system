@@ -47,6 +47,7 @@ def _serialize_config(config):
         'id': config.id,
         'continuous_assessment_weight': config.continuous_assessment_weight,
         'exam_weight': config.exam_weight,
+        'pass_mark': config.pass_mark,
         'result_type': config.result_type,
         'grade_type': config.grade_type,
         'grade_bands': [
@@ -115,6 +116,7 @@ def save_level_assessment_config(
     result_type,
     grade_type=None,
     grade_bands=None,
+    pass_mark=None,
     term_id=None,
 ):
     school_setup, _ = SchoolSetup.objects.get_or_create(school=school)
@@ -139,6 +141,7 @@ def save_level_assessment_config(
 
     config.continuous_assessment_weight = Decimal(continuous_assessment_weight)
     config.exam_weight = Decimal(exam_weight)
+    config.pass_mark = Decimal(pass_mark if pass_mark is not None else '40.00')
     config.result_type = result_type
 
     try:

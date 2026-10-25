@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Button, FormLabel, InputField, Modal } from '@/components/ui'
 import type { CaItem } from '../assessment/types'
 
@@ -10,19 +10,15 @@ type AddCaItemModalProps = {
   onSubmit: (_payload: { name: string; max_marks: number }) => string | null
 }
 
-const AddCaItemModal = ({ open, mode, initial, onClose, onSubmit }: AddCaItemModalProps) => {
-  const [name, setName] = useState('')
-  const [maxMarks, setMaxMarks] = useState('20')
+const AddCaItemModalBody = ({
+  mode,
+  initial,
+  onClose,
+  onSubmit,
+}: Omit<AddCaItemModalProps, 'open'>) => {
+  const [name, setName] = useState(initial?.name ?? '')
+  const [maxMarks, setMaxMarks] = useState(initial ? String(initial.max_marks) : '20')
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!open) return
-    setName(initial?.name ?? '')
-    setMaxMarks(initial ? String(initial.max_marks) : '20')
-    setError(null)
-  }, [open, initial])
-
-  if (!open) return null
 
   const title = mode === 'edit' ? 'Edit class assessment' : 'Add class assessment'
 
@@ -46,7 +42,7 @@ const AddCaItemModal = ({ open, mode, initial, onClose, onSubmit }: AddCaItemMod
   }
 
   return (
-    <Modal open={open} title={title} onClose={onClose}>
+    <Modal open title={title} onClose={onClose}>
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div>
           <FormLabel label="Assessment name" required />
@@ -86,6 +82,11 @@ const AddCaItemModal = ({ open, mode, initial, onClose, onSubmit }: AddCaItemMod
       </form>
     </Modal>
   )
+}
+
+const AddCaItemModal = ({ open, ...props }: AddCaItemModalProps) => {
+  if (!open) return null
+  return <AddCaItemModalBody key={props.initial?.id ?? props.mode} {...props} />
 }
 
 export default AddCaItemModal

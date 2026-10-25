@@ -1,34 +1,10 @@
 import { useNavigate } from 'react-router-dom'
-import type { AdminDashboardSetupHealth, AdminDashboardSetupHealthMetric } from '../types'
+import type { AdminDashboardSetupHealth } from '../types'
+import { getSetupHealthMetrics } from '../utils/setupHealth'
 
 type SetupHealthCardProps = {
   health: AdminDashboardSetupHealth
 }
-
-export const getSetupHealthMetrics = (
-  health: AdminDashboardSetupHealth,
-): AdminDashboardSetupHealthMetric[] => {
-  const metrics = [
-    health.class_teachers,
-    health.subject_teachers,
-    health.classes_with_students,
-    health.subject_groups_with_students,
-    health.students_in_subject_groups,
-  ]
-  return metrics.filter((metric) => {
-    if (
-      metric === health.subject_groups_with_students ||
-      metric === health.students_in_subject_groups
-    ) {
-      return metric.total > 0
-    }
-    return true
-  })
-}
-
-/** True when any applicable coverage bar is incomplete. */
-export const isSetupHealthIncomplete = (health: AdminDashboardSetupHealth) =>
-  getSetupHealthMetrics(health).some((metric) => metric.percent < 100)
 
 const SetupHealthCard = ({ health }: SetupHealthCardProps) => {
   const navigate = useNavigate()

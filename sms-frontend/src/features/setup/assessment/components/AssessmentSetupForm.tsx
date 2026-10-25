@@ -99,6 +99,9 @@ const AssessmentSetupFormItem = ({
     parseConfigWeight(config?.continuous_assessment_weight),
   )
   const [examWeight, setExamWeight] = useState(parseConfigWeight(config?.exam_weight))
+  const [passMark, setPassMark] = useState(
+    parseConfigWeight(config?.pass_mark) || '40',
+  )
   const [resultFormat, setResultFormat] = useState<ResultType | null>(config?.result_type ?? null)
   const [gradeTable, setGradeTable] = useState<GradeTableState>(() => {
     if (config?.grade_type) {
@@ -132,6 +135,7 @@ const AssessmentSetupFormItem = ({
     const validationError = validateLevelForm({
       continuousAssessmentWeight,
       examWeight,
+      passMark,
       resultType: resultFormat,
       gradeTable,
     })
@@ -145,6 +149,7 @@ const AssessmentSetupFormItem = ({
       resultFormat,
       continuousAssessmentWeight,
       examWeight,
+      passMark,
       gradeTable,
       config,
     )
@@ -186,6 +191,22 @@ const AssessmentSetupFormItem = ({
             className="rounded-none bg-white py-3"
           />
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <FormLabel label="Pass mark (%)" required />
+        <InputField
+          type="number"
+          placeholder="Minimum score out of 100 that counts as a pass"
+          min={0}
+          max={100}
+          value={passMark}
+          onChange={(event) => setPassMark(event.target.value)}
+          className="rounded-none bg-white py-3"
+        />
+        <p className="text-sm text-slate-500">
+          Used in reports to compare averages and subject totals (default 40%).
+        </p>
       </div>
 
       <div className="space-y-4">

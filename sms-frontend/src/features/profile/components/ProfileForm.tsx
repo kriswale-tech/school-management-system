@@ -13,20 +13,18 @@ const schema = z.object({
   last_name: z.string().min(1, 'Last name is required'),
   email: z
     .string()
-    .optional()
     .refine((value) => !value || z.string().email().safeParse(value).success, {
       message: 'Invalid email address',
     }),
   gender: z.enum(['male', 'female', 'other']).optional(),
   phone_number_alt: z
     .string()
-    .optional()
     .refine((value) => !value || ghanaPhoneSchema.safeParse(value).success, {
       message: 'Invalid Ghana phone number',
     }),
-  date_of_birth: z.string().optional(),
-  address: z.string().optional(),
-  bio: z.string().max(500, 'Bio must be 500 characters or fewer').optional(),
+  date_of_birth: z.string(),
+  address: z.string(),
+  bio: z.string().max(500, 'Bio must be 500 characters or fewer'),
 })
 
 type ProfileFormSubmitPayload = {

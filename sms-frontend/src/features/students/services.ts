@@ -4,6 +4,7 @@ import { getQueryUrl } from '@/utils/get-query-url'
 import type {
   GuardianCreatePayload,
   GuardianUpdatePayload,
+  MarkStudentLeftPayload,
   Parent,
   ParentQueryParams,
   Student,
@@ -15,6 +16,7 @@ import type {
   StudentOnboardPayload,
   StudentPayment,
   StudentAssessmentsQueryParams,
+  StudentPerformance,
   StudentQueryParams,
   StudentStats,
   StudentYearFees,
@@ -54,6 +56,19 @@ export const getStudent = async (studentId: string): Promise<StudentDetail> => {
 
 export const clearStudentGraduation = async (studentId: string): Promise<StudentDetail> => {
   const response = await api.post<StudentDetail>(`/students/${studentId}/clear-graduation/`)
+  return response.data
+}
+
+export const markStudentLeft = async (
+  studentId: string,
+  payload: MarkStudentLeftPayload,
+): Promise<StudentDetail> => {
+  const response = await api.post<StudentDetail>(`/students/${studentId}/mark-left/`, payload)
+  return response.data
+}
+
+export const reactivateStudent = async (studentId: string): Promise<StudentDetail> => {
+  const response = await api.post<StudentDetail>(`/students/${studentId}/reactivate/`)
   return response.data
 }
 
@@ -124,6 +139,13 @@ export const getStudentAssessments = async (
 ): Promise<StudentAssessment> => {
   const url = getQueryUrl(`/students/${studentId}/assessments/`, params)
   const response = await api.get<StudentAssessment>(url)
+  return response.data
+}
+
+export const getStudentPerformance = async (
+  studentId: string,
+): Promise<StudentPerformance> => {
+  const response = await api.get<StudentPerformance>(`/students/${studentId}/performance/`)
   return response.data
 }
 

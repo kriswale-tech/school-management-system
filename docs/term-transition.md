@@ -37,7 +37,7 @@ Skipped, and not moved:
 
 - Inactive pupils.
 - Anyone already enrolled on the target term.
-- Active pupils with no class this term. They are listed as a warning.
+- Active pupils with no class this term. They **block** the open until enrolled or marked left / graduated.
 
 Roll-forward enrollments keep `is_new_student` false.
 
@@ -53,13 +53,13 @@ If the next term has no catalog yet, the list is the current term’s items. Con
 
 Class and level fees stay pointed at the class or level they were written for. A pupil who moved to another class simply does not match the fee they left behind.
 
-Confirm publishes a draft if needed, then applies the catalog. Apply locks it. An already applied catalog is left locked, and newly placed pupils are billed from it. A missing catalog, or a catalog with no items, blocks the open.
+Confirm publishes a draft if needed, then applies the catalog. Apply locks it. An already applied catalog is left locked, and newly placed pupils are billed from it. A missing catalog, or a catalog with no items, blocks the open. The Fees and Confirm steps both say that opening locks the list, so amounts should be finished in Fees settings before the open.
 
 Past-term balances stay on those terms. Advances already apply when the next catalog is applied.
 
 ### Confirm
 
-Warnings (unreleased reports, unmatched subjects, subject groups that could not be copied, pupils with no class, opening before the start date) must be acknowledged. Blockers stop the button: no next term, overlapping dates, a class with nowhere to go and no stream choice, or no fee items.
+Warnings (unreleased reports, unmatched subjects, subject groups that could not be copied, opening before the start date) must be acknowledged. Blockers stop the button: no next term, overlapping dates, a class with nowhere to go and no stream choice, no fee items, or active pupils with no class this term.
 
 Confirm then:
 
@@ -87,9 +87,9 @@ The student profile shows **Graduated**. An admin can **Clear graduation** (`POS
 | Match class streams | Year change only. Every moving class has a matching stream or a choice |
 | Pupils leaving | Year change only. Informational, always treated as done |
 
-## What the old switch still does
+## Standalone activate (disabled)
 
-`POST /api/v1/schools/settings/academic-years/terms/<term_id>/activate/` still only flips which term is current and copies assessment settings. The settings screen no longer calls it. Use the wizard to place pupils and bill the next term.
+`POST /api/v1/schools/settings/academic-years/terms/<term_id>/activate/` returns **403**. Term activation only happens inside transition confirm, after pupils are placed and fees applied. The settings screen does not expose activate.
 
 ## Code
 
@@ -101,4 +101,4 @@ The student profile shows **Graduated**. An admin can **Clear graduation** (`POS
 | Wizard and saved progress | `sms-frontend/src/features/settings/components/TransitionWizard.tsx` |
 | Navbar and dashboard entry | `TransitionProvider.tsx`, `NavBar.tsx`, `TransitionNotice.tsx` |
 
-**Last reviewed:** 2026-10-15
+**Last reviewed:** 2026-10-24

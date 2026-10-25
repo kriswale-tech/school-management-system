@@ -5,7 +5,7 @@ import { getAcademicYearAndTerm } from '@/features/setup/academic-year-and-term/
 import type { TermApiKey } from '@/features/setup/academic-year-and-term/types'
 import ProfileComponent from './ProfileComponent'
 import AlertsMenu from '@/features/settings/components/AlertsMenu'
-import { useTransitionWizard } from '@/features/settings/components/TransitionProvider'
+import { useTransitionWizard } from '@/features/settings/hooks/useTransitionWizard'
 import { getTransitionStatus, TRANSITION_STATUS_QUERY_KEY } from '@/features/settings/services'
 import { mergeClasses } from '@/utils'
 

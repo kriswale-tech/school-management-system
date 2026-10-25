@@ -40,7 +40,7 @@ const AssignSubjectGroupStudents = ({
     enabled: open && Boolean(assignmentId),
   })
 
-  const candidates = data?.results ?? []
+  const candidates = useMemo(() => data?.results ?? [], [data?.results])
   const selectableIds = useMemo(
     () => candidates.filter((item) => item.selectable).map((item) => item.id),
     [candidates],

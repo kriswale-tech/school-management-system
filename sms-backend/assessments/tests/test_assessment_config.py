@@ -39,7 +39,19 @@ class AssessmentConfigModelTests(TestCase):
 
         self.assertEqual(config.continuous_assessment_weight, Decimal('40.00'))
         self.assertEqual(config.exam_weight, Decimal('60.00'))
+        self.assertEqual(config.pass_mark, Decimal('40.00'))
         self.assertIsNone(config.grade_type)
+
+    def test_rejects_pass_mark_outside_0_to_100(self):
+        with self.assertRaises(ValidationError) as ctx:
+            AssessmentConfig.objects.create(
+                level=self.level,
+                term=self.term,
+                result_type=AssessmentConfig.ResultType.POSITION,
+                pass_mark=Decimal('101.00'),
+            )
+
+        self.assertIn('pass_mark', ctx.exception.message_dict)
 
     def test_rejects_weights_that_do_not_sum_to_100(self):
         with self.assertRaises(ValidationError) as ctx:

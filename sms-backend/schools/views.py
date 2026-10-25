@@ -17,7 +17,6 @@ from schools.serializers import (
     TransitionConfirmSerializer,
 )
 from schools.services.academic_calendar import (
-    activate_term,
     create_next_academic_year,
     list_academic_calendar,
     preview_term_switch,
@@ -143,26 +142,27 @@ class TermSwitchPreviewView(SchoolScopedAPIView):
 
 
 @extend_schema(
-    summary='Make a term current',
+    summary='Make a term current (disabled)',
     description=(
-        'Moves the active term to the immediate next term. '
-        'Does not roll enrollments or apply fees.'
+        'Standalone term activation is disabled. Use Open the next term '
+        '(transition confirm) so pupils are placed and fees applied before '
+        'the term becomes current.'
     ),
     request=TermSwitchSerializer,
-    responses={200: AcademicYearCalendarSerializer},
+    responses={403: None},
+    deprecated=True,
 )
 class TermActivateView(SchoolScopedAPIView):
     permission_classes = [HasActiveSchool, IsAdmin]
 
     def post(self, request, term_id):
-        serializer = TermSwitchSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        calendar = activate_term(
-            self.school,
-            term_id,
-            acknowledge_warnings=serializer.validated_data['acknowledge_warnings'],
+        from rest_framework.exceptions import PermissionDenied
+
+        raise PermissionDenied(
+            'Activating a term directly is disabled. '
+            'Open the next term from the transition wizard so continuing pupils '
+            'are enrolled (or graduated) and fees are applied first.'
         )
-        return Response(AcademicYearCalendarSerializer(calendar).data)
 
 
 @extend_schema(

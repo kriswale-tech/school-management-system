@@ -23,7 +23,7 @@ const AssessmentSettings = ({ embedded = false }: AssessmentSettingsProps) => {
       ),
   })
 
-  const terms = data?.terms ?? []
+  const terms = useMemo(() => data?.terms ?? [], [data?.terms])
   const defaultTermId = data?.active_term_id ?? terms[0]?.id ?? ''
   const term: FilterSelection = termSelection !== undefined ? termSelection : defaultTermId
   const termId = term === '' ? undefined : String(term)

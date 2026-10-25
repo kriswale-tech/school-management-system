@@ -1,15 +1,6 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { TransitionWizardContext } from './transitionWizardContext'
 import TransitionWizard from './TransitionWizard'
-
-type TransitionWizardContextValue = {
-  openWizard: () => void
-}
-
-const TransitionWizardContext = createContext<TransitionWizardContextValue | null>(null)
-
-export const useTransitionWizard = () => {
-  return useContext(TransitionWizardContext)
-}
 
 const TransitionProvider = ({ children }: { children: ReactNode }) => {
   const [wizardOpen, setWizardOpen] = useState(false)

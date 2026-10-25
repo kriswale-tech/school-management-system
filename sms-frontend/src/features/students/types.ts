@@ -130,6 +130,8 @@ export type StudentGuardian = {
   is_emergency_contact: boolean
 }
 
+export type StudentLeaveReason = 'dropout' | 'transfer' | 'other'
+
 export type StudentDetail = {
   id: string
   student_id: string
@@ -144,10 +146,19 @@ export type StudentDetail = {
   address: string
   is_active: boolean
   is_graduated: boolean
+  left_at: string | null
+  leave_reason: StudentLeaveReason | null
+  leave_notes: string
+  left_by_name: string | null
   is_new_student: boolean | null
   class_assignment: StudentClassAssignment | null
   guardians: StudentGuardian[]
   term_id: string
+}
+
+export type MarkStudentLeftPayload = {
+  reason: StudentLeaveReason
+  notes?: string
 }
 
 export type StudentBioUpdatePayload = {
@@ -249,4 +260,68 @@ export type StudentFeesQueryParams = {
 
 export type StudentAssessmentsQueryParams = {
   term?: string
+}
+
+export type SubjectRating = 'strong' | 'secure' | 'borderline' | 'at_risk'
+
+export type StudentPerformanceSubject = {
+  rank: number
+  subject_id: string | null
+  subject_name: string
+  total: number
+  grade: string | null
+  rating: SubjectRating
+  terms_with_score?: number
+  terms_enrolled?: number
+  incomplete?: boolean
+}
+
+export type StudentPerformanceGradeRow = {
+  grade: string
+  count: number
+  percent: number
+}
+
+export type StudentPerformanceTerm = {
+  term_id: string
+  term_label: string
+  class_display_name: string
+  overall_average: number | null
+  pass_mark: number
+  mode: 'grades' | 'score_bands'
+  result_type: string
+  subjects: StudentPerformanceSubject[]
+  total_graded: number
+  grade_distribution: StudentPerformanceGradeRow[]
+  expected_subjects_count: number
+  published_subjects_count: number
+  missing_subjects_count: number
+  results_incomplete: boolean
+}
+
+export type StudentPerformanceOverallPoint = {
+  term_id: string
+  term_label: string
+  average_score: number
+}
+
+export type StudentSubjectTrend = {
+  subject_name: string
+  points: Array<{
+    term_id: string
+    term_label: string
+    total: number
+  }>
+}
+
+export type StudentPerformance = {
+  student_id: string
+  full_name: string
+  terms: StudentPerformanceTerm[]
+  overall_trend: StudentPerformanceOverallPoint[]
+  subject_trends: StudentSubjectTrend[]
+  all_time_ranking: StudentPerformanceSubject[]
+  all_time_pass_mark: number
+  all_time_incomplete: boolean
+  enrolled_term_count: number
 }

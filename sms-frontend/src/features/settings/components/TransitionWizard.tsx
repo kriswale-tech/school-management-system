@@ -139,32 +139,27 @@ const TransitionWizard = ({ open, onClose }: TransitionWizardProps) => {
       : (steps[0] ?? 'Pupils')
   const stepIndex = Math.max(0, steps.indexOf(stepName))
 
-  useEffect(() => {
-    if (!data?.term_id || hydratedTermId !== data.term_id) return
-    setStreamChoices((current) => {
-      const pruned = pruneStreamChoices(current, data.placements)
-      const same = Object.keys(pruned).length === Object.keys(current).length
-        && Object.entries(pruned).every(([key, value]) => current[key] === value)
-      return same ? current : pruned
-    })
-  }, [data, hydratedTermId])
+  const effectiveStreamChoices = useMemo(
+    () => (data ? pruneStreamChoices(streamChoices, data.placements) : streamChoices),
+    [data, streamChoices],
+  )
 
   useEffect(() => {
     if (!data?.term_id || hydratedTermId !== data.term_id) return
-    writeDraft(data.term_id, { step: stepName, streamChoices })
-  }, [data?.term_id, hydratedTermId, stepName, streamChoices])
+    writeDraft(data.term_id, { step: stepName, streamChoices: effectiveStreamChoices })
+  }, [data?.term_id, hydratedTermId, stepName, effectiveStreamChoices])
   const warnings = [...(data?.warnings ?? []), ...extraWarnings.filter(
     (warning) => !(data?.warnings ?? []).includes(warning),
   )]
   const streamReady = (data?.placements ?? [])
     .filter((row) => row.outcome === 'needs_stream')
-    .every((row) => row.stream_options.length > 0 && streamChoices[row.source_stream_id])
+    .every((row) => row.stream_options.length > 0 && effectiveStreamChoices[row.source_stream_id])
 
   const { mutate: confirm, isPending } = useMutation({
     mutationFn: () =>
       confirmTransition({
         acknowledge_warnings: acknowledge || warnings.length === 0,
-        stream_choices: Object.entries(streamChoices).map(([source_stream_id, destination_stream_id]) => ({
+        stream_choices: Object.entries(effectiveStreamChoices).map(([source_stream_id, destination_stream_id]) => ({
           source_stream_id,
           destination_stream_id,
         })),
@@ -237,7 +232,7 @@ const TransitionWizard = ({ open, onClose }: TransitionWizardProps) => {
           {stepName === 'Streams' ? (
             <StreamsStep
               placements={data.placements}
-              choices={streamChoices}
+              choices={effectiveStreamChoices}
               onChange={(sourceId, destinationId) =>
                 setStreamChoices((current) => ({ ...current, [sourceId]: destinationId }))
               }
@@ -423,6 +418,11 @@ const ConfirmStep = ({
   <div className="space-y-3">
     <p className="text-sm text-slate-700">
       {preview.term_label} becomes the current term. Past marks and bills stay on the term you are leaving.
+    </p>
+    <p className="text-sm text-slate-700">
+      {preview.fees.locked
+        ? `Fees for ${preview.term_label ?? 'this term'} are already applied and locked. Newly placed pupils will be billed from that list.`
+        : `Opening applies the fee list for ${preview.term_label ?? 'this term'} and locks it. Edit those items in Fees settings before you open if anything still needs to change.`}
     </p>
     {preview.graduate_count > 0 ? (
       <p className="text-sm text-slate-700">

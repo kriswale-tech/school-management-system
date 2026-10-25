@@ -180,10 +180,19 @@ class StudentDetailSerializer(serializers.Serializer):
     address = serializers.CharField(allow_blank=True)
     is_active = serializers.BooleanField()
     is_graduated = serializers.BooleanField()
+    left_at = serializers.DateTimeField(allow_null=True)
+    leave_reason = serializers.CharField(allow_null=True, allow_blank=True)
+    leave_notes = serializers.CharField(allow_blank=True)
+    left_by_name = serializers.CharField(allow_null=True, allow_blank=True)
     is_new_student = serializers.BooleanField(allow_null=True)
     class_assignment = StudentClassAssignmentSerializer(allow_null=True)
     guardians = StudentGuardianSerializer(many=True)
     term_id = serializers.UUIDField()
+
+
+class MarkStudentLeftSerializer(serializers.Serializer):
+    reason = serializers.ChoiceField(choices=Student.LeaveReason.choices)
+    notes = serializers.CharField(required=False, allow_blank=True, default='')
 
 
 class StudentUpdateSerializer(serializers.Serializer):

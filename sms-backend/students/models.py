@@ -35,6 +35,11 @@ class Student(BaseModel):
         FEMALE = 'female', 'Female'
         OTHER = 'other', 'Other'
 
+    class LeaveReason(models.TextChoices):
+        DROPOUT = 'dropout', 'Dropped out'
+        TRANSFER = 'transfer', 'Transferred'
+        OTHER = 'other', 'Other'
+
     school = models.ForeignKey(
         'schools.School',
         on_delete=models.CASCADE,
@@ -56,6 +61,25 @@ class Student(BaseModel):
     is_graduated = models.BooleanField(
         default=False,
         help_text='Finished the last class the school offers. Not enrolled in later years.',
+    )
+    left_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When the student was marked as having left the school.',
+    )
+    leave_reason = models.CharField(
+        max_length=20,
+        choices=LeaveReason.choices,
+        blank=True,
+        default='',
+    )
+    leave_notes = models.TextField(blank=True, default='')
+    left_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='students_marked_left',
     )
     parents = models.ManyToManyField(
         'students.Parent',

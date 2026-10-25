@@ -12,7 +12,7 @@ import {
 } from '../services'
 import type { AcademicYearCalendar, AcademicYearStatus, CalendarYear, TermKey } from '../types'
 import SettingsSection from './SettingsSection'
-import { useTransitionWizard } from './TransitionProvider'
+import { useTransitionWizard } from '../hooks/useTransitionWizard'
 
 const STATUS_LABEL: Record<AcademicYearStatus, string> = {
   past: 'Past',

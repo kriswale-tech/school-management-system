@@ -21,6 +21,10 @@ import type {
   TeachingAssignmentDetail,
 } from './types'
 import type {
+  ClassStreamPerformance,
+  TeachingAssignmentPerformance,
+} from '@/features/reports/types'
+import type {
   AdminAssessmentDetail,
   AdminAssessmentFilterOptions,
   AdminAssessmentOverview,
@@ -95,6 +99,15 @@ export const getClassSubjects = async (streamId: string): Promise<ClassSubjectLi
   return response.data
 }
 
+export const getClassPerformance = async (
+  streamId: string,
+): Promise<ClassStreamPerformance> => {
+  const response = await api.get<ClassStreamPerformance>(
+    `/academics/classes/${streamId}/performance/`,
+  )
+  return response.data
+}
+
 export const getClassTeacherOptions = async (
   params: { search?: string } = {},
 ): Promise<ClassTeacherOptionListResponse> => {
@@ -160,6 +173,15 @@ export const getTeachingAssignmentStudents = async (
 ): Promise<ClassStudentListResponse> => {
   const url = getQueryUrl(`/academics/teaching-assignments/${assignmentId}/students/`, params)
   const response = await api.get<ClassStudentListResponse>(url)
+  return response.data
+}
+
+export const getTeachingAssignmentPerformance = async (
+  assignmentId: string,
+): Promise<TeachingAssignmentPerformance> => {
+  const response = await api.get<TeachingAssignmentPerformance>(
+    `/academics/teaching-assignments/${assignmentId}/performance/`,
+  )
   return response.data
 }
 

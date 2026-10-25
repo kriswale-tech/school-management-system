@@ -4,7 +4,7 @@ import { Icon } from '@iconify/react'
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui'
 import { useAuth } from '@/features/auth/hooks'
-import { useTransitionWizard } from '@/features/settings/components/TransitionProvider'
+import { useTransitionWizard } from '@/features/settings/hooks/useTransitionWizard'
 import { getTransitionStatus, TRANSITION_STATUS_QUERY_KEY } from '@/features/settings/services'
 import { mergeClasses } from '@/utils'
 

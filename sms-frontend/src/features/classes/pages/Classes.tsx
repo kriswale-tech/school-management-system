@@ -114,10 +114,15 @@ const AdminClassesPage = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard title="Total Classes" value={String(stats?.total_classes ?? 0)} />
-        <StatsCard title="Total Subjects" value={String(stats?.total_class_subjects ?? 0)} />
+        <StatsCard
+          title="Total Subjects"
+          value={String(stats?.total_class_subjects ?? 0)}
+          description="Subject–class slots (a subject offered on a class), not unique subject names"
+        />
         <StatsCard
           title="Unassigned Subjects"
           value={String(stats?.unassigned_class_subjects ?? 0)}
+          description="Subject–class slots still without a teacher"
         />
         <StatsCard title="Unassigned Classes" value={String(stats?.unassigned_classes ?? 0)} />
       </div>

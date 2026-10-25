@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import ActionBar from '@/components/shared/ActionBar'
 import { TabComponent } from '@/components/shared'
@@ -9,18 +8,48 @@ import Assessment from '../components/detail-pages/Assessment'
 import Bio from '../components/detail-pages/Bio'
 import Fees from '../components/detail-pages/Fees'
 import Guardian from '../components/detail-pages/Guardian'
+import Performance from '../components/detail-pages/Performance'
 import { getStudent } from '../services'
 import { STUDENT_DETAIL_QUERY_KEY } from '../utils'
 import DotComponent from '@/components/ui/DotComponent'
 
 const TAB_BIO = 'Bio'
 const TAB_GUARDIAN = 'Guardian'
+const TAB_PERFORMANCE = 'Performance'
 const TAB_ASSESSMENT = 'Reports & Assessment'
 const TAB_FEES = 'Fees'
 
+const TAB_FROM_QUERY: Record<string, string> = {
+  bio: TAB_BIO,
+  guardian: TAB_GUARDIAN,
+  performance: TAB_PERFORMANCE,
+  assessment: TAB_ASSESSMENT,
+  fees: TAB_FEES,
+}
+
+const QUERY_FROM_TAB: Record<string, string> = {
+  [TAB_BIO]: 'bio',
+  [TAB_GUARDIAN]: 'guardian',
+  [TAB_PERFORMANCE]: 'performance',
+  [TAB_ASSESSMENT]: 'assessment',
+  [TAB_FEES]: 'fees',
+}
+
 const StudentDetails = () => {
   const { id } = useParams<{ id: string }>()
-  const [activeTab, setActiveTab] = useState(TAB_BIO)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const activeTab =
+    (tabParam && TAB_FROM_QUERY[tabParam.toLowerCase()]) || TAB_BIO
+
+  const selectTab = (label: string) => {
+    const key = QUERY_FROM_TAB[label]
+    if (!key || key === 'bio') {
+      setSearchParams({}, { replace: true })
+      return
+    }
+    setSearchParams({ tab: key }, { replace: true })
+  }
 
   const {
     data: student,
@@ -36,19 +65,23 @@ const StudentDetails = () => {
   const tabs = [
     {
       label: TAB_BIO,
-      onClick: () => setActiveTab(TAB_BIO),
+      onClick: () => selectTab(TAB_BIO),
     },
     {
       label: TAB_GUARDIAN,
-      onClick: () => setActiveTab(TAB_GUARDIAN),
+      onClick: () => selectTab(TAB_GUARDIAN),
+    },
+    {
+      label: TAB_PERFORMANCE,
+      onClick: () => selectTab(TAB_PERFORMANCE),
     },
     {
       label: TAB_ASSESSMENT,
-      onClick: () => setActiveTab(TAB_ASSESSMENT),
+      onClick: () => selectTab(TAB_ASSESSMENT),
     },
     {
       label: TAB_FEES,
-      onClick: () => setActiveTab(TAB_FEES),
+      onClick: () => selectTab(TAB_FEES),
     },
   ]
 
@@ -96,6 +129,7 @@ const StudentDetails = () => {
               {activeTab === TAB_GUARDIAN && (
                 <Guardian studentId={student.id} guardians={student.guardians} />
               )}
+              {activeTab === TAB_PERFORMANCE && <Performance studentId={student.id} />}
               {activeTab === TAB_ASSESSMENT && <Assessment studentId={student.id} />}
               {activeTab === TAB_FEES && <Fees studentId={student.id} />}
             </div>

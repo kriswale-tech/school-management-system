@@ -6,6 +6,7 @@ from academics.views import (
     AllClassesView,
     ClassDetailView,
     ClassListView,
+    ClassPerformanceView,
     ClassStatsView,
     ClassStudentsView,
     SubjectClassListView,
@@ -19,6 +20,7 @@ from academics.views import (
     SubjectGroupCandidatesView,
     SubjectGroupUnassignStudentsView,
     TeachingAssignmentDetailView,
+    TeachingAssignmentPerformanceView,
     TeachingAssignmentStudentsView,
 )
 from assessments.views import (
@@ -89,6 +91,11 @@ urlpatterns = [
         'teaching-assignments/<uuid:assignment_id>/students/',
         TeachingAssignmentStudentsView.as_view(),
         name='academics-teaching-assignment-students',
+    ),
+    path(
+        'teaching-assignments/<uuid:assignment_id>/performance/',
+        TeachingAssignmentPerformanceView.as_view(),
+        name='academics-teaching-assignment-performance',
     ),
     path(
         'teaching-assignments/<uuid:assignment_id>/workspace/',
@@ -229,6 +236,11 @@ urlpatterns = [
         'classes/<uuid:stream_id>/subjects/',
         ClassSubjectsView.as_view(),
         name='academics-class-subjects',
+    ),
+    path(
+        'classes/<uuid:stream_id>/performance/',
+        ClassPerformanceView.as_view(),
+        name='academics-class-performance',
     ),
     path(
         'classes/<uuid:stream_id>/class-teacher/',

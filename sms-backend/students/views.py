@@ -10,13 +10,17 @@ from assessments.services.report_pdf import (
     generate_student_profile_report,
     get_student_profile_report,
 )
-from accounts.permissions import HasActiveSchool, IsAdmin
+from accounts.capabilities import Capability
+from accounts.permissions import HasActiveSchool, HasCapability, IsAdmin
 from fees.services import get_student_fee_history, get_student_fees, list_student_payments
+from reports.serializers import StudentPerformanceSerializer
+from reports.services import get_student_performance
 from shared.views import SchoolScopedAPIView
 from students.filters import ParentFilter, StudentEnrollmentFilter
 from students.serializers import (
     GuardianCreateSerializer,
     GuardianUpdateSerializer,
+    MarkStudentLeftSerializer,
     ParentListSerializer,
     StudentDetailSerializer,
     StudentFeeHistorySerializer,
@@ -37,7 +41,9 @@ from students.services import (
     list_enrollments_for_term,
     list_parents_for_school,
     list_student_guardians,
+    mark_student_left,
     onboard_student,
+    reactivate_student,
     remove_student_guardian,
     resolve_term,
     update_student,
@@ -229,6 +235,55 @@ class StudentClearGraduationView(SchoolScopedAPIView):
         return Response(StudentDetailSerializer(detail).data)
 
 
+class StudentMarkLeftView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.STUDENTS_MARK_LEFT
+
+    @extend_schema(
+        tags=['Students'],
+        summary='Mark student as left',
+        description=(
+            'Marks a student as having left the school (dropout, transfer, or other). '
+            'Admins may mark any student; class teachers only students in their class. '
+            'Writes an activity feed entry.'
+        ),
+        request=MarkStudentLeftSerializer,
+        responses={200: StudentDetailSerializer},
+    )
+    def post(self, request, student_id):
+        serializer = MarkStudentLeftSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        detail = mark_student_left(
+            school=self.school,
+            membership=self.membership,
+            student_id=student_id,
+            **serializer.validated_data,
+        )
+        return Response(StudentDetailSerializer(detail).data)
+
+
+class StudentReactivateView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, IsAdmin]
+
+    @extend_schema(
+        tags=['Students'],
+        summary='Reactivate student',
+        description=(
+            'Admin-only. Restores a student who left so they can be enrolled again. '
+            'Writes an activity feed entry.'
+        ),
+        request=None,
+        responses={200: StudentDetailSerializer},
+    )
+    def post(self, request, student_id):
+        detail = reactivate_student(
+            school=self.school,
+            membership=self.membership,
+            student_id=student_id,
+        )
+        return Response(StudentDetailSerializer(detail).data)
+
+
 class StudentAssessmentView(SchoolScopedAPIView):
     @extend_schema(
         tags=['Students'],
@@ -255,6 +310,24 @@ class StudentAssessmentView(SchoolScopedAPIView):
             term_id=request.query_params.get('term') or None,
         )
         return Response(StudentAssessmentSerializer(payload).data)
+
+
+class StudentPerformanceView(SchoolScopedAPIView):
+    @extend_schema(
+        tags=['Students'],
+        summary='Student performance across terms',
+        description=(
+            'Published subject scores, overall averages, and grade distribution '
+            'for every term this student has been enrolled in.'
+        ),
+        responses={200: StudentPerformanceSerializer},
+    )
+    def get(self, request, student_id):
+        payload = get_student_performance(
+            school=self.school,
+            student_id=student_id,
+        )
+        return Response(StudentPerformanceSerializer(payload).data)
 
 
 class StudentAssessmentReportView(SchoolScopedAPIView):

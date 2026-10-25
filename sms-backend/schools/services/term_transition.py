@@ -252,8 +252,14 @@ def _public_group(group):
 
 
 def _unenrolled_students(school, active):
+    """Active pupils who must be in a class before the next term can open."""
     students = (
-        Student.objects.filter(school=school, is_active=True, is_graduated=False)
+        Student.objects.filter(
+            school=school,
+            is_active=True,
+            is_graduated=False,
+            left_at__isnull=True,
+        )
         .exclude(enrollments__term=active)
         .order_by('last_name', 'first_name')
     )
@@ -292,6 +298,15 @@ def build_transition_preview(school, *, today=None):
     elif target is None:
         blockers.append('The next term is not set up yet.')
 
+    unenrolled = _unenrolled_students(school, active)
+    if unenrolled:
+        count = len(unenrolled)
+        noun = 'pupil is' if count == 1 else 'pupils are'
+        blockers.append(
+            f'{count} active {noun} not in a class this term. '
+            'Enrol them or mark them left / graduated before opening the next term.'
+        )
+
     if target is None or blockers:
         label = None
         if target is not None:
@@ -306,7 +321,7 @@ def build_transition_preview(school, *, today=None):
             'term_id': _sid(target.id) if target else None,
             'term_label': label,
             'placements': [],
-            'unenrolled_students': _unenrolled_students(school, active),
+            'unenrolled_students': unenrolled,
             'already_enrolled_count': 0,
             'graduate_count': 0,
             'unreleased_reports': _unreleased_report_count(school=school, term=active),
@@ -330,14 +345,6 @@ def build_transition_preview(school, *, today=None):
     if unreleased:
         noun = 'report is' if unreleased == 1 else 'reports are'
         warnings.append(f'{unreleased} {noun} still unreleased on the current term.')
-
-    unenrolled = _unenrolled_students(school, active)
-    if unenrolled:
-        count = len(unenrolled)
-        noun = 'pupil is' if count == 1 else 'pupils are'
-        warnings.append(
-            f'{count} active {noun} not in a class this term and will not be moved.'
-        )
 
     if today < target.start_date:
         warnings.append(

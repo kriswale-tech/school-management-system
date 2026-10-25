@@ -27,6 +27,8 @@ class Activity(BaseModel):
         SUBJECT_TEACHER_ASSIGNED = 'subject_teacher_assigned', 'Subject teacher assigned'
         SUBJECT_GROUP_PLACED = 'subject_group_placed', 'Subject group placed'
         STUDENT_ENROLLED = 'student_enrolled', 'Student enrolled'
+        STUDENT_LEFT = 'student_left', 'Student left'
+        STUDENT_REACTIVATED = 'student_reactivated', 'Student reactivated'
 
     school = models.ForeignKey(
         'schools.School',

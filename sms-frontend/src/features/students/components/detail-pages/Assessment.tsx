@@ -187,7 +187,9 @@ const Assessment = ({ studentId }: AssessmentProps) => {
                       ) : null}
                       {data.uses_position ? (
                         <Table.Cell>
-                          {subject.position != null ? formatOrdinal(subject.position) : '—'}
+                          {subject.position !== null && subject.position !== undefined
+                            ? formatOrdinal(subject.position)
+                            : '—'}
                         </Table.Cell>
                       ) : null}
                       <Table.Cell>{subject.band_remark ?? '—'}</Table.Cell>
@@ -200,13 +202,16 @@ const Assessment = ({ studentId }: AssessmentProps) => {
 
           {data.uses_position ? (
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-              {student.overall_position != null && student.overall_cohort_size != null ? (
+              {student.overall_position !== null &&
+              student.overall_position !== undefined &&
+              student.overall_cohort_size !== null &&
+              student.overall_cohort_size !== undefined ? (
                 <p>
                   Overall position:{' '}
                   <span className="font-medium text-slate-900">
                     {formatOrdinal(student.overall_position)} of {student.overall_cohort_size}
                   </span>
-                  {student.overall_average != null ? (
+                  {student.overall_average !== null && student.overall_average !== undefined ? (
                     <span className="text-slate-500">
                       {' '}
                       · Average {formatScore(student.overall_average)}%

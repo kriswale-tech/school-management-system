@@ -232,7 +232,7 @@ const StudentReportSheet = ({ data }: StudentReportSheetProps) => {
       </footer>
 
       {data.uses_grades && data.grade_bands.length > 0 ? (
-        <section className="mt-6">
+        <section className="mt-10 border-t border-dashed border-slate-300 pt-8">
           <h2 className="mb-2 text-center text-xs font-medium italic underline underline-offset-4">
             Grades Interpretation
           </h2>

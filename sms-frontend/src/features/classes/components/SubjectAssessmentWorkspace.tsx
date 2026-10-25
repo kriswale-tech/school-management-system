@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { Icon } from '@iconify/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { ConfirmDialog, Table, TableWrapper } from '@/components/shared'
@@ -30,6 +31,9 @@ type SubjectAssessmentWorkspaceProps = {
   canRecord: boolean
   isRecording: boolean
   onExitRecording: () => void
+  onStartRecording: () => void
+  onPublish: () => void
+  onOpenAddCa: () => void
   addCaOpen: boolean
   onCloseAddCa: () => void
 }
@@ -61,11 +65,14 @@ const SubjectAssessmentWorkspace = ({
   canRecord,
   isRecording,
   onExitRecording,
+  onStartRecording,
+  onPublish,
+  onOpenAddCa,
   addCaOpen,
   onCloseAddCa,
 }: SubjectAssessmentWorkspaceProps) => {
   const queryClient = useQueryClient()
-  const [draftMarks, setDraftMarks] = useState<StudentAssessmentMarks[]>([])
+  const [draftMarks, setDraftMarks] = useState<StudentAssessmentMarks[] | null>(null)
   const [editingItem, setEditingItem] = useState<CaItem | null>(null)
   const [pendingDelete, setPendingDelete] = useState<CaItem | null>(null)
   const [statusFilter, setStatusFilter] = useState<'all' | 'needs_correction'>('all')
@@ -85,7 +92,7 @@ const SubjectAssessmentWorkspace = ({
   const weights = workspace?.weights ?? DEFAULT_ASSESSMENT_WEIGHTS
   const gradeBands =
     workspace?.grade_bands?.length ? workspace.grade_bands : DEFAULT_GRADE_BANDS
-  const students = workspace?.students ?? []
+  const students = useMemo(() => workspace?.students ?? [], [workspace?.students])
   const needsCorrectionCount = students.filter((student) => student.needs_correction).length
   const visibleStudents = useMemo(() => {
     if (statusFilter === 'needs_correction') {
@@ -103,12 +110,6 @@ const SubjectAssessmentWorkspace = ({
       })),
     [students],
   )
-
-  useEffect(() => {
-    if (isRecording) {
-      setDraftMarks(cloneMarks(savedMarks))
-    }
-  }, [isRecording, savedMarks])
 
   const invalidateWorkspace = () =>
     queryClient.invalidateQueries({ queryKey: workspaceQueryKey(assignmentId) })
@@ -178,7 +179,7 @@ const SubjectAssessmentWorkspace = ({
     onError: (err) => toast.error(getApiErrorMessage(err, 'Unable to unpublish')),
   })
 
-  const activeMarks = isRecording ? draftMarks : savedMarks
+  const activeMarks = isRecording ? (draftMarks ?? savedMarks) : savedMarks
 
   const marksByStudent = useMemo(() => {
     const map = new Map<string, StudentAssessmentMarks>()
@@ -189,19 +190,21 @@ const SubjectAssessmentWorkspace = ({
   const updateDraftCa = (studentId: string, itemId: string, raw: string) => {
     const parsed = parseMarkInput(raw)
     if (parsed === 'invalid') return
-    setDraftMarks((prev) =>
-      prev.map((row) =>
+    setDraftMarks((prev) => {
+      const base = prev ?? cloneMarks(savedMarks)
+      return base.map((row) =>
         row.student_id === studentId ? { ...row, ca: { ...row.ca, [itemId]: parsed } } : row,
-      ),
-    )
+      )
+    })
   }
 
   const updateDraftExam = (studentId: string, raw: string) => {
     const parsed = parseMarkInput(raw)
     if (parsed === 'invalid') return
-    setDraftMarks((prev) =>
-      prev.map((row) => (row.student_id === studentId ? { ...row, exam: parsed } : row)),
-    )
+    setDraftMarks((prev) => {
+      const base = prev ?? cloneMarks(savedMarks)
+      return base.map((row) => (row.student_id === studentId ? { ...row, exam: parsed } : row))
+    })
   }
 
   const handleCaSubmit = (payload: { name: string; max_marks: number }): string | null => {
@@ -218,7 +221,7 @@ const SubjectAssessmentWorkspace = ({
       toast.error('Add at least one class assessment before saving.')
       return
     }
-    const editableDraft = draftMarks.filter((row) => {
+    const editableDraft = (draftMarks ?? savedMarks).filter((row) => {
       const student = students.find((item) => item.id === row.student_id)
       return student && !student.is_published
     })
@@ -308,44 +311,81 @@ const SubjectAssessmentWorkspace = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-        <p>
-          Class score uses {weights.continuous_assessment_weight}% CA · Exam{' '}
-          {weights.exam_weight}% (max {EXAM_MAX})
-        </p>
-        {isRecording ? (
-          <p className="text-amber-700">Record mode — enter marks, then save.</p>
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0 space-y-2">
+          <div className="text-xs text-slate-500">
+            <p>
+              Class score uses {weights.continuous_assessment_weight}% CA · Exam{' '}
+              {weights.exam_weight}% (max {EXAM_MAX})
+            </p>
+            {isRecording ? (
+              <p className="mt-1 text-amber-700">Record mode — enter marks, then save.</p>
+            ) : null}
+          </div>
+          {!isRecording ? (
+            <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Student status filter">
+              {pillTabs.map((tab) => {
+                const active = statusFilter === tab.key
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setStatusFilter(tab.key)}
+                    className={mergeClasses(
+                      'rounded-full px-3 py-1 text-xs font-medium transition-colors cursor-pointer',
+                      active
+                        ? tab.key === 'needs_correction'
+                          ? 'bg-orange-700 text-white'
+                          : 'bg-slate-900 text-white'
+                        : tab.key === 'needs_correction'
+                          ? 'bg-orange-50 text-orange-800 hover:bg-orange-100'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                    )}
+                  >
+                    {tab.label} {tab.count}
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
+        </div>
+
+        {canRecord ? (
+          isRecording ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="max-w-fit shrink-0 py-2 text-sm"
+              onClick={onOpenAddCa}
+            >
+              <Icon icon="hugeicons:plus-sign" className="size-4" />
+              Add class assessment
+            </Button>
+          ) : (
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="max-w-fit py-2 text-sm"
+                onClick={onPublish}
+              >
+                <Icon icon="hugeicons:sent" className="size-4" />
+                Publish
+              </Button>
+              <Button
+                type="button"
+                className="max-w-fit py-2 text-sm"
+                onClick={onStartRecording}
+              >
+                <Icon icon="hugeicons:edit-02" className="size-4" />
+                Record assessment
+              </Button>
+            </div>
+          )
         ) : null}
       </div>
-
-      {!isRecording ? (
-        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Student status filter">
-          {pillTabs.map((tab) => {
-            const active = statusFilter === tab.key
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setStatusFilter(tab.key)}
-                className={mergeClasses(
-                  'rounded-full px-3 py-1 text-xs font-medium transition-colors cursor-pointer',
-                  active
-                    ? tab.key === 'needs_correction'
-                      ? 'bg-orange-700 text-white'
-                      : 'bg-slate-900 text-white'
-                    : tab.key === 'needs_correction'
-                      ? 'bg-orange-50 text-orange-800 hover:bg-orange-100'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-                )}
-              >
-                {tab.label} {tab.count}
-              </button>
-            )
-          })}
-        </div>
-      ) : null}
 
       <TableWrapper
         isLoading={isLoading}

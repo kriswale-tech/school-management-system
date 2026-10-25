@@ -49,6 +49,15 @@ class AssessmentConfig(BaseModel):
         default=Decimal('60.00'),
         help_text='Exam weight as a percentage of the total.',
     )
+    pass_mark = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('40.00'),
+        help_text=(
+            'Minimum overall / subject total (out of 100) treated as a pass '
+            'in reports and related views.'
+        ),
+    )
     result_type = models.CharField(
         max_length=30,
         choices=ResultType.choices,
@@ -76,6 +85,10 @@ class AssessmentConfig(BaseModel):
                 condition=Q(continuous_assessment_weight=100 - F('exam_weight')),
                 name='assessment_config_weights_sum_100',
             ),
+            models.CheckConstraint(
+                condition=Q(pass_mark__gte=0) & Q(pass_mark__lte=100),
+                name='assessment_config_pass_mark_0_to_100',
+            ),
         ]
 
     def uses_grades(self):
@@ -97,6 +110,11 @@ class AssessmentConfig(BaseModel):
                 errors['continuous_assessment_weight'] = (
                     'Continuous assessment and exam weights must sum to 100.'
                 )
+
+        if self.pass_mark is not None and (
+            self.pass_mark < 0 or self.pass_mark > 100
+        ):
+            errors['pass_mark'] = 'Pass mark must be between 0 and 100.'
 
         if self.uses_grades():
             if not self.grade_type:

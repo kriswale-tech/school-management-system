@@ -309,9 +309,9 @@ class TermTransitionTests(APITestCase):
         _level, (basic4,) = _classes(self.school, ['Basic 4'])
         stream = _named_stream(basic4, 'A')
         student = create_student(school=self.school, student_id='IN-1')
+        enroll_student(student=student, term=terms['first_term'], stream=stream)
         student.is_active = False
         student.save(update_fields=['is_active', 'updated_at'])
-        enroll_student(student=student, term=terms['first_term'], stream=stream)
         _school_fee(self.school, terms['first_term'], self.admin)
 
         response = self.client.post(
@@ -326,3 +326,30 @@ class TermTransitionTests(APITestCase):
         ).exists())
         student.refresh_from_db()
         self.assertFalse(student.is_graduated)
+
+    def test_active_unenrolled_student_blocks_transition(self):
+        today = date.today()
+        _add_year(self.school, '2026/2027', today - timedelta(days=10))
+        _classes(self.school, ['Basic 4'])
+        create_student(school=self.school, student_id='HANG-1')
+        terms = {
+            row.term: row
+            for row in Term.objects.filter(school=self.school, academic_year__academic_year='2026/2027')
+        }
+        _school_fee(self.school, terms['first_term'], self.admin)
+
+        preview = self.client.get(self.preview_url)
+        self.assertEqual(preview.status_code, status.HTTP_200_OK, preview.data)
+        self.assertFalse(preview.data['can_confirm'])
+        self.assertTrue(
+            any('not in a class' in blocker for blocker in preview.data['blockers']),
+            preview.data['blockers'],
+        )
+        self.assertEqual(len(preview.data['unenrolled_students']), 1)
+
+        response = self.client.post(
+            self.confirm_url,
+            {'acknowledge_warnings': True},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

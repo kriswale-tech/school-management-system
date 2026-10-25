@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -70,7 +70,7 @@ const AdminAssessmentDetail = () => {
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
-  const [headRemarks, setHeadRemarks] = useState('')
+  const [remarksByStudent, setRemarksByStudent] = useState<Record<string, string>>({})
   const [bulkOpen, setBulkOpen] = useState(false)
   const [correctionOpen, setCorrectionOpen] = useState(false)
 
@@ -86,27 +86,33 @@ const AdminAssessmentDetail = () => {
     return students.filter((student) => student.status === statusFilter)
   }, [data?.students, statusFilter])
 
-  useEffect(() => {
-    if (!filteredStudents.length) {
-      setSelectedStudentId(null)
-      return
-    }
-    if (selectedStudentId && filteredStudents.some((student) => student.id === selectedStudentId)) {
-      return
+  const resolvedStudentId = (() => {
+    if (!filteredStudents.length) return null
+    if (
+      selectedStudentId &&
+      filteredStudents.some((student) => student.id === selectedStudentId)
+    ) {
+      return selectedStudentId
     }
     const preferred =
-      filteredStudents.find((student) => student.status === 'ready_for_you') ?? filteredStudents[0]
-    setSelectedStudentId(preferred.id)
-  }, [filteredStudents, selectedStudentId])
+      filteredStudents.find((student) => student.status === 'ready_for_you') ??
+      filteredStudents[0]
+    return preferred.id
+  })()
 
-  const selectedStudent: AdminAssessmentDetailStudent | null = useMemo(() => {
-    if (!selectedStudentId) return null
-    return data?.students.find((student) => student.id === selectedStudentId) ?? null
-  }, [data?.students, selectedStudentId])
+  const selectedStudent: AdminAssessmentDetailStudent | null =
+    resolvedStudentId
+      ? (data?.students.find((student) => student.id === resolvedStudentId) ?? null)
+      : null
 
-  useEffect(() => {
-    setHeadRemarks(selectedStudent?.head_teacher_remarks ?? '')
-  }, [selectedStudent?.id, selectedStudent?.head_teacher_remarks])
+  const headRemarks = selectedStudent
+    ? (remarksByStudent[selectedStudent.id] ?? selectedStudent.head_teacher_remarks ?? '')
+    : ''
+
+  const setHeadRemarks = (value: string) => {
+    if (!selectedStudent) return
+    setRemarksByStudent((current) => ({ ...current, [selectedStudent.id]: value }))
+  }
 
   const { mutate: releaseStudents, isPending: isReleasing } = useMutation({
     mutationFn: (payload: { student_ids: string[]; remarks?: string }) =>
@@ -122,7 +128,7 @@ const AdminAssessmentDetail = () => {
 
   const { mutate: correctStudent, isPending: isCorrecting } = useMutation({
     mutationFn: (payload: { teaching_assignment_ids: string[]; reason: string }) =>
-      adminCorrectStudent(streamId!, selectedStudentId!, payload, termId),
+      adminCorrectStudent(streamId!, resolvedStudentId!, payload, termId),
     onSuccess: (payload) => {
       toast.success(
         payload.correction.kind === 'reopen'
@@ -254,7 +260,7 @@ const AdminAssessmentDetail = () => {
                 </li>
               ) : (
                 filteredStudents.map((student) => {
-                  const selected = student.id === selectedStudentId
+                  const selected = student.id === resolvedStudentId
                   return (
                     <li key={student.id}>
                       <button
@@ -406,7 +412,9 @@ const AdminAssessmentDetail = () => {
                             ) : null}
                             {data.uses_position ? (
                               <Table.Cell>
-                                {subject.position != null ? formatOrdinal(subject.position) : '—'}
+                                {subject.position !== null && subject.position !== undefined
+                                  ? formatOrdinal(subject.position)
+                                  : '—'}
                               </Table.Cell>
                             ) : null}
                             <Table.Cell>{subject.band_remark ?? '—'}</Table.Cell>
@@ -422,15 +430,18 @@ const AdminAssessmentDetail = () => {
 
                 {data.uses_position ? (
                   <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                    {selectedStudent.overall_position != null &&
-                    selectedStudent.overall_cohort_size != null ? (
+                    {selectedStudent.overall_position !== null &&
+                    selectedStudent.overall_position !== undefined &&
+                    selectedStudent.overall_cohort_size !== null &&
+                    selectedStudent.overall_cohort_size !== undefined ? (
                       <p>
                         Overall position:{' '}
                         <span className="font-medium text-slate-900">
                           {formatOrdinal(selectedStudent.overall_position)} of{' '}
                           {selectedStudent.overall_cohort_size}
                         </span>
-                        {selectedStudent.overall_average != null ? (
+                        {selectedStudent.overall_average !== null &&
+                        selectedStudent.overall_average !== undefined ? (
                           <span className="text-slate-500">
                             {' '}
                             · Average {formatScore(selectedStudent.overall_average)}%

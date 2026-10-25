@@ -37,6 +37,12 @@ const navItems = [
     capability: Capability.NAV_FEES,
   },
   {
+    label: 'Insights',
+    icon: 'hugeicons:analytics-01',
+    path: '/reports',
+    capability: Capability.NAV_REPORTS,
+  },
+  {
     label: 'Staff',
     icon: 'hugeicons:user-group',
     path: '/staff',
@@ -61,6 +67,7 @@ const SideNav = () => {
   const canClasses = useCan(Capability.NAV_CLASSES)
   const canAssessments = useCan(Capability.NAV_ASSESSMENTS)
   const canFees = useCan(Capability.NAV_FEES)
+  const canReports = useCan(Capability.NAV_REPORTS)
   const canStaff = useCan(Capability.NAV_STAFF)
 
   const allowedByCapability: Record<string, boolean> = {
@@ -69,6 +76,7 @@ const SideNav = () => {
     [Capability.NAV_CLASSES]: canClasses,
     [Capability.NAV_ASSESSMENTS]: canAssessments,
     [Capability.NAV_FEES]: canFees,
+    [Capability.NAV_REPORTS]: canReports,
     [Capability.NAV_STAFF]: canStaff,
   }
 
@@ -157,15 +165,13 @@ const SideNav = () => {
       <ConfirmDialog
         open={open}
         title="Log out?"
-        description="You will need to sign in again to continue."
+        message="You will need to sign in again to continue."
         confirmLabel="Log out"
-        cancelLabel="Cancel"
-        confirmVariant="danger"
         isLoading={isLoading}
         onConfirm={() => {
           void confirmLogout()
         }}
-        onCancel={cancelLogout}
+        onClose={cancelLogout}
       />
     </>
   )

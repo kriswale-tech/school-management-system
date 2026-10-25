@@ -48,6 +48,10 @@ def resolve_session_access(membership: SchoolMembership | None) -> SessionAccess
             caps.add(Capability.NAV_ASSESSMENTS)
             caps.add(Capability.ASSESSMENTS_APPROVE)
             caps.add(Capability.FEES_VIEW)
+            caps.add(Capability.STUDENTS_MARK_LEFT)
+        if scope.is_class_teacher or scope.is_subject_teacher:
+            caps.add(Capability.NAV_REPORTS)
+            caps.add(Capability.REPORTS_VIEW)
         return SessionAccess(capabilities=frozenset(caps), scope=scope)
 
     # Admin, staff, accountant: full school pack until role packs are tightened.

@@ -17,8 +17,11 @@ from students.views import (
     StudentGuardianDetailView,
     StudentGuardianListCreateView,
     StudentListView,
+    StudentMarkLeftView,
     StudentOnboardView,
     StudentPaymentListView,
+    StudentPerformanceView,
+    StudentReactivateView,
     StudentStatsView,
 )
 
@@ -38,9 +41,24 @@ urlpatterns = [
         name='student-clear-graduation',
     ),
     path(
+        '<uuid:student_id>/mark-left/',
+        StudentMarkLeftView.as_view(),
+        name='student-mark-left',
+    ),
+    path(
+        '<uuid:student_id>/reactivate/',
+        StudentReactivateView.as_view(),
+        name='student-reactivate',
+    ),
+    path(
         '<uuid:student_id>/assessments/',
         StudentAssessmentView.as_view(),
         name='student-assessments',
+    ),
+    path(
+        '<uuid:student_id>/performance/',
+        StudentPerformanceView.as_view(),
+        name='student-performance',
     ),
     path(
         '<uuid:student_id>/assessments/report/',

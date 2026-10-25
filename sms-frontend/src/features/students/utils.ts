@@ -54,3 +54,4 @@ export const STUDENT_FEE_HISTORY_QUERY_KEY = 'student-fee-history' as const
 export const STUDENT_PAYMENTS_QUERY_KEY = 'student-payments' as const
 export const STUDENT_ASSESSMENTS_QUERY_KEY = 'student-assessments' as const
 export const STUDENT_ASSESSMENTS_REPORT_QUERY_KEY = 'student-assessments-report' as const
+export const STUDENT_PERFORMANCE_QUERY_KEY = 'student-performance' as const

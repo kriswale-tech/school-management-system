@@ -3,6 +3,7 @@ import TabComponent from '@/components/shared/TabComponent'
 import { DotComponent } from '@/components/ui'
 import { Capability } from '@/features/auth/capabilities'
 import { useCan } from '@/features/auth/hooks'
+import ClassPerformancePanel from '@/features/reports/components/ClassPerformancePanel'
 import { getApiErrorMessage } from '@/utils'
 import { Icon } from '@iconify/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -11,10 +12,16 @@ import { useParams } from 'react-router-dom'
 import AssignClassTeacher from '../components/AssignClassTeacher'
 import ClassStudentsTable from '../components/ClassStudentsTable'
 import ClassSubjectsTable from '../components/ClassSubjectsTable'
-import { getClassDetail, getClassStudents, getClassSubjects } from '../services'
+import {
+  getClassDetail,
+  getClassPerformance,
+  getClassStudents,
+  getClassSubjects,
+} from '../services'
 
 const TAB_STUDENTS = 'Students'
 const TAB_SUBJECTS = 'Subjects'
+const TAB_PERFORMANCE = 'Performance'
 
 const ClassDetail = () => {
   const { id: streamId } = useParams<{ id: string }>()
@@ -46,6 +53,17 @@ const ClassDetail = () => {
     enabled: Boolean(streamId) && activeTab === TAB_SUBJECTS,
   })
 
+  const {
+    data: performance,
+    isLoading: isLoadingPerformance,
+    isError: isPerformanceError,
+    error: performanceError,
+  } = useQuery({
+    queryKey: ['classes', 'performance', streamId],
+    queryFn: () => getClassPerformance(streamId!),
+    enabled: Boolean(streamId) && activeTab === TAB_PERFORMANCE,
+  })
+
   const tabs = [
     {
       label: TAB_STUDENTS,
@@ -55,6 +73,10 @@ const ClassDetail = () => {
       label: TAB_SUBJECTS,
       onClick: () => setActiveTab(TAB_SUBJECTS),
       attention: Boolean(classDetail?.needs_attention),
+    },
+    {
+      label: TAB_PERFORMANCE,
+      onClick: () => setActiveTab(TAB_PERFORMANCE),
     },
   ]
 
@@ -135,6 +157,22 @@ const ClassDetail = () => {
                   isLoading={isLoadingSubjects}
                   onAssigned={invalidateClassQueries}
                 />
+              )}
+              {activeTab === TAB_PERFORMANCE && (
+                <>
+                  {isLoadingPerformance ? (
+                    <p className="text-sm text-slate-500 py-8">Loading performance…</p>
+                  ) : isPerformanceError || !performance ? (
+                    <p className="text-sm text-red-600 py-8" role="alert">
+                      {getApiErrorMessage(
+                        performanceError,
+                        'Unable to load class performance.',
+                      )}
+                    </p>
+                  ) : (
+                    <ClassPerformancePanel data={performance} />
+                  )}
+                </>
               )}
             </div>
           </>

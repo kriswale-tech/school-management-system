@@ -63,6 +63,8 @@ Checklist by domain. Status values:
 | Class enrollment per term | Yes | Via onboard / class views | Done |
 | Fees on student (read) | Yes | Yes | Done |
 | Reports & assessment tab | Yes (`GET /students/:id/assessments/`) | Student detail tab | Done |
+| Performance insights tab | Yes (`GET /students/:id/performance/`) | Student detail → Performance | Done |
+| Mark as left / reactivate | Yes (see [mark-as-left.md](../sms-backend/docs/mark-as-left.md)) | Student bio + confirm | Done |
 | Promotion / transfer | — | — | Not started |
 | Parent login portal | — | — | Not started |
 
@@ -72,9 +74,22 @@ Checklist by domain. Status values:
 | --- | --- | --- | --- |
 | Create/list/update/delete users by role | Yes (`accounts/users`) | Setup + shared modals | Done |
 | Teaching / class-teacher assignments | Models + setup + academics | Setup + class detail | Done |
-| Main `/staff` page | Same APIs | Placeholder | Stub |
-| Teacher markbook / portal | — | — | Not started |
+| Main `/staff` page | `accounts/staff` desk APIs | `/staff` list + detail | Done |
+| Teacher markbook / portal | Via classes / assessments | Subject workspace | Done (scoped) |
 | Profile page (`/profile`) | `GET`/`PATCH /accounts/me/` | `/profile` | Done (see [profile.md](./profile.md)) |
+
+## Reports & Insights
+
+School-wide and teacher-scoped analytics at `/reports`. See
+[reports-insights.md](../sms-backend/docs/reports-insights.md).
+
+| Feature | Backend | Frontend | Status |
+| --- | --- | --- | --- |
+| Overview + compare term | `GET /reports/overview/` | Overview tab | Done |
+| Teacher desk (my classes / subjects) | `GET /reports/teacher-desk/` | Teacher tabs + score curve | Done |
+| Academic charts + structure KPIs | by-class, heatmap, grades, trends | Academic tab | Done |
+| Finance / enrollment / fees×risk | reports APIs | Tabs | Done |
+| Teachers load insights | `GET /reports/staff-capacity/` | Teachers tab (links to `/staff/:id`) | Done |
 
 ## Fees
 
@@ -117,7 +132,7 @@ Signup setup is unchanged. These screens edit the school after the wizard, under
 
 The calendar lists every year. Past years are view-only. **Add** saves the next year’s three terms and leaves the current term active. Assessment settings are copied onto any new term that does not have them yet.
 
-**Open the next term** places continuing pupils, marks the last class graduated at year end, copies teachers, applies the next fee catalog, and then turns that term on. See [term-transition.md](./term-transition.md). `POST …/terms/<term_id>/activate/` remains a low-level calendar switch and does not place pupils or bill fees.
+**Open the next term** places continuing pupils, marks the last class graduated at year end, copies teachers, applies the next fee catalog, and then turns that term on. See [term-transition.md](./term-transition.md). Standalone `POST …/terms/<term_id>/activate/` is disabled (403); activation only runs inside transition confirm.
 
 Alerts are in-app only: outstanding fees (admin and accountant), unreleased results (admin and class teachers), and new enrollments (admin). The transition popup on the dashboard has its own checkbox.
 
@@ -148,3 +163,5 @@ Alerts are in-app only: outstanding fees (admin and accountant), unreleased resu
 - Teacher bulk import (frontend contract): [`sms-backend/docs/frontend-teacher-bulk-import.md`](../sms-backend/docs/frontend-teacher-bulk-import.md)
 - Assessment structure per term: [assessment-config.md](./assessment-config.md)
 - Admin and teacher dashboards, activity feed: [dashboard.md](./dashboard.md)
+- Reports & Insights: [`sms-backend/docs/reports-insights.md`](../sms-backend/docs/reports-insights.md)
+- Mark student as left: [`sms-backend/docs/mark-as-left.md`](../sms-backend/docs/mark-as-left.md)

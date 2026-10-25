@@ -108,6 +108,10 @@
       font-weight: 500;
       margin-bottom: 10px;
     }
+    .grades-section {
+      break-before: page;
+      page-break-before: always;
+    }
     .grades-title {
       text-align: center;
       font-size: 12px;
@@ -115,7 +119,7 @@
       font-style: italic;
       text-decoration: underline;
       text-underline-offset: 4px;
-      margin: 24px 0 8px;
+      margin: 0 0 8px;
     }
     .grades-box {
       border: 1px solid #000;
@@ -269,22 +273,24 @@
   </table>
 
   {% if uses_grades and grade_columns %}
-  <p class="grades-title">Grades Interpretation</p>
-  <div class="grades-box">
-    <table class="grades-table">
-      <tr>
-        {% for column in grade_columns %}
-        <td>
-          {% for band in column %}
-          <p>
-            <span class="label">Grade {{ band.grade }}:</span>
-            {{ band.min_score }}-{{ band.max_score }} ({{ band.remark }})
-          </p>
+  <div class="grades-section">
+    <p class="grades-title">Grades Interpretation</p>
+    <div class="grades-box">
+      <table class="grades-table">
+        <tr>
+          {% for column in grade_columns %}
+          <td>
+            {% for band in column %}
+            <p>
+              <span class="label">Grade {{ band.grade }}:</span>
+              {{ band.min_score }}-{{ band.max_score }} ({{ band.remark }})
+            </p>
+            {% endfor %}
+          </td>
           {% endfor %}
-        </td>
-        {% endfor %}
-      </tr>
-    </table>
+        </tr>
+      </table>
+    </div>
   </div>
   {% endif %}
 </body>

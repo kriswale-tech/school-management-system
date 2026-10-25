@@ -46,6 +46,14 @@ from academics.services.teaching_assignments import (
 from accounts.capabilities import Capability
 from accounts.permissions import HasActiveSchool, HasCapability
 from accounts.services.access_scope import resolve_access_scope
+from reports.serializers import (
+    ClassStreamPerformanceSerializer,
+    TeachingAssignmentPerformanceSerializer,
+)
+from reports.services import (
+    get_class_stream_performance,
+    get_teaching_assignment_performance,
+)
 from shared.views import SchoolScopedAPIView
 from students.services import resolve_term
 
@@ -407,6 +415,33 @@ class ClassSubjectsView(SchoolScopedAPIView):
 
 @extend_schema(
     tags=['Academics'],
+    summary='Class stream performance',
+    description=(
+        'Published-results performance for a class stream: averages, pass rate, '
+        'grade or score distribution, and ranked students with results coverage.'
+    ),
+    parameters=[
+        OpenApiParameter(
+            name='term',
+            type=str,
+            description='Optional term UUID. Defaults to the school active term.',
+        ),
+    ],
+    responses={200: ClassStreamPerformanceSerializer},
+)
+class ClassPerformanceView(SchoolScopedAPIView):
+    def get(self, request, stream_id):
+        payload = get_class_stream_performance(
+            school=self.school,
+            membership=self.membership,
+            stream_id=stream_id,
+            term_id=request.query_params.get('term'),
+        )
+        return Response(ClassStreamPerformanceSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Academics'],
     summary='Assign class teacher',
     description=(
         'Assigns or replaces the class teacher for this stream in the active term.'
@@ -556,6 +591,26 @@ class TeachingAssignmentStudentsView(SchoolScopedAPIView):
             search=request.query_params.get('search'),
         )
         return Response(ClassStudentListSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Academics'],
+    summary='Teaching assignment performance',
+    description=(
+        'Published-results performance for a subject teaching assignment: '
+        'average, pass rate, distribution, score curve data, and ranked students.'
+    ),
+    responses={200: TeachingAssignmentPerformanceSerializer},
+)
+class TeachingAssignmentPerformanceView(SchoolScopedAPIView):
+    def get(self, request, assignment_id):
+        payload = get_teaching_assignment_performance(
+            school=self.school,
+            membership=self.membership,
+            teaching_assignment_id=assignment_id,
+            term_id=request.query_params.get('term'),
+        )
+        return Response(TeachingAssignmentPerformanceSerializer(payload).data)
 
 
 @extend_schema(

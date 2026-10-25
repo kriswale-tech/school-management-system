@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button, Modal } from '@/components/ui'
 import type { ClassAssessmentSubjectRow } from '@/features/classes/assessment/types'
 
@@ -13,8 +13,7 @@ type CorrectionModalProps = {
   onConfirm: (_payload: { teaching_assignment_ids: string[]; reason: string }) => void
 }
 
-const CorrectionModal = ({
-  open,
+const CorrectionModalBody = ({
   title,
   description,
   confirmLabel,
@@ -22,7 +21,7 @@ const CorrectionModal = ({
   isSubmitting = false,
   onClose,
   onConfirm,
-}: CorrectionModalProps) => {
+}: Omit<CorrectionModalProps, 'open'>) => {
   const selectable = useMemo(
     () =>
       subjects.filter(
@@ -30,16 +29,10 @@ const CorrectionModal = ({
       ),
     [subjects],
   )
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [selectedIds, setSelectedIds] = useState(() =>
+    selectable.map((subject) => subject.teaching_assignment_id!),
+  )
   const [reason, setReason] = useState('')
-
-  useEffect(() => {
-    if (!open) return
-    setSelectedIds(selectable.map((subject) => subject.teaching_assignment_id!))
-    setReason('')
-  }, [open, selectable])
-
-  if (!open) return null
 
   const toggle = (id: string) => {
     setSelectedIds((current) =>
@@ -50,7 +43,7 @@ const CorrectionModal = ({
   const canSubmit = selectedIds.length > 0 && reason.trim().length > 0
 
   return (
-    <Modal open={open} title={title} onClose={onClose} className="max-w-lg">
+    <Modal open title={title} onClose={onClose} className="max-w-lg">
       <div className="space-y-4">
         <p className="text-sm text-slate-600">{description}</p>
 
@@ -123,6 +116,11 @@ const CorrectionModal = ({
       </div>
     </Modal>
   )
+}
+
+const CorrectionModal = ({ open, ...props }: CorrectionModalProps) => {
+  if (!open) return null
+  return <CorrectionModalBody {...props} />
 }
 
 export default CorrectionModal

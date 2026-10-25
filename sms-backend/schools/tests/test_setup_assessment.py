@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -159,6 +161,7 @@ class SetupAssessmentMutationTests(APITestCase):
         self.assertEqual(response.data['level_id'], str(self.level.id))
         self.assertEqual(response.data['config']['result_type'], 'grade_and_position')
         self.assertEqual(response.data['config']['grade_type'], 'letter')
+        self.assertEqual(response.data['config']['pass_mark'], '40.00')
         self.assertEqual(
             len(response.data['config']['grade_bands']),
             len(GES_INTERNAL_LETTER_GRADES),
@@ -166,6 +169,18 @@ class SetupAssessmentMutationTests(APITestCase):
         self.assertTrue(
             AssessmentConfig.objects.filter(level=self.level, term=self.term).exists(),
         )
+
+    def test_save_persists_custom_pass_mark(self):
+        response = self.client.put(
+            self.url,
+            self._letter_payload(pass_mark='50.00'),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['config']['pass_mark'], '50.00')
+        config = AssessmentConfig.objects.get(level=self.level, term=self.term)
+        self.assertEqual(config.pass_mark, Decimal('50.00'))
 
     def test_save_position_only_clears_grades(self):
         self.client.put(self.url, self._letter_payload(), format='json')

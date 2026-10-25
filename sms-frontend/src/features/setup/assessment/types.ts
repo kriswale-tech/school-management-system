@@ -25,6 +25,7 @@ export interface GradeBand {
     id: string;
     continuous_assessment_weight: string;
     exam_weight: string;
+    pass_mark: string;
     result_type: ResultType;
     grade_type: GradeType;
     grade_bands: GradeBand[];
@@ -33,6 +34,7 @@ export interface GradeBand {
   export interface LevelConfigPayload {
     continuous_assessment_weight: number;
     exam_weight: number;
+    pass_mark: number;
     result_type: ResultType;
     grade_type: GradeType;
     grade_bands: GradeBand[];

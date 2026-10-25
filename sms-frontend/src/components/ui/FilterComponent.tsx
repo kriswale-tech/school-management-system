@@ -21,6 +21,8 @@ type FilterComponentProps = {
   className?: string
   selectClassName?: string
   placeholder?: string
+  /** When false, omit the empty "All / placeholder" option (required filters). */
+  allowEmpty?: boolean
 } & Omit<SelectHTMLAttributes<HTMLSelectElement>, 'value' | 'onChange'>
 
 const serializeFilterValue = (value: FilterOptionValue) => String(value)
@@ -44,10 +46,16 @@ const FilterComponent = ({
   className,
   selectClassName,
   placeholder = 'All',
+  allowEmpty = true,
   ...selectProps
 }: FilterComponentProps) => {
   const selectId = selectProps.id ?? filterKey ?? filterName
-  const serializedValue = value === '' ? '' : serializeFilterValue(value)
+  const fallbackValue =
+    !allowEmpty && value === '' && options.length > 0
+      ? serializeFilterValue(options[0].value)
+      : value === ''
+        ? ''
+        : serializeFilterValue(value)
 
   return (
     <div
@@ -59,7 +67,7 @@ const FilterComponent = ({
       <div className="relative min-w-28 flex-1">
         <select
           id={selectId}
-          value={serializedValue}
+          value={fallbackValue}
           onChange={(event) => onChange?.(parseFilterValue(event.target.value, options))}
           className={mergeClasses(
             'select h-full w-full p-2 appearance-none rounded-none border-0 bg-transparent pr-9 pl-3 shadow-none focus:outline-none',
@@ -69,7 +77,7 @@ const FilterComponent = ({
           aria-label={filterName}
           {...selectProps}
         >
-          <option value="">{placeholder}</option>
+          {allowEmpty ? <option value="">{placeholder}</option> : null}
           {options.map((option) => (
             <option
               key={`${option.key ?? filterKey ?? filterName}-${serializeFilterValue(option.value)}`}

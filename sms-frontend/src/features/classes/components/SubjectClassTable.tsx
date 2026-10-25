@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Table, TableWrapper } from '@/components/shared'
 import ActionButton from '@/components/ui/ActionButton'
@@ -13,9 +14,11 @@ type SubjectClassTableProps = {
 }
 
 const SubjectClassTable = ({ subjects = [], isLoading = false }: SubjectClassTableProps) => {
+  const navigate = useNavigate()
   const canManageClasses = useCan(Capability.CLASSES_MANAGE)
   const queryClient = useQueryClient()
   const [selectedSubject, setSelectedSubject] = useState<SubjectClassPairing | null>(null)
+  const showActions = canManageClasses || subjects.some((row) => row.teaching_assignment_id)
 
   return (
     <>
@@ -27,7 +30,7 @@ const SubjectClassTable = ({ subjects = [], isLoading = false }: SubjectClassTab
           description: 'Subjects taught in each class will appear here once configured.',
           icon: 'hugeicons:book-02',
         }}
-        skeletonColumns={canManageClasses ? 6 : 5}
+        skeletonColumns={showActions ? 6 : 5}
         variant="card"
       >
         <Table>
@@ -38,7 +41,7 @@ const SubjectClassTable = ({ subjects = [], isLoading = false }: SubjectClassTab
               <Table.HeaderCell>Class</Table.HeaderCell>
               <Table.HeaderCell>Students</Table.HeaderCell>
               <Table.HeaderCell>Subject Teacher</Table.HeaderCell>
-              {canManageClasses ? <Table.HeaderCell>Action</Table.HeaderCell> : null}
+              {showActions ? <Table.HeaderCell>Action</Table.HeaderCell> : null}
             </Table.Row>
           </Table.Head>
           <Table.Body>
@@ -62,13 +65,26 @@ const SubjectClassTable = ({ subjects = [], isLoading = false }: SubjectClassTab
                   </Table.Cell>
                   <Table.Cell>{subject.students_count}</Table.Cell>
                   <Table.Cell>{subject.teacher?.full_name ?? '-'}</Table.Cell>
-                  {canManageClasses ? (
+                  {showActions ? (
                     <Table.Cell>
-                      <ActionButton
-                        icon={hasTeacher ? 'hugeicons:user-switch' : 'hugeicons:user-add-01'}
-                        label={actionLabel}
-                        onClick={() => setSelectedSubject(subject)}
-                      />
+                      <div className="flex items-center gap-1">
+                        {subject.teaching_assignment_id ? (
+                          <ActionButton
+                            icon="hugeicons:view"
+                            label={`Open ${subject.name}`}
+                            onClick={() =>
+                              navigate(`/classes/subjects/${subject.teaching_assignment_id}`)
+                            }
+                          />
+                        ) : null}
+                        {canManageClasses ? (
+                          <ActionButton
+                            icon={hasTeacher ? 'hugeicons:user-switch' : 'hugeicons:user-add-01'}
+                            label={actionLabel}
+                            onClick={() => setSelectedSubject(subject)}
+                          />
+                        ) : null}
+                      </div>
                     </Table.Cell>
                   ) : null}
                 </Table.Row>

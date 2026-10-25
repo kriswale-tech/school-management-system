@@ -291,6 +291,10 @@ def create_class_enrollment(*, student, term, stream, is_new_student=False):
         raise ValidationError({
             'student': 'This student has graduated. Clear graduation before enrolling them.',
         })
+    if not student.is_active:
+        raise ValidationError({
+            'student': 'This student has left the school. Reactivate them before enrolling.',
+        })
     enrollment = ClassEnrollment.objects.create(
         student=student,
         term=term,
@@ -325,6 +329,7 @@ def create_class_enrollment(*, student, term, stream, is_new_student=False):
 def get_student(*, school, student_id):
     student = (
         Student.objects.filter(school=school, id=student_id)
+        .select_related('left_by')
         .prefetch_related(
             Prefetch(
                 'parent_links',
@@ -415,6 +420,14 @@ def build_student_detail(*, school, student, term=None):
         'address': student.address,
         'is_active': student.is_active,
         'is_graduated': student.is_graduated,
+        'left_at': student.left_at,
+        'leave_reason': student.leave_reason or None,
+        'leave_notes': student.leave_notes or '',
+        'left_by_name': (
+            student.left_by.get_full_name().strip()
+            if student.left_by_id and student.left_by.get_full_name().strip()
+            else None
+        ),
         'is_new_student': is_new_student,
         'class_assignment': class_payload,
         'guardians': guardians,
@@ -457,6 +470,186 @@ def clear_student_graduation(*, school, student_id):
         raise ValidationError({'student': 'This student has not graduated.'})
     student.is_graduated = False
     student.save(update_fields=['is_graduated', 'updated_at'])
+    return build_student_detail(
+        school=school,
+        student=get_student(school=school, student_id=student.id),
+    )
+
+
+def _student_display_name(student) -> str:
+    return ' '.join(
+        part
+        for part in (student.first_name, student.other_names, student.last_name)
+        if part
+    ).strip()
+
+
+def _assert_can_mark_student_left(*, school, membership, student):
+    """Admins: any student. Class teachers: only students in their active-term class."""
+    from accounts.models import User
+    from accounts.services.access_scope import resolve_access_scope
+    from teachers.models import ClassTeacher
+
+    if membership.role == User.RoleChoices.ADMIN:
+        return
+
+    scope = resolve_access_scope(membership)
+    if not scope.is_class_teacher:
+        raise ValidationError({
+            'detail': 'Only admins and class teachers can mark a student as left.',
+        })
+
+    term = get_active_term(school)
+    enrollment = (
+        ClassEnrollment.objects.filter(student=student, term=term)
+        .select_related('stream')
+        .first()
+    )
+    if enrollment is None:
+        raise ValidationError({
+            'detail': 'This student is not enrolled in the active term.',
+        })
+
+    class_teacher_rows = ClassTeacher.objects.filter(
+        teacher_id=membership.user_id,
+        term=term,
+        class_level_id=enrollment.class_level_id,
+    )
+    allowed = False
+    for row in class_teacher_rows:
+        if row.stream_id is None or row.stream_id == enrollment.stream_id:
+            allowed = True
+            break
+    if not allowed:
+        raise ValidationError({
+            'detail': 'You can only mark students in your own class as left.',
+        })
+
+
+@transaction.atomic
+def mark_student_left(*, school, membership, student_id, reason, notes=''):
+    student = get_student(school=school, student_id=student_id)
+    _assert_can_mark_student_left(school=school, membership=membership, student=student)
+
+    if student.is_graduated:
+        raise ValidationError({
+            'detail': 'Graduated students cannot be marked as left. Clear graduation first if needed.',
+        })
+    if not student.is_active:
+        raise ValidationError({'detail': 'This student has already left the school.'})
+
+    if reason not in Student.LeaveReason.values:
+        raise ValidationError({
+            'reason': f'Invalid reason. Use one of: {", ".join(Student.LeaveReason.values)}.',
+        })
+
+    from django.utils import timezone
+
+    from activities.models import Activity
+    from activities.services import record_activity
+
+    term = get_active_term(school)
+    enrollment = (
+        ClassEnrollment.objects.filter(student=student, term=term)
+        .select_related('stream')
+        .first()
+    )
+
+    notes = (notes or '').strip()
+    student.is_active = False
+    student.left_at = timezone.now()
+    student.leave_reason = reason
+    student.leave_notes = notes
+    student.left_by = membership.user
+    student.save(
+        update_fields=[
+            'is_active',
+            'left_at',
+            'leave_reason',
+            'leave_notes',
+            'left_by',
+            'updated_at',
+        ]
+    )
+
+    reason_label = Student.LeaveReason(reason).label
+    name = _student_display_name(student)
+    actor_name = membership.user.get_full_name().strip() or 'Someone'
+    summary = f'{actor_name} marked {name} as left ({reason_label}).'
+    if notes:
+        summary = f'{summary} Note: {notes[:120]}'
+
+    record_activity(
+        school=school,
+        actor=membership.user,
+        verb=Activity.Verb.STUDENT_LEFT,
+        summary=summary[:500],
+        href=f'/students/{student.id}',
+        term=term,
+        target_kind='student',
+        target_id=student.id,
+        stream=enrollment.stream if enrollment else None,
+    )
+
+    return build_student_detail(
+        school=school,
+        student=get_student(school=school, student_id=student.id),
+    )
+
+
+@transaction.atomic
+def reactivate_student(*, school, membership, student_id):
+    """Admin-only: restore an inactive (left) student so they can be enrolled again."""
+    from accounts.models import User
+
+    if membership.role != User.RoleChoices.ADMIN:
+        raise ValidationError({'detail': 'Only admins can reactivate students.'})
+
+    student = get_student(school=school, student_id=student_id)
+    if student.is_active:
+        raise ValidationError({'detail': 'This student is already active.'})
+    if student.is_graduated:
+        raise ValidationError({
+            'detail': 'Clear graduation before reactivating this student.',
+        })
+
+    from activities.models import Activity
+    from activities.services import record_activity
+
+    previous_reason = student.leave_reason
+    student.is_active = True
+    student.left_at = None
+    student.leave_reason = ''
+    student.leave_notes = ''
+    student.left_by = None
+    student.save(
+        update_fields=[
+            'is_active',
+            'left_at',
+            'leave_reason',
+            'leave_notes',
+            'left_by',
+            'updated_at',
+        ]
+    )
+
+    term = Term.objects.filter(school=school, is_active=True).first()
+    name = _student_display_name(student)
+    actor_name = membership.user.get_full_name().strip() or 'Admin'
+    reason_bit = ''
+    if previous_reason:
+        reason_bit = f' (was: {Student.LeaveReason(previous_reason).label})'
+    record_activity(
+        school=school,
+        actor=membership.user,
+        verb=Activity.Verb.STUDENT_REACTIVATED,
+        summary=f'{actor_name} reactivated {name}{reason_bit}.',
+        href=f'/students/{student.id}',
+        term=term,
+        target_kind='student',
+        target_id=student.id,
+    )
+
     return build_student_detail(
         school=school,
         student=get_student(school=school, student_id=student.id),

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button, CheckboxField, Modal } from '@/components/ui'
 import type { AssessmentWorkspaceStudent } from '../assessment/types'
 
@@ -10,13 +10,12 @@ type PublishStudentsModalProps = {
   onPublish: (_studentIds: string[]) => void
 }
 
-const PublishStudentsModal = ({
-  open,
+const PublishStudentsModalBody = ({
   students,
   isPublishing = false,
   onClose,
   onPublish,
-}: PublishStudentsModalProps) => {
+}: Omit<PublishStudentsModalProps, 'open'>) => {
   const completeStudents = useMemo(
     () => students.filter((student) => student.status === 'Complete'),
     [students],
@@ -25,14 +24,7 @@ const PublishStudentsModal = ({
     () => completeStudents.map((student) => student.id),
     [completeStudents],
   )
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
-
-  useEffect(() => {
-    if (!open) return
-    setSelectedIds(completeIds)
-  }, [open, completeIds])
-
-  if (!open) return null
+  const [selectedIds, setSelectedIds] = useState(completeIds)
 
   const allSelected =
     completeIds.length > 0 && completeIds.every((id) => selectedIds.includes(id))
@@ -44,7 +36,7 @@ const PublishStudentsModal = ({
   }
 
   return (
-    <Modal open={open} title="Publish results" onClose={onClose} className="max-w-lg">
+    <Modal open title="Publish results" onClose={onClose} className="max-w-lg">
       <div className="space-y-4">
         <p className="text-sm text-slate-600">
           Choose complete students to publish to the class teacher. Published results are locked
@@ -112,6 +104,11 @@ const PublishStudentsModal = ({
       </div>
     </Modal>
   )
+}
+
+const PublishStudentsModal = ({ open, ...props }: PublishStudentsModalProps) => {
+  if (!open) return null
+  return <PublishStudentsModalBody {...props} />
 }
 
 export default PublishStudentsModal

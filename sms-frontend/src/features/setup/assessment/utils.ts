@@ -60,6 +60,7 @@ const showsGradeTypeTable = (resultType: ResultType | null) =>
 export type LevelFormValues = {
   continuousAssessmentWeight: number
   examWeight: number
+  passMark: number
   resultType: ResultType
   gradeType: GradeType
   gradeBands: GradeBand[]
@@ -69,6 +70,7 @@ export const validateLevelForm = (
   values: {
     continuousAssessmentWeight: string
     examWeight: string
+    passMark: string
     resultType: ResultType | null
     gradeTable: GradeTableState
   },
@@ -79,13 +81,22 @@ export const validateLevelForm = (
 
   const caWeight = Number(values.continuousAssessmentWeight)
   const examWeight = Number(values.examWeight)
+  const passMark = Number(values.passMark)
 
   if (Number.isNaN(caWeight) || Number.isNaN(examWeight)) {
     return 'Continuous Assessment and Exams must be valid numbers'
   }
 
+  if (Number.isNaN(passMark)) {
+    return 'Pass mark must be a valid number'
+  }
+
   if (caWeight < 0 || caWeight > 100 || examWeight < 0 || examWeight > 100) {
     return 'Percentages must be between 0 and 100'
+  }
+
+  if (passMark < 0 || passMark > 100) {
+    return 'Pass mark must be between 0 and 100'
   }
 
   if (caWeight + examWeight !== 100) {
@@ -121,6 +132,7 @@ export const parseConfigWeight = (value: string | number | null | undefined): st
 export const buildLevelConfigPayload = (values: LevelFormValues): LevelConfigPayload => ({
   continuous_assessment_weight: values.continuousAssessmentWeight,
   exam_weight: values.examWeight,
+  pass_mark: values.passMark,
   result_type: values.resultType,
   grade_type: values.gradeType,
   grade_bands: values.gradeBands,
@@ -130,6 +142,7 @@ export const getLevelFormValues = (
   resultType: ResultType | null,
   continuousAssessmentWeight: string,
   examWeight: string,
+  passMark: string,
   gradeTable: GradeTableState,
   existingConfig: LevelConfig | null,
 ): LevelFormValues | null => {
@@ -148,6 +161,7 @@ export const getLevelFormValues = (
   return {
     continuousAssessmentWeight: Number(continuousAssessmentWeight),
     examWeight: Number(examWeight),
+    passMark: Number(passMark),
     resultType,
     gradeType,
     gradeBands,

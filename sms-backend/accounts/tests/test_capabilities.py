@@ -116,6 +116,8 @@ class TeacherAccessCapabilitiesTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn(Capability.NAV_STUDENTS, response.data['capabilities'])
         self.assertIn(Capability.CLASSES_MANAGE, response.data['capabilities'])
+        self.assertIn(Capability.NAV_REPORTS, response.data['capabilities'])
+        self.assertIn(Capability.REPORTS_VIEW, response.data['capabilities'])
         self.assertEqual(response.data['access']['mode'], 'school')
 
     def test_subject_teacher_capabilities_and_scoped_classes(self):
@@ -128,6 +130,8 @@ class TeacherAccessCapabilitiesTests(APITestCase):
 
         session = resolve_session_access(self.teacher_membership)
         self.assertTrue(session.has(Capability.ASSESSMENTS_RECORD))
+        self.assertTrue(session.has(Capability.NAV_REPORTS))
+        self.assertTrue(session.has(Capability.REPORTS_VIEW))
         self.assertFalse(session.has(Capability.NAV_ASSESSMENTS))
         self.assertFalse(session.has(Capability.FEES_VIEW))
         self.assertFalse(session.has(Capability.NAV_STUDENTS))
@@ -155,6 +159,10 @@ class TeacherAccessCapabilitiesTests(APITestCase):
         session = resolve_session_access(self.teacher_membership)
         self.assertTrue(session.has(Capability.NAV_ASSESSMENTS))
         self.assertTrue(session.has(Capability.ASSESSMENTS_APPROVE))
+        self.assertTrue(session.has(Capability.NAV_REPORTS))
+        self.assertTrue(session.has(Capability.REPORTS_VIEW))
+        self.assertTrue(session.has(Capability.STUDENTS_MARK_LEFT))
+        self.assertFalse(session.has(Capability.STUDENTS_REACTIVATE))
         self.assertFalse(session.has(Capability.ASSESSMENTS_RELEASE))
         self.assertTrue(session.has(Capability.FEES_VIEW))
         self.assertFalse(session.has(Capability.ASSESSMENTS_RECORD))

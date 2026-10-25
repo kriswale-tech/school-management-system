@@ -51,6 +51,7 @@ def clone_assessment_config(source: AssessmentConfig, *, term) -> AssessmentConf
         term=term,
         continuous_assessment_weight=source.continuous_assessment_weight,
         exam_weight=source.exam_weight,
+        pass_mark=source.pass_mark,
         result_type=source.result_type,
         grade_type=source.grade_type,
     )

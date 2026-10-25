@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, CheckboxField, FormLabel, InputField } from '@/components/ui'
@@ -20,16 +20,14 @@ const AlertsSection = () => {
     queryKey: [SCHOOL_SETTINGS_QUERY_KEY],
     queryFn: getSchoolSettings,
   })
-  const [draft, setDraft] = useState<SchoolSettings | null>(null)
-
-  useEffect(() => {
-    if (data) setDraft(data)
-  }, [data])
+  const [draftOverride, setDraftOverride] = useState<SchoolSettings | null>(null)
+  const draft = draftOverride ?? data ?? null
 
   const { mutate: saveAlerts, isPending } = useMutation({
     mutationFn: updateSchoolSettings,
     onSuccess: (saved) => {
       toast.success('Alert settings saved')
+      setDraftOverride(null)
       queryClient.setQueryData([SCHOOL_SETTINGS_QUERY_KEY], saved)
       void queryClient.invalidateQueries({ queryKey: [SCHOOL_ALERTS_QUERY_KEY] })
       void queryClient.invalidateQueries({ queryKey: [TRANSITION_STATUS_QUERY_KEY] })
@@ -63,7 +61,7 @@ const AlertsSection = () => {
           <CheckboxField
             checked={draft.fees_alert_enabled}
             onChange={(event) =>
-              setDraft({ ...draft, fees_alert_enabled: event.target.checked })
+              setDraftOverride({ ...draft, fees_alert_enabled: event.target.checked })
             }
           >
             Outstanding fees for admins and accountants
@@ -80,14 +78,14 @@ const AlertsSection = () => {
               step="0.01"
               value={draft.fees_alert_threshold}
               onChange={(event) =>
-                setDraft({ ...draft, fees_alert_threshold: event.target.value })
+                setDraftOverride({ ...draft, fees_alert_threshold: event.target.value })
               }
             />
           </div>
           <CheckboxField
             checked={draft.results_alert_enabled}
             onChange={(event) =>
-              setDraft({ ...draft, results_alert_enabled: event.target.checked })
+              setDraftOverride({ ...draft, results_alert_enabled: event.target.checked })
             }
           >
             Unreleased results for admins and class teachers
@@ -95,7 +93,7 @@ const AlertsSection = () => {
           <CheckboxField
             checked={draft.enrollments_alert_enabled}
             onChange={(event) =>
-              setDraft({ ...draft, enrollments_alert_enabled: event.target.checked })
+              setDraftOverride({ ...draft, enrollments_alert_enabled: event.target.checked })
             }
           >
             New enrollments for admins
@@ -103,7 +101,7 @@ const AlertsSection = () => {
           <CheckboxField
             checked={draft.transition_popup_enabled}
             onChange={(event) =>
-              setDraft({ ...draft, transition_popup_enabled: event.target.checked })
+              setDraftOverride({ ...draft, transition_popup_enabled: event.target.checked })
             }
           >
             Popup on the dashboard while opening the next term still needs action

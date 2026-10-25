@@ -39,10 +39,21 @@ const StudentReportViewer = ({
     retry: false,
   })
 
-  const generateMutation = useMutation({
+  const {
+    mutate: runGenerate,
+    reset: resetGenerate,
+    data: generatedReport,
+    error: generateError,
+    isPending: isGeneratePending,
+    isError: isGenerateError,
+  } = useMutation({
     mutationFn: generateReport,
     onSuccess: (data) => {
       queryClient.setQueryData([...queryKey], data)
+      toast.success('Report ready')
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Unable to generate report.'))
     },
   })
 
@@ -54,34 +65,33 @@ const StudentReportViewer = ({
   useEffect(() => {
     autoGenerateStarted.current = false
     setRequested(false)
-    generateMutation.reset()
-  }, [queryKeyValue])
+    resetGenerate()
+  }, [queryKeyValue, resetGenerate])
 
   useEffect(() => {
     if (!loadEnabled) return
     if (!missingReport) return
     if (autoGenerateStarted.current) return
-    if (generateMutation.isPending) return
+    if (isGeneratePending) return
     autoGenerateStarted.current = true
-    generateMutation.mutate()
-  }, [loadEnabled, missingReport, generateMutation.isPending, generateMutation.mutate])
+    runGenerate()
+  }, [loadEnabled, missingReport, isGeneratePending, runGenerate])
 
-  const report = reportQuery.data ?? generateMutation.data
+  const report = reportQuery.data ?? generatedReport
   const hasReadyReport = Boolean(report?.url && report.status === 'ready')
   const isGenerating =
-    generateMutation.isPending ||
-    (missingReport && !generateMutation.isError && !hasReadyReport)
+    isGeneratePending || (missingReport && !isGenerateError && !hasReadyReport)
 
-  const generateFailed = generateMutation.isError
+  const generateFailed = isGenerateError
   const loadFailed = reportQuery.isError && !missingReport && !hasReadyReport
 
   const errorMessage = generateFailed
-    ? getApiErrorMessage(generateMutation.error, 'Unable to generate report.')
+    ? getApiErrorMessage(generateError, 'Unable to generate report.')
     : loadFailed
       ? getApiErrorMessage(reportQuery.error, 'Unable to load report.')
       : null
 
-  const showRegenerate = generateFailed || loadFailed
+  const showRegenerate = hasReadyReport || generateFailed || loadFailed
 
   const handleShare = async () => {
     if (!report?.url) return
@@ -118,6 +128,7 @@ const StudentReportViewer = ({
             variant="outline"
             className="max-w-fit py-2 text-sm"
             onClick={() => window.open(report!.url!, '_blank', 'noopener,noreferrer')}
+            disabled={isGeneratePending}
           >
             Open in new tab
           </Button>
@@ -126,7 +137,7 @@ const StudentReportViewer = ({
             variant="outline"
             className="max-w-fit py-2 text-sm"
             onClick={handleShare}
-            disabled={shareBusy}
+            disabled={shareBusy || isGeneratePending}
           >
             Share
           </Button>
@@ -137,11 +148,11 @@ const StudentReportViewer = ({
           className="max-w-fit py-2 text-sm"
           loading={loadEnabled && isGenerating}
           loadingText="Generating"
-          disabled={!enabled || generateMutation.isPending}
+          disabled={!enabled || isGeneratePending}
           onClick={() => {
             setRequested(true)
             if (missingReport || generateFailed) {
-              generateMutation.mutate()
+              runGenerate()
             }
           }}
         >
@@ -151,12 +162,14 @@ const StudentReportViewer = ({
       {showRegenerate ? (
         <Button
           type="button"
-          variant={hasReadyReport ? 'outline' : 'solid'}
+          variant="outline"
           className="max-w-fit py-2 text-sm"
-          onClick={() => generateMutation.mutate()}
-          disabled={!enabled || generateMutation.isPending}
+          loading={isGeneratePending}
+          loadingText="Generating"
+          onClick={() => runGenerate()}
+          disabled={!enabled || isGeneratePending}
         >
-          {generateMutation.isPending ? 'Generating…' : 'Regenerate'}
+          Regenerate
         </Button>
       ) : null}
     </div>

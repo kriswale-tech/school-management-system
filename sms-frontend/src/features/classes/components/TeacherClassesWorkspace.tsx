@@ -31,7 +31,7 @@ const TeacherClassesWorkspace = () => {
   })
 
   const managed = data?.class_teacher_assignments ?? []
-  const teaching = data?.teaching_assignments ?? []
+  const teaching = useMemo(() => data?.teaching_assignments ?? [], [data?.teaching_assignments])
   const teachingIds = useMemo(() => new Set(teaching.map((item) => item.id)), [teaching])
   const inbox = data?.corrections_inbox ?? []
   const inboxCount = data?.corrections_inbox_count ?? inbox.length

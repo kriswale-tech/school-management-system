@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Button, Modal } from '@/components/ui'
 
 type BulkApproveModalProps = {
@@ -9,23 +9,16 @@ type BulkApproveModalProps = {
   onConfirm: (_remarks: string) => void
 }
 
-const BulkApproveModal = ({
-  open,
+const BulkApproveModalBody = ({
   awaitingCount,
   isSubmitting = false,
   onClose,
   onConfirm,
-}: BulkApproveModalProps) => {
+}: Omit<BulkApproveModalProps, 'open'>) => {
   const [remarks, setRemarks] = useState('')
 
-  useEffect(() => {
-    if (open) setRemarks('')
-  }, [open])
-
-  if (!open) return null
-
   return (
-    <Modal open={open} title="Approve awaiting students" onClose={onClose} className="max-w-lg">
+    <Modal open title="Approve awaiting students" onClose={onClose} className="max-w-lg">
       <div className="space-y-4">
         <p className="text-sm text-slate-600">
           Apply an optional shared remark and approve all{' '}
@@ -69,6 +62,11 @@ const BulkApproveModal = ({
       </div>
     </Modal>
   )
+}
+
+const BulkApproveModal = ({ open, ...props }: BulkApproveModalProps) => {
+  if (!open) return null
+  return <BulkApproveModalBody {...props} />
 }
 
 export default BulkApproveModal

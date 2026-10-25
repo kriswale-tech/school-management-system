@@ -26,6 +26,7 @@ class SetupAssessmentConfigSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     continuous_assessment_weight = serializers.DecimalField(max_digits=5, decimal_places=2)
     exam_weight = serializers.DecimalField(max_digits=5, decimal_places=2)
+    pass_mark = serializers.DecimalField(max_digits=5, decimal_places=2)
     result_type = serializers.ChoiceField(choices=AssessmentConfig.ResultType.choices)
     grade_type = serializers.ChoiceField(
         choices=AssessmentConfig.GradeType.choices,
@@ -69,6 +70,14 @@ class SaveLevelAssessmentConfigSerializer(serializers.Serializer):
         decimal_places=2,
         min_value=Decimal('0'),
     )
+    pass_mark = serializers.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        min_value=Decimal('0'),
+        max_value=Decimal('100'),
+        default=Decimal('40.00'),
+        required=False,
+    )
     result_type = serializers.ChoiceField(choices=AssessmentConfig.ResultType.choices)
     grade_type = serializers.ChoiceField(
         choices=AssessmentConfig.GradeType.choices,
@@ -86,6 +95,8 @@ class SaveLevelAssessmentConfigSerializer(serializers.Serializer):
                     'Continuous assessment and exam weights must sum to 100.'
                 ),
             })
+
+        attrs.setdefault('pass_mark', Decimal('40.00'))
 
         result_type = attrs['result_type']
         uses_grades = result_type in AssessmentConfig.GRADE_RESULT_TYPES
