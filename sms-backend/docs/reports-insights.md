@@ -12,8 +12,10 @@ Backend: `sms-backend/reports/` (`/api/v1/reports/`).
 
 | Role | Tabs |
 |------|------|
-| Admin / school-wide | Overview · Finance · Academic · Enrollment · Teachers |
-| Teacher (scoped) | **My classes** (if class teacher) · **My subjects** (if subject teacher) · Academic |
+| Admin / school-wide | Overview · Finance · Academic · Enrollment · Teachers · **Activity** |
+| Accountant | Finance · **Activity** (fee events) |
+| Staff | Overview · Academic · Enrollment · Teachers · **Activity** (non-fee) |
+| Teacher (scoped) | **My classes** (if class teacher) · **My subjects** (if subject teacher) · Academic · **Activity** |
 
 Teachers do **not** see Overview, Finance, Enrollment, or Teachers. Tabs appear only
 for roles they hold (both if they are class + subject teacher). Accountants with
@@ -29,10 +31,23 @@ Active tab is persisted as `?tab=` on `/reports`:
 | Academic | `academic` |
 | Enrollment | `enrollment` |
 | Teachers | `teachers` |
+| Activity | `activity` |
 | My classes | `my-classes` |
 | My subjects | `my-subjects` |
 
 Invalid or role-forbidden values fall back to the role default.
+
+### Activity
+Role-scoped feed from `GET /api/v1/activities/?term=` (requires `reports.view`):
+
+| Role | Events shown |
+|------|----------------|
+| Admin | All school activities for the term |
+| Accountant | Fee verbs only (payments, advances, catalog publish/apply) |
+| Staff | Non-fee (academics, enrollment, staffing) |
+| Teacher | Classes/subjects they manage or teach (no fees) |
+
+Each row shows verb, summary, actor, timestamp, and navigates via `href` when present. Paginated (`page`, `page_size`).
 
 **My classes / My subjects** use a single selected assignment (Class / Subject
 filters), not a stack of cards:
@@ -96,17 +111,20 @@ Performance deep-dive (published scores only; already scope-filtered for teacher
 - Students to watch (top / at-risk) with optional class filter → Performance tab
 
 ### Enrollment
-Retention-style change vs the previous term:
+Retention-style change vs the previous term, plus final-year leavers for the selected term:
 
 | Bucket | Meaning |
 |--------|---------|
+| Leaving this year | Enrolled in the school’s last active class (e.g. JHS 3, or Primary 6 in a primary-only school). Class name is returned so JHS and primary leavers read differently. |
 | Retained | Enrolled in previous and current term |
 | New | `is_new_student` on current term |
-| Graduated | Expected exit (`is_graduated`) |
+| Graduated | Previous-term pupils with `is_graduated` who are not enrolled this term (this step only — not all-time). Includes `graduated_class_name` from their previous class. |
 | Marked left | `is_active=False` with leave reason (see `mark-as-left.md`) |
 | Not re-enrolled | In previous, not current, not graduated, not marked left |
 
 Also: headcount by class, left-by-reason breakdown.
+
+UI copy uses plain school language (“Graduated”, “Leaving this year”) — not internal labels like “expected exit”.
 
 ### Teachers
 Per-teacher load for the selected term (`GET /reports/staff-capacity/`):
@@ -174,9 +192,11 @@ API: `GET /api/v1/students/<id>/performance/`
 - Teacher attendance × performance
 - Family / customer lifetime value
 - Typed attrition beyond mark-as-left + graduation
+- All-time graduated totals / by-year alumni chart (lifetime count is a different question from term-to-term movement)
 - AI natural-language charting
 
 ## Related
 
 - `docs/mark-as-left.md` — leave workflow used by Enrollment “marked left”
+- `docs/term-transition.md` — graduation + deferred BECE / final-year exam decision
 - `docs/FEATURES.md` — product status row for Reports & Insights

@@ -72,11 +72,11 @@ const FeePrepNotice = ({ variant = 'banner' }: FeePrepNoticeProps) => {
       </div>
       <div className="px-5 py-4 space-y-4">
         <p className="text-sm text-slate-600">{data.summary}</p>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 gap-3">
           <Button type="button" variant="outline" onClick={() => setDismissed(true)}>
             Not now
           </Button>
-          <Link to={data.href} onClick={() => setDismissed(true)}>
+          <Link to={data.href} onClick={() => setDismissed(true)} className="block">
             <Button type="button">Set up fees</Button>
           </Link>
         </div>

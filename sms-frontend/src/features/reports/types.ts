@@ -249,6 +249,9 @@ export type EnrollmentResponse = {
   new_students: number
   retained_count: number | null
   graduated_count: number | null
+  graduated_class_name: string | null
+  leaving_this_year_count: number
+  leaving_this_year_class_name: string | null
   left_count: number | null
   left_by_reason: Array<{ reason: string; count: number }>
   retention_rate: number | null

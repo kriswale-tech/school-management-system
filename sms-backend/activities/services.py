@@ -60,6 +60,16 @@ def list_activities(*, school, term=None):
     return queryset.order_by('-created_at')
 
 
+def list_activities_for_accountant(*, school, term=None):
+    """Fee desk events only — payments, advances, catalog publish/apply."""
+    return list_activities(school=school, term=term).filter(verb__in=FEE_VERBS)
+
+
+def list_activities_for_staff(*, school, term=None):
+    """Academics, enrollment, and staffing — no fee ledger noise."""
+    return list_activities(school=school, term=term).exclude(verb__in=FEE_VERBS)
+
+
 def list_activities_for_teacher(*, school, user, term):
     """Events for the classes this teacher manages and the subjects they teach."""
     from teachers.models import ClassTeacher, TeachingAssignment
@@ -98,3 +108,26 @@ def list_activities_for_teacher(*, school, user, term):
         query |= Q(stream_id__in=subject_stream_ids, verb__in=CLASS_WIDE_VERBS)
 
     return list_activities(school=school, term=term).filter(query).exclude(verb__in=FEE_VERBS)
+
+
+def list_activities_for_membership(*, membership, school, term=None):
+    """Role-scoped feed for Insights / Activities API."""
+    from accounts.models import User
+
+    if membership is None:
+        return Activity.objects.none()
+
+    role = membership.role
+    if role == User.RoleChoices.ADMIN:
+        return list_activities(school=school, term=term)
+    if role == User.RoleChoices.ACCOUNTANT:
+        return list_activities_for_accountant(school=school, term=term)
+    if role == User.RoleChoices.STAFF:
+        return list_activities_for_staff(school=school, term=term)
+    if role == User.RoleChoices.TEACHER:
+        return list_activities_for_teacher(
+            school=school,
+            user=membership.user,
+            term=term,
+        )
+    return Activity.objects.none()

@@ -1033,6 +1033,24 @@ def get_finance(*, school, membership, term_id=None, limit=10):
     }
 
 
+def _final_year_class(school):
+    """Last active class in curriculum order — pupils here leave at year end.
+
+    Same idea as term transition: JHS 3 in a full basic school, or Primary 6
+    when the school only runs through primary.
+    """
+    ordered = (
+        ClassLevel.objects.filter(school=school)
+        .select_related('level')
+        .order_by('level__order', 'order', 'name')
+    )
+    last = None
+    for class_level in ordered:
+        if class_level.is_active and class_level.level_id and class_level.level.is_active:
+            last = class_level
+    return last
+
+
 def get_enrollment(*, school, membership, term_id=None):
     """Retention-style enrollment change vs previous term."""
     from students.models import ClassEnrollment
@@ -1057,16 +1075,29 @@ def get_enrollment(*, school, membership, term_id=None):
     current_ids = {row.student_id for row in current_rows}
     new_count = sum(1 for row in current_rows if row.is_new_student)
 
+    final_year = _final_year_class(school)
+    leaving_this_year_class_name = final_year.name if final_year else None
+    leaving_this_year_count = 0
+    if final_year is not None:
+        leaving_this_year_count = sum(
+            1 for row in current_rows if row.class_level_id == final_year.id
+        )
+
     previous_ids: set = set()
+    previous_rows = []
     if previous is not None:
-        prev_qs = ClassEnrollment.objects.filter(term=previous)
+        prev_qs = ClassEnrollment.objects.filter(term=previous).select_related(
+            'class_level',
+        )
         if scope.is_scoped and scope.visible_stream_ids:
             prev_qs = prev_qs.filter(stream_id__in=scope.visible_stream_ids)
-        previous_ids = set(prev_qs.values_list('student_id', flat=True))
+        previous_rows = list(prev_qs)
+        previous_ids = {row.student_id for row in previous_rows}
 
     retained = len(current_ids & previous_ids) if previous else None
 
     graduated_count = None
+    graduated_class_name = None
     left_count = None
     left_by_reason: Counter = Counter()
     if previous is not None:
@@ -1089,6 +1120,14 @@ def get_enrollment(*, school, membership, term_id=None):
             left_by_reason[row.leave_reason or 'other'] += 1
         graduated_count = len(graduated_ids)
         left_count = len(left_rows)
+        if graduated_ids:
+            class_names = Counter(
+                row.class_level.name
+                for row in previous_rows
+                if row.student_id in graduated_ids and row.class_level_id
+            )
+            if class_names:
+                graduated_class_name = class_names.most_common(1)[0][0]
 
     by_class = []
     class_counts: dict[str, int] = defaultdict(int)
@@ -1122,6 +1161,9 @@ def get_enrollment(*, school, membership, term_id=None):
         'new_students': new_count,
         'retained_count': retained,
         'graduated_count': graduated_count if previous else None,
+        'graduated_class_name': graduated_class_name if previous else None,
+        'leaving_this_year_count': leaving_this_year_count,
+        'leaving_this_year_class_name': leaving_this_year_class_name,
         'left_count': left_count if previous else None,
         'left_by_reason': [
             {'reason': reason, 'count': count}

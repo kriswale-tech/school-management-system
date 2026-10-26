@@ -148,3 +148,20 @@ class AdminDashboardSerializer(serializers.Serializer):
     setup_health = SetupHealthSerializer()
     academic_progress = AcademicProgressRowSerializer(many=True)
     levels = LevelOptionSerializer(many=True)
+
+
+class StaffSchoolOverviewSerializer(serializers.Serializer):
+    total_students = serializers.IntegerField()
+    total_classes = serializers.IntegerField()
+    teachers_count = serializers.IntegerField()
+
+
+class StaffDashboardSerializer(serializers.Serializer):
+    term_id = serializers.UUIDField(allow_null=True)
+    term_label = serializers.CharField(allow_null=True)
+    show_academic_widgets = serializers.BooleanField()
+    school_overview = StaffSchoolOverviewSerializer()
+    academic_overview = AcademicOverviewSerializer()
+    coverage_overview = CoverageOverviewSerializer()
+    needs_attention = NeedsAttentionItemSerializer(many=True)
+    activities = ActivitySerializer(many=True)

@@ -11,6 +11,7 @@ export const REPORTS_FINANCE_QUERY_KEY = 'reports-finance' as const
 export const REPORTS_ENROLLMENT_QUERY_KEY = 'reports-enrollment' as const
 export const REPORTS_STAFF_QUERY_KEY = 'reports-staff-capacity' as const
 export const REPORTS_TEACHER_DESK_QUERY_KEY = 'reports-teacher-desk' as const
+export const REPORTS_ACTIVITIES_QUERY_KEY = 'reports-activities' as const
 
 export const CHART_SKY = '#0284c7'
 export const CHART_SKY_LIGHT = '#38bdf8'

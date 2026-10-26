@@ -1,9 +1,13 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework.response import Response
 
-from accounts.permissions import HasActiveSchool, IsAdmin, IsTeacher
-from dashboard.serializers import AdminDashboardSerializer, TeacherDashboardSerializer
-from dashboard.services import get_admin_dashboard, get_teacher_dashboard
+from accounts.permissions import HasActiveSchool, IsAdmin, IsStaff, IsTeacher
+from dashboard.serializers import (
+    AdminDashboardSerializer,
+    StaffDashboardSerializer,
+    TeacherDashboardSerializer,
+)
+from dashboard.services import get_admin_dashboard, get_staff_dashboard, get_teacher_dashboard
 from shared.views import SchoolScopedAPIView
 
 
@@ -39,3 +43,21 @@ class TeacherDashboardView(SchoolScopedAPIView):
     def get(self, request):
         payload = get_teacher_dashboard(school=self.school, membership=self.membership)
         return Response(TeacherDashboardSerializer(payload).data)
+
+
+class StaffDashboardView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, IsStaff]
+
+    @extend_schema(
+        tags=['Dashboard'],
+        summary='Staff dashboard overview',
+        description=(
+            'School and academic overview for staff: students/classes/teachers, '
+            'report workflow, coverage gaps, needs-attention, and recent activity. '
+            'No fee data.'
+        ),
+        responses={200: StaffDashboardSerializer},
+    )
+    def get(self, request):
+        payload = get_staff_dashboard(school=self.school)
+        return Response(StaffDashboardSerializer(payload).data)

@@ -37,11 +37,23 @@ const EnrollmentTab = ({ data }: EnrollmentTabProps) => {
     students: row.students_count,
   }))
 
+  const leavingClass = data.leaving_this_year_class_name
+  const graduatedClass = data.graduated_class_name
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatsCard title="Enrolled this term" value={String(data.enrolled_count)} />
         <StatsCard title="New students" value={String(data.new_students)} />
+        <StatsCard
+          title="Leaving this year"
+          value={String(data.leaving_this_year_count)}
+          description={
+            leavingClass
+              ? `Pupils in ${leavingClass} — the last class this school offers`
+              : 'No final-year class set up yet'
+          }
+        />
         <StatsCard
           title="Retention rate"
           value={formatPercent(data.retention_rate)}
@@ -51,22 +63,28 @@ const EnrollmentTab = ({ data }: EnrollmentTabProps) => {
               : 'Needs a previous term to compare'
           }
         />
-        <StatsCard
-          title="Marked left"
-          value={data.left_count === null ? '—' : String(data.left_count)}
-          description="Students marked left who were enrolled previously"
-        />
       </div>
 
       {data.previous_term_label ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <StatsCard
             title="Retained"
             value={data.retained_count === null ? '—' : String(data.retained_count)}
+            description={`Still enrolled after ${data.previous_term_label}`}
           />
           <StatsCard
-            title="Graduated (expected exit)"
+            title="Graduated"
             value={data.graduated_count === null ? '—' : String(data.graduated_count)}
+            description={
+              graduatedClass
+                ? `Finished ${graduatedClass} and were not enrolled again`
+                : 'Finished the last class and were not enrolled again'
+            }
+          />
+          <StatsCard
+            title="Marked left"
+            value={data.left_count === null ? '—' : String(data.left_count)}
+            description="Left early (dropout, transfer, or other)"
           />
         </div>
       ) : (

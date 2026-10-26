@@ -36,7 +36,7 @@ export const GENDER_OPTIONS = [
   { value: 'female', label: 'Female' },
 ] as const
 
-/** Roles available when adding staff from the directory. */
+/** Roles available when adding staff from the directory (admin). */
 export const STAFF_DESK_ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
   { value: 'teacher', label: 'Teacher' },
@@ -44,13 +44,29 @@ export const STAFF_DESK_ROLE_OPTIONS = [
   { value: 'staff', label: 'Staff' },
 ] as const
 
-/** Role filter options for the directory ActionBar. */
+/** Role filter options for the directory ActionBar (admin). */
 export const STAFF_DESK_FILTER_OPTIONS = [
   { value: 'admin', label: 'Admin' },
   { value: 'teacher', label: 'Teacher' },
   { value: 'accountant', label: 'Accountant' },
   { value: 'staff', label: 'Staff' },
 ] as const
+
+export type StaffDeskRoleOption = (typeof STAFF_DESK_ROLE_OPTIONS)[number]
+
+/**
+ * Roles the signed-in membership can manage in the directory.
+ * Mirrors backend MANAGEABLE_ROLES_BY_REQUESTER.
+ */
+export const manageableStaffDeskRoles = (
+  viewerRole: string | null | undefined,
+): StaffDeskRoleOption[] => {
+  if (viewerRole === 'admin') return [...STAFF_DESK_ROLE_OPTIONS]
+  if (viewerRole === 'staff') {
+    return STAFF_DESK_ROLE_OPTIONS.filter((option) => option.value === 'teacher')
+  }
+  return []
+}
 
 export interface StaffProfile {
   profile_picture: string | null

@@ -8,6 +8,7 @@ import { Capability } from '@/features/auth/capabilities'
 import { useAccess, useCan } from '@/features/auth/hooks'
 import { getApiErrorMessage } from '@/utils'
 import AcademicTab from '../components/AcademicTab'
+import ActivityTab from '../components/ActivityTab'
 import EnrollmentTab from '../components/EnrollmentTab'
 import FinanceTab from '../components/FinanceTab'
 import OverviewTab from '../components/OverviewTab'
@@ -49,6 +50,7 @@ const TAB_FINANCE = 'Finance'
 const TAB_ACADEMIC = 'Academic'
 const TAB_ENROLLMENT = 'Enrollment'
 const TAB_TEACHERS = 'Teachers'
+const TAB_ACTIVITY = 'Activity'
 
 const TAB_FROM_QUERY: Record<string, string> = {
   overview: TAB_OVERVIEW,
@@ -56,6 +58,7 @@ const TAB_FROM_QUERY: Record<string, string> = {
   academic: TAB_ACADEMIC,
   enrollment: TAB_ENROLLMENT,
   teachers: TAB_TEACHERS,
+  activity: TAB_ACTIVITY,
   'my-classes': TAB_MY_CLASSES,
   'my-subjects': TAB_MY_SUBJECTS,
 }
@@ -66,6 +69,7 @@ const QUERY_FROM_TAB: Record<string, string> = {
   [TAB_ACADEMIC]: 'academic',
   [TAB_ENROLLMENT]: 'enrollment',
   [TAB_TEACHERS]: 'teachers',
+  [TAB_ACTIVITY]: 'activity',
   [TAB_MY_CLASSES]: 'my-classes',
   [TAB_MY_SUBJECTS]: 'my-subjects',
 }
@@ -101,15 +105,15 @@ const ReportsPage = () => {
   const [studentsClassLevelId, setStudentsClassLevelId] = useState<FilterSelection>('')
 
   const teacherTabs = useMemo(() => {
-    const tabs = new Set<string>([TAB_ACADEMIC])
+    const tabs = new Set<string>([TAB_ACADEMIC, TAB_ACTIVITY])
     if (showMyClasses) tabs.add(TAB_MY_CLASSES)
     if (showMySubjects) tabs.add(TAB_MY_SUBJECTS)
     return tabs
   }, [showMyClasses, showMySubjects])
 
   const schoolTabs = useMemo(() => {
-    const tabs = new Set<string>()
-    // Accountant: finance only. Staff/admin: overview + role-relevant tabs.
+    const tabs = new Set<string>([TAB_ACTIVITY])
+    // Accountant: finance only (+ activity). Staff/admin: overview + role-relevant tabs.
     if (!(showFinance && !showAcademic)) {
       tabs.add(TAB_OVERVIEW)
     }
@@ -197,9 +201,10 @@ const ReportsPage = () => {
     queryFn: () => getReportsFeesAcademicRisk({ term_id: resolvedTermId, limit: 8 }),
     enabled:
       termReady &&
-      activeTab === TAB_OVERVIEW &&
       !isTeacherScoped &&
-      overview?.scope_mode === 'school',
+      showFinance &&
+      (activeTab === TAB_FINANCE ||
+        (activeTab === TAB_OVERVIEW && overview?.scope_mode === 'school')),
   })
 
   const { data: teacherDesk } = useQuery({
@@ -313,6 +318,11 @@ const ReportsPage = () => {
           icon: 'hugeicons:chart-average',
           onClick: () => selectTab(TAB_ACADEMIC),
         },
+        {
+          label: TAB_ACTIVITY,
+          icon: 'hugeicons:time-04',
+          onClick: () => selectTab(TAB_ACTIVITY),
+        },
       ]
     : [
         ...(schoolTabs.has(TAB_OVERVIEW)
@@ -360,6 +370,11 @@ const ReportsPage = () => {
               },
             ]
           : []),
+        {
+          label: TAB_ACTIVITY,
+          icon: 'hugeicons:time-04',
+          onClick: () => selectTab(TAB_ACTIVITY),
+        },
       ]
 
   return (
@@ -376,17 +391,19 @@ const ReportsPage = () => {
             if (value !== '' && value === compareTermId) setCompareTermId('')
           }}
         />
-        {!isTeacherScoped || activeTab === TAB_ACADEMIC ? (
-          <FilterComponent
-            filterName="Compare"
-            filterKey="reports-compare"
-            options={compareOptions}
-            value={compareTermId}
-            placeholder="No comparison"
-            onChange={setCompareTermId}
-            disabled={compareOptions.length === 0}
-          />
-        ) : null}
+        {!isTeacherScoped || activeTab === TAB_ACADEMIC
+          ? (
+              <FilterComponent
+                filterName="Compare"
+                filterKey="reports-compare"
+                options={compareOptions}
+                value={compareTermId}
+                placeholder="No comparison"
+                onChange={setCompareTermId}
+                disabled={compareOptions.length === 0}
+              />
+            )
+          : null}
       </ActionBar>
 
       <TabComponent activeTab={activeTab} tabs={tabs} />
@@ -426,7 +443,9 @@ const ReportsPage = () => {
         <TeacherDeskTab data={teacherDesk} mode="subjects" />
       ) : null}
 
-      {!isTeacherScoped && activeTab === TAB_FINANCE ? <FinanceTab data={finance} /> : null}
+      {!isTeacherScoped && activeTab === TAB_FINANCE ? (
+        <FinanceTab data={finance} feesRisk={feesRisk} />
+      ) : null}
 
       {activeTab === TAB_ACADEMIC ? (
         overviewLoading && !overview ? (
@@ -462,6 +481,10 @@ const ReportsPage = () => {
 
       {!isTeacherScoped && activeTab === TAB_TEACHERS ? (
         <StaffTab data={teachers} />
+      ) : null}
+
+      {activeTab === TAB_ACTIVITY ? (
+        <ActivityTab key={resolvedTermId} termId={resolvedTermId} />
       ) : null}
     </div>
   )

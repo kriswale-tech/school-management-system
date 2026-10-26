@@ -10,14 +10,16 @@ import {
 } from 'recharts'
 import StatsCard from '@/components/shared/StatsCard'
 import ChartCard from './ChartCard'
-import type { FinanceResponse } from '../types'
+import FeesRiskCard from './FeesRiskCard'
+import type { FeesAcademicRiskResponse, FinanceResponse } from '../types'
 import { CHART_GRID, CHART_SKY, CHART_TICK, formatCompactFee, formatPercent } from '../utils'
 
 type FinanceTabProps = {
   data?: FinanceResponse
+  feesRisk?: FeesAcademicRiskResponse
 }
 
-const FinanceTab = ({ data }: FinanceTabProps) => {
+const FinanceTab = ({ data, feesRisk }: FinanceTabProps) => {
   if (!data) {
     return (
       <div className="bg-white p-8 custom-shadow-md text-sm text-slate-500">Loading finance…</div>
@@ -106,6 +108,8 @@ const FinanceTab = ({ data }: FinanceTabProps) => {
           ))}
         </ul>
       </ChartCard>
+
+      <FeesRiskCard data={feesRisk} />
     </div>
   )
 }

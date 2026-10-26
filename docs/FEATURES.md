@@ -90,6 +90,7 @@ School-wide and teacher-scoped analytics at `/reports`. See
 | Academic charts + structure KPIs | by-class, heatmap, grades, trends | Academic tab | Done |
 | Finance / enrollment / fees×risk | reports APIs | Tabs | Done |
 | Teachers load insights | `GET /reports/staff-capacity/` | Teachers tab (links to `/staff/:id`) | Done |
+| Activity feed (role-scoped) | `GET /activities/` (`reports.view`) | Insights → Activity (`?tab=activity`) | Done |
 
 ## Fees
 
@@ -133,7 +134,7 @@ Signup setup is unchanged. These screens edit the school after the wizard, under
 
 The calendar lists every year. Past years are view-only. **Add** saves the next year’s three terms and leaves the current term active. Assessment settings are copied onto any new term that does not have them yet.
 
-**Open the next term** places continuing pupils, marks the last class graduated at year end, copies teachers, applies the next fee catalog, and then turns that term on. See [term-transition.md](./term-transition.md). Standalone `POST …/terms/<term_id>/activate/` is disabled (403); activation only runs inside transition confirm.
+**Open the next term** places continuing pupils, marks the last class graduated at year end, copies teachers, applies the next fee catalog, and then turns that term on. See [term-transition.md](./term-transition.md) (includes deferred BECE / final-year exam decision). Standalone `POST …/terms/<term_id>/activate/` is disabled (403); activation only runs inside transition confirm.
 
 Alerts are in-app only: outstanding fees (admin and accountant), unreleased results (admin and class teachers), and new enrollments (admin). The transition popup on the dashboard has its own checkbox.
 

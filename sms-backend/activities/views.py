@@ -1,23 +1,26 @@
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
-from accounts.permissions import HasActiveSchool, IsAdmin
+from accounts.capabilities import Capability
+from accounts.permissions import HasActiveSchool, HasCapability
 from activities.serializers import ActivitySerializer
-from activities.services import list_activities
+from activities.services import list_activities_for_membership
 from core.pagination import StandardResultsSetPagination, paginated_schema
 from schools.models import Term
 from shared.views import SchoolScopedAPIView
 
 
 class ActivityListView(SchoolScopedAPIView):
-    permission_classes = [HasActiveSchool, IsAdmin]
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.REPORTS_VIEW
     pagination_class = StandardResultsSetPagination
 
     @extend_schema(
         tags=['Activities'],
         summary='List recent school activities',
         description=(
-            'Newest-first activity feed for the active school. '
-            'Defaults to the active term when one is set.'
+            'Newest-first activity feed for the active school, scoped to the '
+            'caller\'s role (admin: all; accountant: fees; staff: non-fees; '
+            'teacher: assigned classes/subjects). Defaults to the active term.'
         ),
         parameters=[
             OpenApiParameter(
@@ -32,7 +35,11 @@ class ActivityListView(SchoolScopedAPIView):
     )
     def get(self, request):
         term = _resolve_term(self.school, request.query_params.get('term'))
-        queryset = list_activities(school=self.school, term=term)
+        queryset = list_activities_for_membership(
+            membership=request.membership,
+            school=self.school,
+            term=term,
+        )
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(queryset, request, view=self)
         return paginator.get_paginated_response(ActivitySerializer(page, many=True).data)

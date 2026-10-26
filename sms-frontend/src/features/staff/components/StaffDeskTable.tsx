@@ -14,6 +14,8 @@ type StaffDeskTableProps = {
   isLoading?: boolean
   pagination?: PaginatedResponse<StaffDeskRow> | null
   onPageChange?: (page: number) => void
+  /** Staff-role desk: teachers only — empty copy and labels match. */
+  teachersOnly?: boolean
   onAddStaff?: () => void
   onViewStaff?: (row: StaffDeskRow) => void
 }
@@ -23,6 +25,7 @@ const StaffDeskTable = ({
   isLoading = false,
   pagination = null,
   onPageChange,
+  teachersOnly = false,
   onAddStaff,
   onViewStaff,
 }: StaffDeskTableProps) => {
@@ -31,9 +34,11 @@ const StaffDeskTable = ({
       isLoading={isLoading}
       isEmpty={!isLoading && rows.length === 0}
       emptyState={{
-        title: 'No staff found',
-        description: 'Try adjusting your search or role filter, or add a staff member.',
-        actionLabel: onAddStaff ? 'Add Staff' : undefined,
+        title: teachersOnly ? 'No teachers found' : 'No staff found',
+        description: teachersOnly
+          ? 'Try adjusting your search, or add a teacher.'
+          : 'Try adjusting your search or role filter, or add a staff member.',
+        actionLabel: onAddStaff ? (teachersOnly ? 'Add Teacher' : 'Add Staff') : undefined,
         onAction: onAddStaff,
         icon: 'hugeicons:user-group',
       }}

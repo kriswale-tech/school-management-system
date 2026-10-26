@@ -27,7 +27,7 @@ const Dashboard = () => {
     <div className="rounded-xl bg-white p-6 custom-shadow-md">
       <h1 className="text-lg font-medium text-slate-900">Dashboard</h1>
       <p className="mt-2 text-sm text-slate-500">
-        Your role does not have a home screen yet. Use the sidebar to continue.
+        Nothing to show here yet. Use the sidebar to continue.
       </p>
     </div>
   )

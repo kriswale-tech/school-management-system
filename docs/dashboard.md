@@ -140,8 +140,8 @@ Not recorded: logins, page views, and individual score edits. Events from before
 
 ### Reading the feed
 
-- Admins: `GET /api/v1/activities/` — newest first, paginated, active term unless `?term=` is set. The admin dashboard requests `page_size=10`.
-- Teachers: the teacher dashboard payload includes up to 10 matching rows. There is no separate teacher list URL.
+- Anyone with `reports.view`: `GET /api/v1/activities/` — newest first, paginated, active term unless `?term=` is set. Scoped by role (admin: all; accountant: fees; staff: non-fees; teacher: assigned classes/subjects). The admin dashboard requests `page_size=10`. Insights → **Activity** uses the same API with the selected reports term.
+- Teachers: the teacher dashboard payload still embeds up to 10 matching rows; the full paginated list is on Insights → Activity.
 
 A row stores `href`. Clicking it in the UI follows that link.
 

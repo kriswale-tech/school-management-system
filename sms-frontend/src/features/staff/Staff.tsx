@@ -9,15 +9,24 @@ import FilterComponent, { type FilterSelection } from '@/components/ui/FilterCom
 import SearchComponent from '@/components/ui/SearchComponent'
 import { Capability } from '@/features/auth/capabilities'
 import { useCan } from '@/features/auth/hooks/useCan'
+import { useAuthStore } from '@/features/auth/store'
 import AddStaffFromDeskModal from './components/AddStaffFromDeskModal'
 import StaffDeskTable from './components/StaffDeskTable'
 import { getStaffDeskList, getStaffDeskStats } from './services'
-import { STAFF_DESK_FILTER_OPTIONS, type StaffDeskQueryParams } from './types'
+import {
+  manageableStaffDeskRoles,
+  STAFF_DESK_FILTER_OPTIONS,
+  type StaffDeskQueryParams,
+} from './types'
 import { STAFF_DESK_QUERY_KEY } from './utils'
 
 const Staff = () => {
   const navigate = useNavigate()
+  const viewerRole = useAuthStore((state) => state.user?.role)
   const canManageStaff = useCan(Capability.STAFF_MANAGE)
+  const teachersOnly = viewerRole === 'staff'
+  const roleOptions = useMemo(() => manageableStaffDeskRoles(viewerRole), [viewerRole])
+
   const [search, setSearch] = useState('')
   const [role, setRole] = useState<FilterSelection>('')
   const [page, setPage] = useState(1)
@@ -27,9 +36,13 @@ const Staff = () => {
     () => ({
       page,
       search: search || undefined,
-      role: role === '' ? undefined : String(role),
+      role: teachersOnly
+        ? 'teacher'
+        : role === ''
+          ? undefined
+          : String(role),
     }),
-    [page, search, role],
+    [page, search, role, teachersOnly],
   )
 
   const { data, isLoading } = useQuery({
@@ -43,53 +56,64 @@ const Staff = () => {
   })
 
   const openAdd = () => setAddOpen(true)
+  const pageTitle = teachersOnly ? 'Teachers' : 'Staff'
+  const addLabel = teachersOnly ? 'Add Teacher' : 'Add Staff'
 
   return (
     <div className="space-y-6">
-      <ActionBar title="Staff">
+      <ActionBar title={pageTitle}>
         <SearchComponent
           value={search}
-          placeholder="Search staff..."
+          placeholder={teachersOnly ? 'Search teachers...' : 'Search staff...'}
           onChange={(value) => {
             setSearch(value)
             setPage(1)
           }}
         />
-        <FilterComponent
-          filterName="Role"
-          filterKey="role"
-          options={[...STAFF_DESK_FILTER_OPTIONS]}
-          value={role}
-          placeholder="All Roles"
-          onChange={(value) => {
-            setRole(value)
-            setPage(1)
-          }}
-        />
+        {!teachersOnly ? (
+          <FilterComponent
+            filterName="Role"
+            filterKey="role"
+            options={[...STAFF_DESK_FILTER_OPTIONS]}
+            value={role}
+            placeholder="All Roles"
+            onChange={(value) => {
+              setRole(value)
+              setPage(1)
+            }}
+          />
+        ) : null}
         {canManageStaff ? (
           <Button type="button" className="py-2 text-sm max-w-fit" onClick={openAdd}>
             <Icon
               icon="hugeicons:plus-sign"
               className="size-4 bg-white text-black rounded-full p-0.5"
             />
-            Add Staff
+            {addLabel}
           </Button>
         ) : null}
       </ActionBar>
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
-        <StatsCard title="Total" value={String(stats?.total_staff ?? 0)} />
-        <StatsCard title="Teachers" value={String(stats?.teachers ?? 0)} />
-        <StatsCard title="Staff" value={String(stats?.staff ?? 0)} />
-        <StatsCard title="Accountants" value={String(stats?.accountants ?? 0)} />
-        <StatsCard title="Admins" value={String(stats?.admins ?? 0)} />
-      </div>
+      {teachersOnly ? (
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+          <StatsCard title="Teachers" value={String(stats?.teachers ?? stats?.total_staff ?? 0)} />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+          <StatsCard title="Total" value={String(stats?.total_staff ?? 0)} />
+          <StatsCard title="Teachers" value={String(stats?.teachers ?? 0)} />
+          <StatsCard title="Staff" value={String(stats?.staff ?? 0)} />
+          <StatsCard title="Accountants" value={String(stats?.accountants ?? 0)} />
+          <StatsCard title="Admins" value={String(stats?.admins ?? 0)} />
+        </div>
+      )}
 
       <StaffDeskTable
         rows={data?.results ?? []}
         isLoading={isLoading}
         pagination={data ?? null}
         onPageChange={setPage}
+        teachersOnly={teachersOnly}
         onAddStaff={canManageStaff ? openAdd : undefined}
         onViewStaff={(row) => {
           navigate(`/staff/${row.id}`)
@@ -97,7 +121,11 @@ const Staff = () => {
       />
 
       {canManageStaff ? (
-        <AddStaffFromDeskModal open={addOpen} onClose={() => setAddOpen(false)} />
+        <AddStaffFromDeskModal
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          roleOptions={roleOptions}
+        />
       ) : null}
     </div>
   )

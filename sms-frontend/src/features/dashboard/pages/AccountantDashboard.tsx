@@ -13,10 +13,12 @@ import {
 import { getApiErrorMessage } from '@/utils'
 import FeePrepNotice from '../components/FeePrepNotice'
 import OverviewCard from '../components/OverviewCard'
+import RecentActivitiesCard from '../components/RecentActivitiesCard'
 import TopDebtorsCard from '../components/TopDebtorsCard'
 import WelcomeBanner from '../components/WelcomeBanner'
+import { getRecentActivities } from '../services'
 import type { AdminDashboardTopDebtor, OverviewMetric } from '../types'
-import { formatDashboardCount } from '../utils'
+import { formatDashboardCount, RECENT_ACTIVITIES_QUERY_KEY } from '../utils'
 
 const AccountantDashboard = () => {
   const firstName = useAuthStore((state) => state.user?.first_name ?? '')
@@ -29,6 +31,11 @@ const AccountantDashboard = () => {
   const { data: debtorsPage } = useQuery({
     queryKey: [FEE_DESK_QUERY_KEY, 'dashboard-debtors'],
     queryFn: () => getFeeDeskList({ debtors: true, page: 1, page_size: 5 }),
+  })
+
+  const { data: activities = [], isLoading: activitiesLoading } = useQuery({
+    queryKey: [RECENT_ACTIVITIES_QUERY_KEY],
+    queryFn: getRecentActivities,
   })
 
   const feesMetrics: OverviewMetric[] = [
@@ -106,8 +113,9 @@ const AccountantDashboard = () => {
         </Link>
       </div>
 
-      <div className="mt-6 max-w-xl">
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <TopDebtorsCard debtors={topDebtors} />
+        <RecentActivitiesCard activities={activities} isLoading={activitiesLoading} />
       </div>
     </div>
   )

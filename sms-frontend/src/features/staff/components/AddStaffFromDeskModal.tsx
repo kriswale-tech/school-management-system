@@ -1,33 +1,51 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Modal, SelectField, Button, FormLabel } from '@/components/ui'
 import AddStaffUserModal from './AddStaffUserModal'
+import type { StaffDeskRoleOption } from '../types'
 import { STAFF_DESK_ROLE_OPTIONS } from '../types'
 import { formatStaffRole, STAFF_DESK_QUERY_KEY } from '../utils'
 
 type AddStaffFromDeskModalProps = {
   open: boolean
   onClose: () => void
+  /** Roles the viewer may add. Defaults to the full admin set. */
+  roleOptions?: StaffDeskRoleOption[]
 }
 
 /**
- * Two-step add flow for the staff directory: pick a role, then reuse the
- * shared AddStaffUserModal form (same as setup teachers/staff).
+ * Add flow for the staff directory. With one manageable role (e.g. staff →
+ * teacher), skips the role picker and opens the form directly.
  */
-const AddStaffFromDeskModal = ({ open, onClose }: AddStaffFromDeskModalProps) => {
+const AddStaffFromDeskModal = ({
+  open,
+  onClose,
+  roleOptions = [...STAFF_DESK_ROLE_OPTIONS],
+}: AddStaffFromDeskModalProps) => {
+  const singleRole = roleOptions.length === 1 ? roleOptions[0] : null
   const [role, setRole] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [sessionKey, setSessionKey] = useState(0)
 
-  const selectedOption = STAFF_DESK_ROLE_OPTIONS.find((option) => option.value === role)
+  useEffect(() => {
+    if (!open) {
+      setRole('')
+      setFormOpen(false)
+      return
+    }
+    if (singleRole) {
+      setRole(singleRole.value)
+      setSessionKey((value) => value + 1)
+      setFormOpen(true)
+    }
+  }, [open, singleRole?.value])
+
+  const selectedOption =
+    roleOptions.find((option) => option.value === role) ?? singleRole
   const roleLabel = selectedOption?.label ?? formatStaffRole(role)
 
-  const reset = () => {
+  const handleCloseAll = () => {
     setRole('')
     setFormOpen(false)
-  }
-
-  const handleCloseAll = () => {
-    reset()
     onClose()
   }
 
@@ -37,10 +55,13 @@ const AddStaffFromDeskModal = ({ open, onClose }: AddStaffFromDeskModalProps) =>
     setFormOpen(true)
   }
 
+  const showRolePicker = open && !formOpen && !singleRole
+  const showForm = open && formOpen && Boolean(selectedOption)
+
   return (
     <>
       <Modal
-        open={open && !formOpen}
+        open={showRolePicker}
         title="Add Staff"
         onClose={handleCloseAll}
         className="max-w-md"
@@ -49,7 +70,7 @@ const AddStaffFromDeskModal = ({ open, onClose }: AddStaffFromDeskModalProps) =>
           <div className="space-y-2">
             <FormLabel label="Role" className="font-normal text-base" required />
             <SelectField
-              options={[...STAFF_DESK_ROLE_OPTIONS]}
+              options={[...roleOptions]}
               value={role}
               onChange={setRole}
               placeholder="Select a role"
@@ -72,7 +93,7 @@ const AddStaffFromDeskModal = ({ open, onClose }: AddStaffFromDeskModalProps) =>
 
       {selectedOption ? (
         <AddStaffUserModal
-          open={formOpen}
+          open={showForm}
           onClose={handleCloseAll}
           sessionKey={sessionKey}
           role={selectedOption.value}

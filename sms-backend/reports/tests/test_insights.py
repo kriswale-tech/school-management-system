@@ -378,3 +378,74 @@ class ReportsInsightsApiTests(APITestCase):
         self.assertGreater(len(response.data['subject_trends']), 0)
         self.assertEqual(len(response.data['all_time_ranking']), 1)
         self.assertEqual(response.data['all_time_ranking'][0]['rank'], 1)
+
+    def test_enrollment_leaving_this_year_uses_final_class_name(self):
+        jhs3 = ClassLevel.objects.create(
+            school=self.school,
+            level=self.level,
+            name='JHS 3',
+            order=3,
+            is_system_generated=False,
+        )
+        jhs3_stream = ensure_default_stream(jhs3)
+        leaver = create_student(
+            school=self.school,
+            first_name='Kojo',
+            last_name='Mensah',
+            student_id='SMS-LEAVE-1',
+        )
+        enroll_student(student=leaver, term=self.term, stream=jhs3_stream)
+
+        set_client_auth_cookies(self.client, self.admin)
+        response = self.client.get(reverse('reports-enrollment'))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['leaving_this_year_class_name'], 'JHS 3')
+        self.assertEqual(response.data['leaving_this_year_count'], 1)
+        self.assertIsNone(response.data['graduated_count'])
+        self.assertIsNone(response.data['graduated_class_name'])
+
+    def test_enrollment_graduated_names_previous_class(self):
+        previous_year = AcademicYear.objects.create(
+            school=self.school,
+            academic_year='2024/2025',
+            start_date=date(2024, 9, 1),
+            end_date=date(2025, 7, 31),
+            is_active=False,
+        )
+        previous_term = Term.objects.create(
+            school=self.school,
+            academic_year=previous_year,
+            term=Term.TermChoices.THIRD_TERM,
+            start_date=date(2025, 4, 1),
+            end_date=date(2025, 7, 31),
+            is_active=False,
+        )
+        jhs3 = ClassLevel.objects.create(
+            school=self.school,
+            level=self.level,
+            name='JHS 3',
+            order=3,
+            is_system_generated=False,
+        )
+        jhs3_stream = ensure_default_stream(jhs3)
+        graduate = create_student(
+            school=self.school,
+            first_name='Ama',
+            last_name='Serwaa',
+            student_id='SMS-GRAD-1',
+        )
+        enroll_student(student=graduate, term=previous_term, stream=jhs3_stream)
+        graduate.is_graduated = True
+        graduate.save(update_fields=['is_graduated', 'updated_at'])
+
+        set_client_auth_cookies(self.client, self.admin)
+        response = self.client.get(
+            reverse('reports-enrollment'),
+            {'term_id': str(self.term.id)},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['graduated_count'], 1)
+        self.assertEqual(response.data['graduated_class_name'], 'JHS 3')
+        self.assertEqual(response.data['leaving_this_year_class_name'], 'JHS 3')

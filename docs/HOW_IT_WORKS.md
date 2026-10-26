@@ -95,7 +95,7 @@ Logged-in users with a finished school use the sidebar:
 
 The year list is the school’s own years, not a generated dropdown. Past years are view-only. **Add** the next year saves its three term dates and leaves the current term in place, so fees and assessment settings can be prepared against it first. Saving a year here does not advance setup and does not turn that year on.
 
-**Open transition** places pupils on the next term, marks leavers graduated, copies teachers, applies the next fee list, and makes that term current. It is also in the navbar from 7 days before the current term ends. Detail: [term-transition.md](./term-transition.md).
+**Open transition** places pupils on the next term, marks leavers graduated, copies teachers, applies the next fee list, and makes that term current. It is also in the navbar from 7 days before the current term ends. Detail: [term-transition.md](./term-transition.md) (BECE / final-year exam special-casing is deferred).
 
 The navbar bell reads the same alert rules: outstanding fees, unreleased results, and new enrollments, limited to what that role should see. Alerts also hold the switch for the dashboard popup that reminds an admin to open the next term.
 
@@ -262,7 +262,7 @@ Page-level line/button tabs keep the active section in the query string (`replac
 | Surface | Param | Values |
 | --- | --- | --- |
 | Settings | path `/settings/:tab` | `school-profile`, `academic-year`, `alerts`, `fees`, `assessments`, `classes` |
-| Reports | `?tab=` | `overview`, `finance`, `academic`, `enrollment`, `teachers`, `my-classes`, `my-subjects` |
+| Reports | `?tab=` | `overview`, `finance`, `academic`, `enrollment`, `teachers`, `activity`, `my-classes`, `my-subjects` |
 | Classes list | `?tab=` (+ optional `attention`) | `classes`, `subjects` |
 | Teacher classes workspace | `?tab=` | `managed`, `subject` |
 | Class detail | `?tab=` | `students` (default/cleared), `subjects`, `performance` |

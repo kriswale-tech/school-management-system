@@ -76,6 +76,20 @@ Marks and bills already recorded stay on the term you leave.
 
 The student profile shows **Graduated**. An admin can **Clear graduation** (`POST /api/v1/students/<student_id>/clear-graduation/`). That only clears the flag. It does not enroll them. A graduated student cannot be enrolled until it is cleared.
 
+Leavers are identified by the **last active class** the school offers (curriculum order), not by a separate graduation type. A full basic school typically graduates **JHS 3**; a primary-only school graduates **Primary 6**. Enrollment insights label that class by name (“Leaving this year” / “Graduated” from that class).
+
+## Final-year assessments / BECE (deferred)
+
+**Decision (2026-10-26):** leave Term 3 assessment behaviour as-is until real schools use the product. Do **not** yet special-case JHS 3 (skip school exam / release on CA + comments only) or build BECE mark entry.
+
+Why:
+
+- In Ghana, JHS 3 sits **BECE in Term 3**; school promotional exams are not what places them into SHS. Continuous assessment still feeds BECE. Primary 6 in a primary-only school usually still takes normal end-of-term work — different rule.
+- Graduation and year-end transition already work without that special case. Unreleased reports on the current term are a **warning** (acknowledge), not a hard block on opening the next term.
+- Shipping “final year = no school exam” now would guess school habits before anyone has pushed back in the product.
+
+When revisiting, prefer a light rule: optional school exam for the last class in Term 3 (or a school toggle), not a full WAEC/BECE workflow. Until then, keep everyone on the normal CA + exam → release path.
+
 ## Checklist behind the popup
 
 `GET /api/v1/schools/transition/` is admin-only. While the window is open it reports:

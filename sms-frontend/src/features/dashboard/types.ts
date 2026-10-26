@@ -136,6 +136,30 @@ export type TeacherDashboard = {
   activities: ActivityItem[]
 }
 
+export type StaffDashboard = {
+  term_id: string | null
+  term_label: string | null
+  show_academic_widgets: boolean
+  school_overview: {
+    total_students: number
+    total_classes: number
+    teachers_count: number
+  }
+  academic_overview: {
+    reports_ready: number
+    pending_reports: number
+    released_reports: number
+    needs_correction: number
+  }
+  coverage_overview: {
+    unassigned_classes: number
+    unassigned_subjects: number
+    empty_classes: number
+  }
+  needs_attention: AdminDashboardNeedsAttentionItem[]
+  activities: ActivityItem[]
+}
+
 export type ActivityItem = {
   id: string
   verb: string
