@@ -148,12 +148,29 @@ export type FeeStructure = {
   is_editable: boolean
   is_locked: boolean
   term_ended: boolean
+  can_publish: boolean
   can_apply: boolean
+  can_copy_from_previous: boolean
   item_count: number
   term_id: string
   term_name: string
   academic_year: string
   applied_at: string | null
+}
+
+export type NextTermFeePrep = {
+  visible: boolean
+  done: boolean
+  urgency: 'amber' | 'red' | null
+  days_remaining: number | null
+  term_ends_on: string | null
+  current_term_label: string | null
+  next_term_id: string | null
+  next_term_label: string | null
+  fee_status: string | null
+  item_count: number
+  summary: string
+  href: string
 }
 
 export type FeeStructureItem = {

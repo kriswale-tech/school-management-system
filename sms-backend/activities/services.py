@@ -15,6 +15,7 @@ CLASS_WIDE_VERBS = (
 FEE_VERBS = (
     Activity.Verb.PAYMENT_RECORDED,
     Activity.Verb.ADVANCE_CREATED,
+    Activity.Verb.FEE_STRUCTURE_PUBLISHED,
     Activity.Verb.FEE_STRUCTURE_APPLIED,
 )
 

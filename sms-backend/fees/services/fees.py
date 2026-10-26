@@ -99,16 +99,92 @@ def get_or_create_fee_structure(*, school, term, created_by):
 
 
 @transaction.atomic
-def publish_fee_structure(fee_structure):
+def publish_fee_structure(fee_structure, *, actor=None):
     if fee_structure.is_locked:
         raise ValidationError('Applied fee structures cannot be published again.')
+    if fee_structure.status == FeeStructure.Status.PUBLISHED:
+        return fee_structure
     if not fee_structure.fee_items.exists():
         raise ValidationError('Add at least one fee item before publishing.')
 
     fee_structure.status = FeeStructure.Status.PUBLISHED
     fee_structure.published_at = timezone.now()
     fee_structure.save(update_fields=['status', 'published_at', 'updated_at'])
+
+    from activities.models import Activity
+    from activities.services import record_activity
+
+    term = fee_structure.term
+    record_activity(
+        school=fee_structure.school,
+        actor=actor or fee_structure.created_by,
+        verb=Activity.Verb.FEE_STRUCTURE_PUBLISHED,
+        summary=(
+            f'Fee structure published for {term.academic_year.academic_year} '
+            f'{term.get_term_display()}.'
+        ),
+        href=f'/fees/settings?term={term.id}',
+        term=term,
+        target_kind='fee_structure',
+        target_id=fee_structure.id,
+    )
     return fee_structure
+
+
+@transaction.atomic
+def copy_fee_items_from_previous(*, school, term, created_by):
+    """Copy items from the previous term into an empty catalog for ``term``.
+
+    Creates the target structure if needed. Refuses when the target already
+    has items or is locked.
+    """
+    previous_term = _previous_term(term)
+    if previous_term is None:
+        raise ValidationError({
+            'term': 'No previous term exists to copy fees from.',
+        })
+
+    source = (
+        FeeStructure.objects.filter(school=school, term=previous_term)
+        .prefetch_related('fee_items')
+        .first()
+    )
+    if source is None or not source.fee_items.exists():
+        raise ValidationError({
+            'term': 'Previous term has no fee items to copy.',
+        })
+
+    structure = FeeStructure.objects.filter(school=school, term=term).first()
+    if structure is None:
+        structure = FeeStructure.objects.create(
+            school=school,
+            term=term,
+            status=FeeStructure.Status.CARRIED_FORWARD,
+            created_by=created_by,
+        )
+    else:
+        if structure.is_locked:
+            raise ValidationError('Fee items cannot be changed after the structure is applied.')
+        if structure.fee_items.exists():
+            raise ValidationError({
+                'term': 'This term already has fee items. Remove them before copying.',
+            })
+        structure.status = FeeStructure.Status.CARRIED_FORWARD
+        structure.save(update_fields=['status', 'updated_at'])
+
+    FeeItem.objects.bulk_create([
+        FeeItem(
+            fee_structure=structure,
+            name=item.name,
+            amount=item.amount,
+            description=item.description,
+            applies_to_type=item.applies_to_type,
+            applies_to_id=item.applies_to_id,
+            student_type=item.student_type,
+        )
+        for item in source.fee_items.all()
+    ])
+    return structure
 
 
 def _student_fee_rows_for_enrollment(enrollment, fee_structure, fee_items):

@@ -4,6 +4,8 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from accounts.capabilities import Capability
+from accounts.permissions import HasActiveSchool, HasCapability, IsAdmin
 from core.pagination import StandardResultsSetPagination, paginated_schema
 from fees.serializers import (
     CreateFeeStructureItemSerializer,
@@ -12,6 +14,7 @@ from fees.serializers import (
     FeeDeskStatsSerializer,
     FeeItemSettingsSerializer,
     FeeStructureDetailSerializer,
+    NextTermFeePrepSerializer,
     RecordPaymentResponseSerializer,
     RecordPaymentSerializer,
     StudentPaymentTargetSerializer,
@@ -24,11 +27,14 @@ from fees.services.desk import (
     resolve_fee_desk_term,
 )
 from fees.services.payments import build_student_payment_target, record_student_payment
+from fees.services.prep import next_term_fee_prep_status
 from fees.services.settings import (
     apply_structure,
+    copy_structure_from_previous,
     create_fee_item,
     delete_fee_item,
     get_fee_structure_detail,
+    publish_structure,
     update_fee_item,
 )
 from shared.views import SchoolScopedAPIView
@@ -281,17 +287,100 @@ class FeeStructureItemDetailView(SchoolScopedAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class ApplyFeeStructureView(SchoolScopedAPIView):
+class PublishFeeStructureView(SchoolScopedAPIView):
+    required_capability = Capability.FEES_MANAGE_SETTINGS
+    permission_classes = [HasActiveSchool, HasCapability]
+
     @extend_schema(
         tags=['Fees'],
-        summary='Apply a fee structure',
+        summary='Publish a fee structure',
         description=(
-            'Publishes a draft if needed, then bills currently enrolled students '
-            'and locks the catalog for that term. Later enrollments are billed automatically.'
+            'Marks the catalog as published so amounts are ready. Applying and locking '
+            'still happens when an admin opens the next term (or uses Apply).'
         ),
         request=None,
         responses={200: FeeStructureDetailSerializer},
     )
     def post(self, request, structure_id):
-        data = apply_structure(school=self.school, structure_id=structure_id)
+        data = publish_structure(
+            school=self.school,
+            structure_id=structure_id,
+            actor=request.user,
+        )
         return Response(FeeStructureDetailSerializer(data).data)
+
+
+class CopyFeeStructureFromPreviousView(SchoolScopedAPIView):
+    required_capability = Capability.FEES_MANAGE_SETTINGS
+    permission_classes = [HasActiveSchool, HasCapability]
+
+    @extend_schema(
+        tags=['Fees'],
+        summary='Copy fee items from the previous term',
+        description=(
+            'Copies fee items from the previous term into an empty catalog for the '
+            'selected term. Fails if the target already has items.'
+        ),
+        parameters=[
+            OpenApiParameter(
+                name='term',
+                type=str,
+                required=True,
+                description='Term UUID to receive the copied items.',
+            ),
+        ],
+        request=None,
+        responses={200: FeeStructureDetailSerializer},
+    )
+    def post(self, request):
+        term_id = request.query_params.get('term') or request.data.get('term')
+        if not term_id:
+            raise ValidationError({'term': 'Term is required.'})
+        data = copy_structure_from_previous(
+            school=self.school,
+            term_id=term_id,
+            created_by=request.user,
+        )
+        return Response(FeeStructureDetailSerializer(data).data)
+
+
+class ApplyFeeStructureView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, IsAdmin]
+
+    @extend_schema(
+        tags=['Fees'],
+        summary='Apply a fee structure',
+        description=(
+            'Publishes a draft if needed, then bills currently enrolled students '
+            'and locks the catalog for that term. Later enrollments are billed automatically. '
+            'Admin only — accountants publish; applying usually happens when opening the next term.'
+        ),
+        request=None,
+        responses={200: FeeStructureDetailSerializer},
+    )
+    def post(self, request, structure_id):
+        data = apply_structure(
+            school=self.school,
+            structure_id=structure_id,
+            actor=request.user,
+        )
+        return Response(FeeStructureDetailSerializer(data).data)
+
+
+class NextTermFeePrepView(SchoolScopedAPIView):
+    required_capability = Capability.FEES_MANAGE_SETTINGS
+    permission_classes = [HasActiveSchool, HasCapability]
+
+    @extend_schema(
+        tags=['Fees'],
+        summary='Next-term fee preparation status',
+        description=(
+            'Lead-window status for preparing the next term’s fee catalog. '
+            'Visible from 7 days before the current term ends until the next catalog '
+            'is published (or applied).'
+        ),
+        responses={200: NextTermFeePrepSerializer},
+    )
+    def get(self, request):
+        data = next_term_fee_prep_status(self.school)
+        return Response(NextTermFeePrepSerializer(data).data)

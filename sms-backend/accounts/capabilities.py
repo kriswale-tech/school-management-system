@@ -35,8 +35,7 @@ class Capability:
     REPORTS_VIEW = 'reports.view'
 
 
-# Full school operators (admin today; staff/accountant keep full access until
-# their packs are tightened in a later phase).
+# Admin — full school operator.
 SCHOOL_WIDE_CAPABILITIES = frozenset({
     Capability.NAV_DASHBOARD,
     Capability.NAV_STUDENTS,
@@ -57,6 +56,41 @@ SCHOOL_WIDE_CAPABILITIES = frozenset({
     Capability.FEES_VIEW,
     Capability.FEES_RECORD_PAYMENT,
     Capability.FEES_MANAGE_SETTINGS,
+    Capability.STAFF_VIEW,
+    Capability.STAFF_MANAGE,
+    Capability.REPORTS_VIEW,
+})
+
+# Accountant — finance desk: students/classes read-only for billing context.
+ACCOUNTANT_CAPABILITIES = frozenset({
+    Capability.NAV_DASHBOARD,
+    Capability.NAV_STUDENTS,
+    Capability.NAV_CLASSES,
+    Capability.NAV_FEES,
+    Capability.NAV_REPORTS,
+    Capability.CLASSES_VIEW,
+    Capability.STUDENTS_VIEW,
+    Capability.FEES_VIEW,
+    Capability.FEES_RECORD_PAYMENT,
+    Capability.FEES_MANAGE_SETTINGS,
+    Capability.REPORTS_VIEW,
+})
+
+# Staff — clerical + academics helper; no fees.
+STAFF_CAPABILITIES = frozenset({
+    Capability.NAV_DASHBOARD,
+    Capability.NAV_STUDENTS,
+    Capability.NAV_CLASSES,
+    Capability.NAV_ASSESSMENTS,
+    Capability.NAV_STAFF,
+    Capability.NAV_REPORTS,
+    Capability.CLASSES_VIEW,
+    Capability.STUDENTS_VIEW,
+    Capability.STUDENTS_CREATE,
+    Capability.STUDENTS_MARK_LEFT,
+    Capability.ASSESSMENTS_RECORD,
+    Capability.ASSESSMENTS_APPROVE,
+    Capability.ASSESSMENTS_RELEASE,
     Capability.STAFF_VIEW,
     Capability.STAFF_MANAGE,
     Capability.REPORTS_VIEW,

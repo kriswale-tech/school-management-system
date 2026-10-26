@@ -7,6 +7,7 @@ export const FEE_DESK_QUERY_KEY = 'fee-desk' as const
 export const FEE_DESK_STATS_QUERY_KEY = 'fee-desk-stats' as const
 export const FEE_DESK_FILTERS_QUERY_KEY = 'fee-desk-filters' as const
 export const FEE_STRUCTURE_QUERY_KEY = 'fee-structure' as const
+export const FEE_NEXT_TERM_PREP_QUERY_KEY = 'fee-next-term-prep' as const
 export const STUDENT_PAYMENT_TARGET_QUERY_KEY = 'student-payment-target' as const
 
 export const PAYMENT_METHOD_OPTIONS = [

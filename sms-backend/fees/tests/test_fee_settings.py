@@ -6,7 +6,9 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from academics.models import ClassLevel, Level
+from accounts.models import User
 from accounts.tests.factories import create_user, set_client_auth_cookies, user_school
+from activities.models import Activity
 from fees.models import FeeItem, FeeStructure, StudentFee
 from fees.services import apply_fee_structure, publish_fee_structure
 from schools.models import AcademicYear, Term
@@ -233,3 +235,103 @@ class FeeSettingsViewTests(APITestCase):
         self.assertTrue(by_id[str(self.past_term.id)]['has_fee_structure'])
         self.assertFalse(by_id[str(self.future_term.id)]['is_ended'])
         self.assertFalse(by_id[str(self.future_term.id)]['has_fee_structure'])
+
+    def test_publish_marks_catalog_ready_without_billing(self):
+        structure = FeeStructure.objects.create(
+            school=self.school,
+            term=self.future_term,
+            created_by=self.user,
+        )
+        FeeItem.objects.create(
+            fee_structure=structure,
+            name='Tuition Fee',
+            amount=Decimal('800.00'),
+            applies_to_type=FeeItem.AppliesToType.SCHOOL,
+            student_type=FeeItem.StudentType.ALL_STUDENTS,
+        )
+
+        response = self.client.post(
+            reverse('fee-structure-publish', kwargs={'structure_id': structure.id}),
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['fee_structure']['status'], 'published')
+        self.assertFalse(response.data['fee_structure']['is_locked'])
+        self.assertEqual(StudentFee.objects.count(), 0)
+        self.assertTrue(
+            Activity.objects.filter(
+                school=self.school,
+                verb=Activity.Verb.FEE_STRUCTURE_PUBLISHED,
+            ).exists()
+        )
+
+    def test_copy_from_previous_fills_empty_catalog(self):
+        source = FeeStructure.objects.create(
+            school=self.school,
+            term=self.current_term,
+            created_by=self.user,
+        )
+        FeeItem.objects.create(
+            fee_structure=source,
+            name='Tuition Fee',
+            amount=Decimal('500.00'),
+            applies_to_type=FeeItem.AppliesToType.SCHOOL,
+            student_type=FeeItem.StudentType.ALL_STUDENTS,
+        )
+        FeeStructure.objects.create(
+            school=self.school,
+            term=self.future_term,
+            created_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse('fee-structure-copy-from-previous'),
+            {'term': str(self.future_term.id)},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['fee_items']), 1)
+        self.assertEqual(response.data['fee_items'][0]['name'], 'Tuition Fee')
+        self.assertTrue(response.data['fee_structure']['can_publish'])
+
+    def test_accountant_can_publish_but_not_apply(self):
+        accountant = create_user(
+            is_active=True,
+            phone_number='+233200000099',
+            email='accountant-fees@test.com',
+            school=self.school,
+            role=User.RoleChoices.ACCOUNTANT,
+        )
+        structure = FeeStructure.objects.create(
+            school=self.school,
+            term=self.current_term,
+            created_by=self.user,
+        )
+        FeeItem.objects.create(
+            fee_structure=structure,
+            name='Tuition Fee',
+            amount=Decimal('500.00'),
+            applies_to_type=FeeItem.AppliesToType.SCHOOL,
+            student_type=FeeItem.StudentType.ALL_STUDENTS,
+        )
+
+        set_client_auth_cookies(self.client, accountant)
+        publish = self.client.post(
+            reverse('fee-structure-publish', kwargs={'structure_id': structure.id}),
+        )
+        self.assertEqual(publish.status_code, status.HTTP_200_OK)
+
+        apply = self.client.post(
+            reverse('fee-structure-apply', kwargs={'structure_id': structure.id}),
+        )
+        self.assertEqual(apply.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_next_term_prep_visible_in_lead_window(self):
+        self.current_term.end_date = date.today() + timedelta(days=3)
+        self.current_term.save(update_fields=['end_date'])
+
+        response = self.client.get(reverse('fee-next-term-prep'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['visible'])
+        self.assertFalse(response.data['done'])
+        self.assertEqual(response.data['next_term_id'], str(self.future_term.id))
+        self.assertIn(response.data['fee_status'], {'missing', 'empty'})

@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import ActionBar from '@/components/shared/ActionBar'
 import { TabComponent } from '@/components/shared'
 import FilterComponent, { type FilterSelection } from '@/components/ui/FilterComponent'
-import { useAccess } from '@/features/auth/hooks'
+import { Capability } from '@/features/auth/capabilities'
+import { useAccess, useCan } from '@/features/auth/hooks'
 import { getApiErrorMessage } from '@/utils'
 import AcademicTab from '../components/AcademicTab'
 import EnrollmentTab from '../components/EnrollmentTab'
@@ -48,11 +50,37 @@ const TAB_ACADEMIC = 'Academic'
 const TAB_ENROLLMENT = 'Enrollment'
 const TAB_TEACHERS = 'Teachers'
 
+const TAB_FROM_QUERY: Record<string, string> = {
+  overview: TAB_OVERVIEW,
+  finance: TAB_FINANCE,
+  academic: TAB_ACADEMIC,
+  enrollment: TAB_ENROLLMENT,
+  teachers: TAB_TEACHERS,
+  'my-classes': TAB_MY_CLASSES,
+  'my-subjects': TAB_MY_SUBJECTS,
+}
+
+const QUERY_FROM_TAB: Record<string, string> = {
+  [TAB_OVERVIEW]: 'overview',
+  [TAB_FINANCE]: 'finance',
+  [TAB_ACADEMIC]: 'academic',
+  [TAB_ENROLLMENT]: 'enrollment',
+  [TAB_TEACHERS]: 'teachers',
+  [TAB_MY_CLASSES]: 'my-classes',
+  [TAB_MY_SUBJECTS]: 'my-subjects',
+}
+
 const ReportsPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams()
   const access = useAccess()
   const isTeacherScoped = access.mode === 'scoped'
   const showMyClasses = isTeacherScoped && access.is_class_teacher
   const showMySubjects = isTeacherScoped && access.is_subject_teacher
+  const showFinance = useCan(Capability.NAV_FEES)
+  const showAcademic = useCan(Capability.NAV_ASSESSMENTS)
+  const canCreateStudents = useCan(Capability.STUDENTS_CREATE)
+  const showTeachers = useCan(Capability.NAV_STAFF)
+  const showEnrollment = canCreateStudents || showTeachers
 
   const defaultTeacherTab = showMyClasses
     ? TAB_MY_CLASSES
@@ -60,7 +88,8 @@ const ReportsPage = () => {
       ? TAB_MY_SUBJECTS
       : TAB_ACADEMIC
 
-  const [selectedTab, setSelectedTab] = useState<string | null>(null)
+  const defaultSchoolTab = showFinance && !showAcademic ? TAB_FINANCE : TAB_OVERVIEW
+
   const [termId, setTermId] = useState<FilterSelection>('')
   const [compareTermId, setCompareTermId] = useState<FilterSelection>('')
 
@@ -78,11 +107,40 @@ const ReportsPage = () => {
     return tabs
   }, [showMyClasses, showMySubjects])
 
+  const schoolTabs = useMemo(() => {
+    const tabs = new Set<string>()
+    // Accountant: finance only. Staff/admin: overview + role-relevant tabs.
+    if (!(showFinance && !showAcademic)) {
+      tabs.add(TAB_OVERVIEW)
+    }
+    if (showFinance) tabs.add(TAB_FINANCE)
+    if (showAcademic) tabs.add(TAB_ACADEMIC)
+    if (showEnrollment) tabs.add(TAB_ENROLLMENT)
+    if (showTeachers) tabs.add(TAB_TEACHERS)
+    return tabs
+  }, [showFinance, showAcademic, showEnrollment, showTeachers])
+
+  const tabFromParam = searchParams.get('tab')
+  const selectedTab =
+    tabFromParam && TAB_FROM_QUERY[tabFromParam.toLowerCase()]
+      ? TAB_FROM_QUERY[tabFromParam.toLowerCase()]
+      : null
+
   const activeTab = isTeacherScoped
     ? selectedTab && teacherTabs.has(selectedTab)
       ? selectedTab
       : defaultTeacherTab
-    : (selectedTab ?? TAB_OVERVIEW)
+    : selectedTab && schoolTabs.has(selectedTab)
+      ? selectedTab
+      : defaultSchoolTab
+
+  const selectTab = (label: string) => {
+    const key = QUERY_FROM_TAB[label]
+    if (!key) return
+    const next = new URLSearchParams(searchParams)
+    next.set('tab', key)
+    setSearchParams(next, { replace: true })
+  }
 
   const { data: filterOptions, isLoading: filtersLoading } = useQuery({
     queryKey: [REPORTS_FILTERS_QUERY_KEY],
@@ -237,7 +295,7 @@ const ReportsPage = () => {
               {
                 label: TAB_MY_CLASSES,
                 icon: 'hugeicons:teaching',
-                onClick: () => setSelectedTab(TAB_MY_CLASSES),
+                onClick: () => selectTab(TAB_MY_CLASSES),
               },
             ]
           : []),
@@ -246,42 +304,62 @@ const ReportsPage = () => {
               {
                 label: TAB_MY_SUBJECTS,
                 icon: 'hugeicons:book-open-01',
-                onClick: () => setSelectedTab(TAB_MY_SUBJECTS),
+                onClick: () => selectTab(TAB_MY_SUBJECTS),
               },
             ]
           : []),
         {
           label: TAB_ACADEMIC,
           icon: 'hugeicons:chart-average',
-          onClick: () => setSelectedTab(TAB_ACADEMIC),
+          onClick: () => selectTab(TAB_ACADEMIC),
         },
       ]
     : [
-        {
-          label: TAB_OVERVIEW,
-          icon: 'hugeicons:dashboard-square-02',
-          onClick: () => setSelectedTab(TAB_OVERVIEW),
-        },
-        {
-          label: TAB_FINANCE,
-          icon: 'hugeicons:money-bag-02',
-          onClick: () => setSelectedTab(TAB_FINANCE),
-        },
-        {
-          label: TAB_ACADEMIC,
-          icon: 'hugeicons:chart-average',
-          onClick: () => setSelectedTab(TAB_ACADEMIC),
-        },
-        {
-          label: TAB_ENROLLMENT,
-          icon: 'hugeicons:student',
-          onClick: () => setSelectedTab(TAB_ENROLLMENT),
-        },
-        {
-          label: TAB_TEACHERS,
-          icon: 'hugeicons:teaching',
-          onClick: () => setSelectedTab(TAB_TEACHERS),
-        },
+        ...(schoolTabs.has(TAB_OVERVIEW)
+          ? [
+              {
+                label: TAB_OVERVIEW,
+                icon: 'hugeicons:dashboard-square-02',
+                onClick: () => selectTab(TAB_OVERVIEW),
+              },
+            ]
+          : []),
+        ...(showFinance
+          ? [
+              {
+                label: TAB_FINANCE,
+                icon: 'hugeicons:money-bag-02',
+                onClick: () => selectTab(TAB_FINANCE),
+              },
+            ]
+          : []),
+        ...(showAcademic
+          ? [
+              {
+                label: TAB_ACADEMIC,
+                icon: 'hugeicons:chart-average',
+                onClick: () => selectTab(TAB_ACADEMIC),
+              },
+            ]
+          : []),
+        ...(showEnrollment
+          ? [
+              {
+                label: TAB_ENROLLMENT,
+                icon: 'hugeicons:student',
+                onClick: () => selectTab(TAB_ENROLLMENT),
+              },
+            ]
+          : []),
+        ...(showTeachers
+          ? [
+              {
+                label: TAB_TEACHERS,
+                icon: 'hugeicons:teaching',
+                onClick: () => selectTab(TAB_TEACHERS),
+              },
+            ]
+          : []),
       ]
 
   return (
@@ -336,6 +414,7 @@ const ReportsPage = () => {
           workflowLevelId={workflowLevelId}
           onWorkflowLevelChange={setWorkflowLevelId}
           showSchoolPanels
+          showFeesRisk={showFinance}
         />
       ) : null}
 

@@ -8,7 +8,7 @@ import { getApiErrorMessage } from '@/utils'
 import { Icon } from '@iconify/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import AssignClassTeacher from '../components/AssignClassTeacher'
 import ClassStudentsTable from '../components/ClassStudentsTable'
 import ClassSubjectsTable from '../components/ClassSubjectsTable'
@@ -23,12 +23,36 @@ const TAB_STUDENTS = 'Students'
 const TAB_SUBJECTS = 'Subjects'
 const TAB_PERFORMANCE = 'Performance'
 
+const TAB_FROM_QUERY: Record<string, string> = {
+  students: TAB_STUDENTS,
+  subjects: TAB_SUBJECTS,
+  performance: TAB_PERFORMANCE,
+}
+
+const QUERY_FROM_TAB: Record<string, string> = {
+  [TAB_STUDENTS]: 'students',
+  [TAB_SUBJECTS]: 'subjects',
+  [TAB_PERFORMANCE]: 'performance',
+}
+
 const ClassDetail = () => {
   const { id: streamId } = useParams<{ id: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const canManageClasses = useCan(Capability.CLASSES_MANAGE)
-  const [activeTab, setActiveTab] = useState(TAB_STUDENTS)
+  const tabParam = searchParams.get('tab')
+  const activeTab =
+    (tabParam && TAB_FROM_QUERY[tabParam.toLowerCase()]) || TAB_STUDENTS
   const [assignClassTeacherOpen, setAssignClassTeacherOpen] = useState(false)
+
+  const selectTab = (label: string) => {
+    const key = QUERY_FROM_TAB[label]
+    if (!key) return
+    const next = new URLSearchParams(searchParams)
+    if (key === 'students') next.delete('tab')
+    else next.set('tab', key)
+    setSearchParams(next, { replace: true })
+  }
 
   const {
     data: classDetail,
@@ -67,16 +91,16 @@ const ClassDetail = () => {
   const tabs = [
     {
       label: TAB_STUDENTS,
-      onClick: () => setActiveTab(TAB_STUDENTS),
+      onClick: () => selectTab(TAB_STUDENTS),
     },
     {
       label: TAB_SUBJECTS,
-      onClick: () => setActiveTab(TAB_SUBJECTS),
+      onClick: () => selectTab(TAB_SUBJECTS),
       attention: Boolean(classDetail?.needs_attention),
     },
     {
       label: TAB_PERFORMANCE,
-      onClick: () => setActiveTab(TAB_PERFORMANCE),
+      onClick: () => selectTab(TAB_PERFORMANCE),
     },
   ]
 

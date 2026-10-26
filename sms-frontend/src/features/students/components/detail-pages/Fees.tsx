@@ -1,6 +1,7 @@
 import { Icon } from '@iconify/react'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ButtonTabComponent } from '@/components/shared'
 import { Button } from '@/components/ui'
 import FilterComponent, { type FilterSelection } from '@/components/ui/FilterComponent'
@@ -21,14 +22,37 @@ import PaymentHistoryTable from '../PaymentHistoryTable'
 const TAB_BREAKDOWN = 'Fees Breakdown'
 const TAB_HISTORY = 'Payment History'
 
+const TAB_FROM_QUERY: Record<string, string> = {
+  breakdown: TAB_BREAKDOWN,
+  history: TAB_HISTORY,
+}
+
+const QUERY_FROM_TAB: Record<string, string> = {
+  [TAB_BREAKDOWN]: 'breakdown',
+  [TAB_HISTORY]: 'history',
+}
+
 type FeesProps = {
   studentId: string
 }
 
 const Fees = ({ studentId }: FeesProps) => {
-  const [activeTab, setActiveTab] = useState(TAB_BREAKDOWN)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const feesTabParam = searchParams.get('feesTab')
+  const activeTab =
+    (feesTabParam && TAB_FROM_QUERY[feesTabParam.toLowerCase()]) || TAB_BREAKDOWN
   const [termSelection, setTermSelection] = useState<FilterSelection | undefined>(undefined)
   const [downloadOpen, setDownloadOpen] = useState(false)
+
+  const selectFeesTab = (label: string) => {
+    const key = QUERY_FROM_TAB[label]
+    if (!key) return
+    const next = new URLSearchParams(searchParams)
+    next.set('tab', 'fees')
+    if (key === 'breakdown') next.delete('feesTab')
+    else next.set('feesTab', key)
+    setSearchParams(next, { replace: true })
+  }
 
   const { data: filterOptions, isLoading: filtersLoading } = useQuery({
     queryKey: [FEE_DESK_FILTERS_QUERY_KEY],
@@ -88,11 +112,11 @@ const Fees = ({ studentId }: FeesProps) => {
           tabs={[
             {
               label: TAB_BREAKDOWN,
-              onClick: () => setActiveTab(TAB_BREAKDOWN),
+              onClick: () => selectFeesTab(TAB_BREAKDOWN),
             },
             {
               label: TAB_HISTORY,
-              onClick: () => setActiveTab(TAB_HISTORY),
+              onClick: () => selectFeesTab(TAB_HISTORY),
             },
           ]}
         />

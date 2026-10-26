@@ -10,6 +10,7 @@ import SearchComponent from '@/components/ui/SearchComponent'
 import { getClasses } from '@/features/classes/services'
 import { Capability } from '@/features/auth/capabilities'
 import { useCan } from '@/features/auth/hooks/useCan'
+import FeePrepNotice from '@/features/dashboard/components/FeePrepNotice'
 import FeesTable from '../components/FeesTable'
 import RecordPaymentSlider from '../components/RecordPaymentSlider'
 import { getFeeDeskFilterOptions, getFeeDeskList, getFeeDeskStats } from '../services'
@@ -115,6 +116,7 @@ const Fees = () => {
 
   return (
     <div className="space-y-6">
+      <FeePrepNotice variant="banner" />
       <ActionBar title="Fees">
         <SearchComponent
           value={search}

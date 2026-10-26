@@ -21,6 +21,7 @@ class Activity(BaseModel):
         CORRECTION_APPLIED = 'correction_applied', 'Correction applied'
         REOPEN_DECLINED = 'reopen_declined', 'Reopen declined'
         PAYMENT_RECORDED = 'payment_recorded', 'Payment recorded'
+        FEE_STRUCTURE_PUBLISHED = 'fee_structure_published', 'Fee structure published'
         FEE_STRUCTURE_APPLIED = 'fee_structure_applied', 'Fee structure applied'
         ADVANCE_CREATED = 'advance_created', 'Advance created'
         CLASS_TEACHER_ASSIGNED = 'class_teacher_assigned', 'Class teacher assigned'

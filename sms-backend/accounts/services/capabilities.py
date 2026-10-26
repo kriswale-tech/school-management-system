@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from accounts.capabilities import (
+    ACCOUNTANT_CAPABILITIES,
     SCHOOL_WIDE_CAPABILITIES,
+    STAFF_CAPABILITIES,
     TEACHER_BASE_CAPABILITIES,
     Capability,
 )
@@ -54,11 +56,16 @@ def resolve_session_access(membership: SchoolMembership | None) -> SessionAccess
             caps.add(Capability.REPORTS_VIEW)
         return SessionAccess(capabilities=frozenset(caps), scope=scope)
 
-    # Admin, staff, accountant: full school pack until role packs are tightened.
-    return SessionAccess(
-        capabilities=SCHOOL_WIDE_CAPABILITIES,
-        scope=scope,
-    )
+    if role == User.RoleChoices.ACCOUNTANT:
+        return SessionAccess(capabilities=ACCOUNTANT_CAPABILITIES, scope=scope)
+
+    if role == User.RoleChoices.STAFF:
+        return SessionAccess(capabilities=STAFF_CAPABILITIES, scope=scope)
+
+    if role == User.RoleChoices.ADMIN:
+        return SessionAccess(capabilities=SCHOOL_WIDE_CAPABILITIES, scope=scope)
+
+    return SessionAccess(capabilities=frozenset(), scope=scope)
 
 
 def membership_has_capability(membership: SchoolMembership | None, capability: str) -> bool:

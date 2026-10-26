@@ -7,8 +7,10 @@ from rest_framework.exceptions import NotFound, ValidationError
 from fees.models import FeeItem, FeeStructure
 from fees.services.fees import (
     apply_fee_structure,
+    copy_fee_items_from_previous,
     get_or_create_fee_structure,
     publish_fee_structure,
+    _previous_term,
 )
 from students.services import resolve_term
 
@@ -71,11 +73,26 @@ def serialize_fee_item(fee_item):
     }
 
 
+def _previous_term_has_items(term) -> bool:
+    previous = _previous_term(term)
+    if previous is None:
+        return False
+    source = FeeStructure.objects.filter(school=term.school, term=previous).first()
+    if source is None:
+        return False
+    return source.fee_items.exists()
+
+
 def serialize_fee_structure(fee_structure, *, fee_items=None):
     if fee_items is None:
         fee_items = list(fee_structure.fee_items.order_by('name'))
     item_count = len(fee_items)
     term_ended = is_term_ended(fee_structure.term)
+    can_mutate = (
+        fee_structure.is_editable
+        and not fee_structure.is_locked
+        and not term_ended
+    )
     return {
         'id': fee_structure.id,
         'name': fee_structure.name,
@@ -84,10 +101,23 @@ def serialize_fee_structure(fee_structure, *, fee_items=None):
         'is_editable': fee_structure.is_editable and not term_ended,
         'is_locked': fee_structure.is_locked,
         'term_ended': term_ended,
+        'can_publish': (
+            can_mutate
+            and item_count > 0
+            and fee_structure.status in {
+                FeeStructure.Status.DRAFT,
+                FeeStructure.Status.CARRIED_FORWARD,
+            }
+        ),
         'can_apply': (
             not fee_structure.is_locked
             and item_count > 0
             and not term_ended
+        ),
+        'can_copy_from_previous': (
+            can_mutate
+            and item_count == 0
+            and _previous_term_has_items(fee_structure.term)
         ),
         'item_count': item_count,
         'term_id': fee_structure.term_id,
@@ -246,22 +276,61 @@ def delete_fee_item(school, *, fee_item_id):
     fee_item.delete()
 
 
-def apply_structure(*, school, structure_id):
+def _get_structure_for_school(*, school, structure_id):
     try:
-        fee_structure = FeeStructure.objects.select_related(
+        return FeeStructure.objects.select_related(
             'term',
             'term__academic_year',
         ).get(id=structure_id, school=school)
     except FeeStructure.DoesNotExist as exc:
         raise NotFound('Fee structure not found.') from exc
 
+
+def publish_structure(*, school, structure_id, actor=None):
+    fee_structure = _get_structure_for_school(school=school, structure_id=structure_id)
     if fee_structure.is_locked:
         raise ValidationError('This fee structure has already been applied.')
     _ensure_term_allows_mutations(fee_structure.term)
 
     try:
-        if fee_structure.status == FeeStructure.Status.DRAFT:
-            publish_fee_structure(fee_structure)
+        publish_fee_structure(fee_structure, actor=actor)
+    except DjangoValidationError as exc:
+        _raise_drf(exc)
+
+    return serialize_structure_detail(fee_structure)
+
+
+def copy_structure_from_previous(*, school, term_id, created_by):
+    term = resolve_term(school, term_id)
+    _ensure_term_allows_mutations(term)
+    try:
+        copy_fee_items_from_previous(
+            school=school,
+            term=term,
+            created_by=created_by,
+        )
+    except DjangoValidationError as exc:
+        _raise_drf(exc)
+    return get_fee_structure_detail(
+        school=school,
+        created_by=created_by,
+        term_id=str(term.id),
+    )
+
+
+def apply_structure(*, school, structure_id, actor=None):
+    fee_structure = _get_structure_for_school(school=school, structure_id=structure_id)
+
+    if fee_structure.is_locked:
+        raise ValidationError('This fee structure has already been applied.')
+    _ensure_term_allows_mutations(fee_structure.term)
+
+    try:
+        if fee_structure.status in {
+            FeeStructure.Status.DRAFT,
+            FeeStructure.Status.CARRIED_FORWARD,
+        }:
+            publish_fee_structure(fee_structure, actor=actor)
         apply_fee_structure(fee_structure)
     except DjangoValidationError as exc:
         _raise_drf(exc)

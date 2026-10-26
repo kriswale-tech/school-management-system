@@ -136,12 +136,29 @@ class FeeStructureSettingsSerializer(serializers.Serializer):
     is_editable = serializers.BooleanField()
     is_locked = serializers.BooleanField()
     term_ended = serializers.BooleanField()
+    can_publish = serializers.BooleanField()
     can_apply = serializers.BooleanField()
+    can_copy_from_previous = serializers.BooleanField()
     item_count = serializers.IntegerField()
     term_id = serializers.UUIDField()
     term_name = serializers.CharField()
     academic_year = serializers.CharField()
     applied_at = serializers.DateTimeField(allow_null=True)
+
+
+class NextTermFeePrepSerializer(serializers.Serializer):
+    visible = serializers.BooleanField()
+    done = serializers.BooleanField()
+    urgency = serializers.CharField(allow_null=True)
+    days_remaining = serializers.IntegerField(allow_null=True)
+    term_ends_on = serializers.CharField(allow_null=True)
+    current_term_label = serializers.CharField(allow_null=True)
+    next_term_id = serializers.CharField(allow_null=True)
+    next_term_label = serializers.CharField(allow_null=True)
+    fee_status = serializers.CharField(allow_null=True)
+    item_count = serializers.IntegerField()
+    summary = serializers.CharField(allow_blank=True)
+    href = serializers.CharField()
 
 
 class FeeItemSettingsSerializer(serializers.Serializer):

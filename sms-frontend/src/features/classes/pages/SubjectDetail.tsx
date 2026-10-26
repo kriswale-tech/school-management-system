@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Icon } from '@iconify/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import ActionBar from '@/components/shared/ActionBar'
 import StatsCard from '@/components/shared/StatsCard'
 import { ConfirmDialog } from '@/components/shared'
@@ -28,8 +28,21 @@ import type { ClassStudent } from '../types'
 
 type DetailTab = 'Workspace' | 'Students' | 'Performance'
 
+const TAB_FROM_QUERY: Record<string, DetailTab> = {
+  workspace: 'Workspace',
+  students: 'Students',
+  performance: 'Performance',
+}
+
+const QUERY_FROM_TAB: Record<DetailTab, string> = {
+  Workspace: 'workspace',
+  Students: 'students',
+  Performance: 'performance',
+}
+
 const SubjectDetail = () => {
   const { assignmentId } = useParams<{ assignmentId: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const access = useAccess()
   const canRecord = useCan(Capability.ASSESSMENTS_RECORD)
@@ -37,18 +50,21 @@ const SubjectDetail = () => {
   const showWorkspace = access.is_subject_teacher && canRecord
 
   const defaultTab: DetailTab = showWorkspace ? 'Workspace' : 'Students'
-  const [activeTab, setActiveTab] = useState<DetailTab>(defaultTab)
+  const tabParam = searchParams.get('tab')
+  const requestedTab =
+    tabParam && TAB_FROM_QUERY[tabParam.toLowerCase()]
+      ? TAB_FROM_QUERY[tabParam.toLowerCase()]
+      : null
+  const activeTab: DetailTab =
+    requestedTab === 'Workspace' && !showWorkspace
+      ? 'Students'
+      : (requestedTab ?? defaultTab)
+
   const [isRecording, setIsRecording] = useState(false)
   const [addCaOpen, setAddCaOpen] = useState(false)
   const [publishOpen, setPublishOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
   const [pendingUnassign, setPendingUnassign] = useState<ClassStudent | null>(null)
-
-  useEffect(() => {
-    if (!showWorkspace && activeTab === 'Workspace') {
-      setActiveTab('Students')
-    }
-  }, [showWorkspace, activeTab])
 
   const {
     data: subject,
@@ -118,7 +134,11 @@ const SubjectDetail = () => {
   const students = studentsData?.results ?? []
 
   const switchTab = (tab: DetailTab) => {
-    setActiveTab(tab)
+    const key = QUERY_FROM_TAB[tab]
+    const next = new URLSearchParams(searchParams)
+    if (key === QUERY_FROM_TAB[defaultTab]) next.delete('tab')
+    else next.set('tab', key)
+    setSearchParams(next, { replace: true })
     if (tab !== 'Workspace') {
       setIsRecording(false)
       setAddCaOpen(false)

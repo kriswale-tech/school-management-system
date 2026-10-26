@@ -12,7 +12,11 @@ from academics.models import (
     LevelSubject,
     Subject,
 )
-from accounts.capabilities import Capability
+from accounts.capabilities import (
+    ACCOUNTANT_CAPABILITIES,
+    Capability,
+    STAFF_CAPABILITIES,
+)
 from accounts.models import User
 from accounts.services.access_scope import resolve_access_scope
 from accounts.services.capabilities import resolve_session_access
@@ -195,3 +199,49 @@ class TeacherAccessCapabilitiesTests(APITestCase):
         classes = self.client.get(self.list_url)
         self.assertEqual(classes.status_code, status.HTTP_200_OK)
         self.assertEqual(classes.data['results'], [])
+
+    def test_accountant_me_capabilities(self):
+        accountant = create_user(
+            is_active=True,
+            phone_number='+233200000012',
+            email='accountant@test.com',
+            school=self.school,
+            role=User.RoleChoices.ACCOUNTANT,
+        )
+        session = resolve_session_access(get_membership(accountant, self.school))
+        self.assertEqual(session.capabilities, ACCOUNTANT_CAPABILITIES)
+        self.assertTrue(session.has(Capability.FEES_MANAGE_SETTINGS))
+        self.assertTrue(session.has(Capability.CLASSES_VIEW))
+        self.assertFalse(session.has(Capability.CLASSES_MANAGE))
+        self.assertFalse(session.has(Capability.NAV_ASSESSMENTS))
+        self.assertFalse(session.has(Capability.NAV_STAFF))
+        self.assertFalse(session.has(Capability.STUDENTS_CREATE))
+
+        set_client_auth_cookies(self.client, accountant)
+        me = self.client.get(self.me_url)
+        self.assertEqual(me.status_code, status.HTTP_200_OK)
+        self.assertIn(Capability.NAV_FEES, me.data['capabilities'])
+        self.assertNotIn(Capability.ASSESSMENTS_RELEASE, me.data['capabilities'])
+
+    def test_staff_me_capabilities(self):
+        staff = create_user(
+            is_active=True,
+            phone_number='+233200000013',
+            email='staff@test.com',
+            school=self.school,
+            role=User.RoleChoices.STAFF,
+        )
+        session = resolve_session_access(get_membership(staff, self.school))
+        self.assertEqual(session.capabilities, STAFF_CAPABILITIES)
+        self.assertTrue(session.has(Capability.ASSESSMENTS_RELEASE))
+        self.assertTrue(session.has(Capability.STUDENTS_MARK_LEFT))
+        self.assertTrue(session.has(Capability.STAFF_MANAGE))
+        self.assertFalse(session.has(Capability.NAV_FEES))
+        self.assertFalse(session.has(Capability.FEES_VIEW))
+        self.assertFalse(session.has(Capability.CLASSES_MANAGE))
+
+        set_client_auth_cookies(self.client, staff)
+        me = self.client.get(self.me_url)
+        self.assertEqual(me.status_code, status.HTTP_200_OK)
+        self.assertIn(Capability.NAV_ASSESSMENTS, me.data['capabilities'])
+        self.assertNotIn(Capability.NAV_FEES, me.data['capabilities'])

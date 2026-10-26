@@ -20,6 +20,8 @@ type OverviewTabProps = {
   onWorkflowLevelChange: (value: FilterSelection) => void
   /** Hide school-wide workflow / fees panels (teacher scoped view). */
   showSchoolPanels?: boolean
+  /** Fee risk panel — hide for roles without fees access. */
+  showFeesRisk?: boolean
 }
 
 const OverviewTab = ({
@@ -30,6 +32,7 @@ const OverviewTab = ({
   workflowLevelId,
   onWorkflowLevelChange,
   showSchoolPanels = true,
+  showFeesRisk = true,
 }: OverviewTabProps) => {
   const avgDelta = formatDelta(overview.compare?.average_score_delta)
   const passDelta = formatDelta(overview.compare?.pass_rate_delta, ' pts')
@@ -104,7 +107,7 @@ const OverviewTab = ({
             levelId={workflowLevelId}
             onLevelChange={onWorkflowLevelChange}
           />
-          <FeesRiskCard data={feesRisk} />
+          {showFeesRisk ? <FeesRiskCard data={feesRisk} /> : null}
         </>
       ) : (
         <div className="bg-white p-4 custom-shadow-md text-sm text-slate-600">

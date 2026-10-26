@@ -19,6 +19,7 @@ from fees.services.fees import (
     apply_fee_structure,
     build_student_term_fees,
     carry_forward_fee_structure,
+    copy_fee_items_from_previous,
     ensure_enrollment_fees,
     get_or_create_fee_structure,
     get_student_academic_year_fees,
@@ -35,11 +36,14 @@ from fees.services.payments import (
     get_earliest_outstanding_term,
     record_student_payment,
 )
+from fees.services.prep import next_term_fee_prep_status
 from fees.services.settings import (
     apply_structure,
+    copy_structure_from_previous,
     create_fee_item,
     delete_fee_item,
     get_fee_structure_detail,
+    publish_structure,
     update_fee_item,
 )
 
@@ -53,6 +57,8 @@ __all__ = [
     'build_student_payment_target',
     'build_student_term_fees',
     'carry_forward_fee_structure',
+    'copy_fee_items_from_previous',
+    'copy_structure_from_previous',
     'create_credit_from_excess',
     'create_fee_item',
     'delete_fee_item',
@@ -70,7 +76,9 @@ __all__ = [
     'get_student_term_balance',
     'list_fee_desk_rows',
     'list_student_payments',
+    'next_term_fee_prep_status',
     'publish_fee_structure',
+    'publish_structure',
     'reconcile_duplicate_backfill_credits_for_school',
     'record_student_payment',
     'resolve_fee_desk_term',

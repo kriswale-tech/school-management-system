@@ -2,6 +2,7 @@ import { Icon } from '@iconify/react'
 import toast from 'react-hot-toast'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ConfirmDialog } from '@/components/shared'
 import { Button } from '@/components/ui'
 import {
@@ -23,6 +24,15 @@ import type {
 } from '../../types'
 import { STAFF_DESK_QUERY_KEY } from '../../utils'
 
+const viewFromParam = (value: string | null): TeacherAssignmentTab | null => {
+  if (value === 'managed') return TAB_MANAGED
+  if (value === 'subject') return TAB_SUBJECT
+  return null
+}
+
+const paramFromView = (tab: TeacherAssignmentTab) =>
+  tab === TAB_SUBJECT ? 'subject' : 'managed'
+
 type PendingUnassign =
   | { kind: 'class'; assignment: StaffDeskClassTeacherAssignment }
   | { kind: 'subject'; assignment: StaffDeskTeachingAssignment }
@@ -40,14 +50,22 @@ const subjectAssignmentLabel = (assignment: StaffDeskTeachingAssignment) => {
 
 const TeacherWorkspace = ({ staff }: TeacherWorkspaceProps) => {
   const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
   const managed = staff.class_teacher_assignments ?? []
   const teaching = staff.teaching_assignments ?? []
-  const [activeTab, setActiveTab] = useState<TeacherAssignmentTab>(
-    managed.length === 0 && teaching.length > 0 ? TAB_SUBJECT : TAB_MANAGED,
-  )
+  const defaultTab =
+    managed.length === 0 && teaching.length > 0 ? TAB_SUBJECT : TAB_MANAGED
+  const activeTab = viewFromParam(searchParams.get('view')) ?? defaultTab
   const [assignClassOpen, setAssignClassOpen] = useState(false)
   const [assignSubjectOpen, setAssignSubjectOpen] = useState(false)
   const [pendingUnassign, setPendingUnassign] = useState<PendingUnassign | null>(null)
+
+  const handleTabChange = (tab: TeacherAssignmentTab) => {
+    const next = new URLSearchParams(searchParams)
+    next.set('tab', 'workspace')
+    next.set('view', paramFromView(tab))
+    setSearchParams(next, { replace: true })
+  }
 
   const { mutate: removeClassAssignment, isPending: isRemovingClass } = useMutation({
     mutationFn: deleteClassTeacherAssignment,
@@ -97,7 +115,7 @@ const TeacherWorkspace = ({ staff }: TeacherWorkspaceProps) => {
         managed={managed}
         teaching={teaching}
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         classActionLabel="Unassign"
         subjectActionLabel="Unassign"
         onClassAction={(assignment) => setPendingUnassign({ kind: 'class', assignment })}

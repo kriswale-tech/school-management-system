@@ -44,11 +44,16 @@ const StudentDetails = () => {
 
   const selectTab = (label: string) => {
     const key = QUERY_FROM_TAB[label]
-    if (!key || key === 'bio') {
-      setSearchParams({}, { replace: true })
-      return
+    if (!key) return
+    const next = new URLSearchParams(searchParams)
+    if (key === 'bio') {
+      next.delete('tab')
+      next.delete('feesTab')
+    } else {
+      next.set('tab', key)
+      if (key !== 'fees') next.delete('feesTab')
     }
-    setSearchParams({ tab: key }, { replace: true })
+    setSearchParams(next, { replace: true })
   }
 
   const {

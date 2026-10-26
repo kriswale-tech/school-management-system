@@ -798,14 +798,25 @@ def transition_status(school, *, today=None):
             fee_summary = 'The next term has no fee catalog yet.'
         elif fee_locked:
             fee_summary = 'Fees for the next term are applied.'
+        elif fee_status == FeeStructure.Status.PUBLISHED:
+            fee_summary = (
+                'Published and ready — will apply when you open the next term.'
+            )
         else:
-            fee_summary = 'Review and apply the next term’s fee catalog in the transition.'
+            fee_summary = (
+                'Accountant can publish items in Fees settings; apply happens when '
+                'you open the next term.'
+            )
         checklist.append({
             'kind': 'fees',
             'title': 'Next term fees',
             'summary': fee_summary,
             'done': fee_locked,
-            'href': '/fees/settings',
+            'href': (
+                f'/fees/settings?term={preview["term_id"]}'
+                if preview and preview.get('term_id')
+                else '/fees/settings'
+            ),
         })
         if preview and preview['is_year_change']:
             needs_stream = any(

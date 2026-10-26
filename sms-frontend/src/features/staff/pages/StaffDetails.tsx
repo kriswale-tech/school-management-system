@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Icon } from '@iconify/react'
 import { useQuery } from '@tanstack/react-query'
 import ActionBar from '@/components/shared/ActionBar'
@@ -15,9 +15,19 @@ import { DEFAULT_PROFILE_IMAGE, STAFF_DESK_QUERY_KEY } from '../utils'
 const TAB_BIO = 'Bio'
 const TAB_WORKSPACE = 'Workspace'
 
+const TAB_FROM_QUERY: Record<string, string> = {
+  bio: TAB_BIO,
+  workspace: TAB_WORKSPACE,
+}
+
+const QUERY_FROM_TAB: Record<string, string> = {
+  [TAB_BIO]: 'bio',
+  [TAB_WORKSPACE]: 'workspace',
+}
+
 const StaffDetails = () => {
   const { id } = useParams<{ id: string }>()
-  const [activeTab, setActiveTab] = useState(TAB_BIO)
+  const [searchParams, setSearchParams] = useSearchParams()
   const [deactivateOpen, setDeactivateOpen] = useState(false)
 
   const {
@@ -32,17 +42,37 @@ const StaffDetails = () => {
   })
 
   const isTeacher = staff?.role === 'teacher'
+  const tabParam = searchParams.get('tab')
+  const requestedTab =
+    tabParam && TAB_FROM_QUERY[tabParam.toLowerCase()]
+      ? TAB_FROM_QUERY[tabParam.toLowerCase()]
+      : TAB_BIO
+  const activeTab =
+    requestedTab === TAB_WORKSPACE && !isTeacher ? TAB_BIO : requestedTab
+
+  const selectTab = (label: string) => {
+    const key = QUERY_FROM_TAB[label]
+    if (!key) return
+    const next = new URLSearchParams(searchParams)
+    if (key === 'bio') {
+      next.delete('tab')
+      next.delete('view')
+    } else {
+      next.set('tab', key)
+    }
+    setSearchParams(next, { replace: true })
+  }
 
   const tabs = [
     {
       label: TAB_BIO,
-      onClick: () => setActiveTab(TAB_BIO),
+      onClick: () => selectTab(TAB_BIO),
     },
     ...(isTeacher
       ? [
           {
             label: TAB_WORKSPACE,
-            onClick: () => setActiveTab(TAB_WORKSPACE),
+            onClick: () => selectTab(TAB_WORKSPACE),
           },
         ]
       : []),

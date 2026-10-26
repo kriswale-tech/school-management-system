@@ -8,6 +8,7 @@ import type {
   FeeStructureDetail,
   FeeStructureItem,
   FeeStructureItemPayload,
+  NextTermFeePrep,
   RecordPaymentPayload,
   RecordPaymentResponse,
   StudentPaymentTarget,
@@ -77,9 +78,31 @@ export const deleteFeeStructureItem = async (id: string) => {
   await api.delete(`${baseUrl}structures/items/${id}/`)
 }
 
+export const publishFeeStructure = async (structureId: string): Promise<FeeStructureDetail> => {
+  const response = await api.post<FeeStructureDetail>(
+    `${baseUrl}structures/${structureId}/publish/`,
+  )
+  return response.data
+}
+
 export const applyFeeStructure = async (structureId: string): Promise<FeeStructureDetail> => {
   const response = await api.post<FeeStructureDetail>(
     `${baseUrl}structures/${structureId}/apply/`,
   )
+  return response.data
+}
+
+export const copyFeeStructureFromPrevious = async (
+  termId: string,
+): Promise<FeeStructureDetail> => {
+  const response = await api.post<FeeStructureDetail>(
+    `${baseUrl}structures/copy-from-previous/`,
+    { term: termId },
+  )
+  return response.data
+}
+
+export const getNextTermFeePrep = async (): Promise<NextTermFeePrep> => {
+  const response = await api.get<NextTermFeePrep>(`${baseUrl}next-term-prep/`)
   return response.data
 }
