@@ -1,8 +1,8 @@
 # Dashboard and activity feed
 
-How the home screen works for admins and teachers, and which school events are recorded.
+How the home screen works for each role, and which school events are recorded.
 
-**Last reviewed:** 2026-09-30
+**Last reviewed:** 2026-10-26
 
 ---
 
@@ -14,7 +14,8 @@ The home route (`/` and `/dashboard`) picks a page from the active membership ro
 | --- | --- |
 | Admin | Admin dashboard only. Teaching assignments on an admin do not add teacher sections. |
 | Teacher | Teacher dashboard for this term’s class-teacher and subject-teacher assignments. |
-| Staff, accountant | Short placeholder. Those roles do not have day-to-day work in the app yet. |
+| Accountant | Fees-focused home (collected / outstanding / debtors) plus next-term fee-prep notice when the lead window is open. |
+| Staff | Shortcut home into Students, Assessments, Staff, and Reports (no fees). |
 
 Class teacher and subject teacher are term assignments (`ClassTeacher`, `TeachingAssignment`), not separate roles. One teacher can hold both, and then sees both sections on the same page.
 
@@ -88,6 +89,27 @@ The teacher activity list is the same card as the admin feed, scoped to their cl
 
 ---
 
+## Accountant dashboard
+
+Frontend-only composition over the fees desk APIs (`getFeeDeskStats`, debtor list). No dedicated `/dashboard/accountant/` endpoint.
+
+- Welcome banner with **Fees Overview** (collected, outstanding, debtors).
+- **Top Debtors** — up to five rows; view all opens `/fees?debtors=true`.
+- Shortcuts into `/fees` and `/fees/settings`.
+- **Fee prep notice** (`FeePrepNotice`) — visible in the same lead window as admin transition (`TRANSITION_LEAD_DAYS` = 7). Status comes from `GET /api/v1/fees/next-term-prep/`. Accountant is done once the next catalog is **published** (or already applied). Apply/lock still happens when an admin opens the next term. Detail: [term-transition.md](./term-transition.md) and [fees.md](./fees.md).
+
+---
+
+## Staff dashboard
+
+Frontend-only shortcut page (no dedicated dashboard API).
+
+- Welcome banner with workspace labels for Students, Assessments, and Staff.
+- Buttons into `/students`, `/assessments`, `/staff`, and `/reports`.
+- Short “what you can do” list aligned with `STAFF_CAPABILITIES` (no fees).
+
+---
+
 ## Activity feed
 
 `activities` is its own Django app. Domain services call `record_activity` in `activities/services.py` after the action succeeds, inside the same transaction. The dashboard only reads. Django signals are not used. The summary sentence is stored when the event is written, and the actor’s name is snapshotted. Targets are plain ids plus optional `stream` and `teaching_assignment` links, so deleting a student does not delete the history.
@@ -131,6 +153,7 @@ A row stores `href`. Clicking it in the UI follows that link.
 | --- | --- | --- |
 | Admin aggregation | `sms-backend/dashboard/services/admin_dashboard.py` | `sms-frontend/src/features/dashboard/pages/AdminDashboard.tsx` |
 | Teacher aggregation | `sms-backend/dashboard/services/teacher_dashboard.py` | `sms-frontend/src/features/dashboard/pages/TeacherDashboard.tsx` |
+| Accountant / staff home | Fees desk + `fees/services/prep.py` | `AccountantDashboard.tsx`, `StaffDashboard.tsx`, `FeePrepNotice.tsx` |
 | Routes | `sms-backend/dashboard/urls.py` | `sms-frontend/src/features/dashboard/Dashboard.tsx` |
 | Activity model and writer | `sms-backend/activities/models.py`, `activities/services.py` | `components/RecentActivitiesCard.tsx` |
 | Admin activity list | `sms-backend/activities/views.py` | `features/dashboard/services.ts` (`getRecentActivities`) |

@@ -16,7 +16,23 @@ Backend: `sms-backend/reports/` (`/api/v1/reports/`).
 | Teacher (scoped) | **My classes** (if class teacher) · **My subjects** (if subject teacher) · Academic |
 
 Teachers do **not** see Overview, Finance, Enrollment, or Teachers. Tabs appear only
-for roles they hold (both if they are class + subject teacher).
+for roles they hold (both if they are class + subject teacher). Accountants with
+fees access but no assessments land on **Finance** by default; school-wide users
+otherwise land on **Overview**.
+
+Active tab is persisted as `?tab=` on `/reports`:
+
+| Label | Query value |
+| --- | --- |
+| Overview | `overview` |
+| Finance | `finance` |
+| Academic | `academic` |
+| Enrollment | `enrollment` |
+| Teachers | `teachers` |
+| My classes | `my-classes` |
+| My subjects | `my-subjects` |
+
+Invalid or role-forbidden values fall back to the role default.
 
 **My classes / My subjects** use a single selected assignment (Class / Subject
 filters), not a stack of cards:
@@ -57,7 +73,7 @@ X = score (0–100 in 5-mark bands), Y = number of students in that band.
 - Smooth area curve; hover shows band + count
 - Dashed reference line at the pass mark
 
-Student names deep-link to `/students/:id?tab=Performance`.
+Student names deep-link to `/students/:id?tab=performance` (param matching is case-insensitive).
 
 ### Finance (school-wide)
 Built from fee desk data:
@@ -125,7 +141,7 @@ slots still without a teacher.
 
 ## Student Performance tab
 
-On student detail (`/students/:id?tab=Performance`):
+On student detail (`/students/:id?tab=performance`):
 
 - Overall average line across enrolled terms
 - Multi-subject line chart across terms

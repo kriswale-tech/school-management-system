@@ -3,7 +3,7 @@
 Reference for the fees product: catalog → bill → pay → advance.  
 Deferred items: [fees-backlog.md](./fees-backlog.md).
 
-**Last reviewed:** 2026-08-25
+**Last reviewed:** 2026-10-26
 
 ---
 
@@ -87,16 +87,18 @@ Refunding unused advance is **not built yet** (see backlog).
 
 | UI | Role |
 | --- | --- |
-| `/fees` | Desk: balances, stats, record payment, open student fee detail |
-| `/fees/settings` | Catalogs by term: add/edit items, Apply, view past catalogs read-only |
+| `/fees` | Desk: balances, stats, record payment, open student fee detail (admin + accountant) |
+| `/fees/settings` | Catalogs by term: add/edit items, **Publish**, **Copy from previous**, **Apply** (admin); accountant prepares/publishes next term in the lead window |
 | `/fees/:studentId` | Student fee breakdown + payment history |
-| Student detail → Fees | Same breakdown/history in student context |
+| Student detail → Fees | Same breakdown/history; nested tabs `?tab=fees&feesTab=breakdown\|history` |
+| Accountant dashboard | Fees overview + fee-prep banner (see [dashboard.md](./dashboard.md)) |
 | Setup → Fees | First-term catalog during onboarding; completing school setup applies the active term |
 
 ### Main APIs
 
 - Desk: `GET /api/v1/fees/`, `/stats/`, `/filter-options/`
-- Structures: `GET /fees/structures/?term=`, items CRUD, `POST /fees/structures/:id/apply/`
+- Prep: `GET /api/v1/fees/next-term-prep/` — accountant/admin banner status in the transition lead window
+- Structures: `GET /fees/structures/?term=`, items CRUD, `POST /fees/structures/copy-from-previous/`, `POST /fees/structures/:id/publish/`, `POST /fees/structures/:id/apply/`
 - Payments: `POST /fees/payments/`, `GET /fees/students/:id/payment-target/`
 - Student: `GET /students/:id/fees/`, `GET /students/:id/payments/`
 
@@ -112,7 +114,18 @@ Refunding unused advance is **not built yet** (see backlog).
 
 ---
 
-## Opening the next term
+## Preparing the next term (accountant)
+
+From `TRANSITION_LEAD_DAYS` (7) before the current term’s `end_date`, until the next term is opened:
+
+1. Accountant (or admin) opens **Fees → Settings** for the next term (`/fees/settings?term=<next id>`), often via the dashboard / fees **FeePrepNotice**.
+2. **Copy from previous** seeds items when the next catalog is missing or empty.
+3. Review amounts, then **Publish**. Published means “ready for admin to apply.”
+4. Accountant prep is **done** when status is `published` or `applied`. Apply/lock still happens in the admin transition wizard.
+
+Status payload: `fees/services/prep.py` → `GET /fees/next-term-prep/`.
+
+## Opening the next term (admin)
 
 The transition wizard places pupils and then applies the next term’s catalog. Full flow: [term-transition.md](./term-transition.md).
 
@@ -122,7 +135,7 @@ Fees behavior inside that wizard:
 - If the next term has no catalog, confirm copies the current term’s items, then publishes (if still a draft) and applies.
 - If the next term already has a catalog, that catalog is applied, unless it is already applied. Newly placed pupils are then billed from the locked list.
 - Class and level fees stay on the class or level they were written for. Movers who no longer match are not billed for that item.
-- Apply locks the catalog. Edit the list in Fees settings before opening the term.
+- Apply locks the catalog. Prefer finishing amounts (and publish) in Fees settings before opening the term.
 - Arrears stay on the old term. Advances apply when the next catalog is applied, as they do for any apply.
 - Past terms stay read-only.
 

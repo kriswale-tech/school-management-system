@@ -116,10 +116,10 @@ Access is never “global admin of everything.” It is always **per school + ro
 
 | Role | Typical meaning |
 | --- | --- |
-| **Admin** | Full school control: setup, users, students, classes, fees, etc. |
-| **Staff** | Can help manage users, but only **teachers** (not other admins/staff/accountants). Full module access for now (packs will tighten later). |
+| **Admin** | Full school control: setup, users, students, classes, fees, etc. (`SCHOOL_WIDE_CAPABILITIES`) |
+| **Staff** | Clerical + academics helper: students, classes, assessments, staff directory, reports. **No fees.** Can manage **teachers** only (`STAFF_CAPABILITIES`). |
 | **Teacher** | Sees only assigned classes/subjects; limited sidebar and actions (see below). |
-| **Accountant** | Role exists; still has full school capability pack until finance-only access is wired. |
+| **Accountant** | Finance desk: fees view/record/settings, students/classes read-only for billing context, reports. **No assessments/staff manage** (`ACCOUNTANT_CAPABILITIES`). |
 
 ### Capabilities (how UI + API share one vocabulary)
 
@@ -251,9 +251,24 @@ Deeper detail: [fees.md](./fees.md).
 
 ### Dashboard
 
-Admins get a school overview (coverage, fees, report progress, debtors, recent activity). Teachers get their classes and subjects for the active term, an academic overview, and a short list of work that is actually waiting. Staff and accountants still see a placeholder.
+Admins get a school overview (coverage, fees, report progress, debtors, recent activity). Teachers get their classes and subjects for the active term, an academic overview, and a short list of work that is actually waiting. Accountants get a fees-focused home plus a next-term fee-prep banner in the lead window. Staff get shortcut links into students, assessments, staff, and reports.
 
 Detail: [dashboard.md](./dashboard.md).
+
+### URL tabs (frontend)
+
+Page-level line/button tabs keep the active section in the query string (`replace: true`), so refresh and shared links restore the same panel. Invalid or role-forbidden values fall back to the page default. Nested tabs use a second param so they do not collide with the parent.
+
+| Surface | Param | Values |
+| --- | --- | --- |
+| Settings | path `/settings/:tab` | `school-profile`, `academic-year`, `alerts`, `fees`, `assessments`, `classes` |
+| Reports | `?tab=` | `overview`, `finance`, `academic`, `enrollment`, `teachers`, `my-classes`, `my-subjects` |
+| Classes list | `?tab=` (+ optional `attention`) | `classes`, `subjects` |
+| Teacher classes workspace | `?tab=` | `managed`, `subject` |
+| Class detail | `?tab=` | `students` (default/cleared), `subjects`, `performance` |
+| Subject detail | `?tab=` | `workspace`, `students`, `performance` |
+| Staff detail | `?tab=` (+ optional `view`) | `bio` (default/cleared), `workspace`; workspace view `managed` \| `subject` |
+| Student detail | `?tab=` (+ optional `feesTab`) | `bio`, `guardian`, `performance`, `assessment`, `fees`; fees nested `breakdown` \| `history` |
 
 ---
 
@@ -299,8 +314,9 @@ Everything under a school stays **school-scoped**. Changing active school change
 - [FEATURES.md](./FEATURES.md) — what is done vs stubbed  
 - [STATUS.md](./STATUS.md) — project snapshot  
 - [fees.md](./fees.md) — fees in more detail  
-- [dashboard.md](./dashboard.md) — admin and teacher dashboards, activity feed  
+- [dashboard.md](./dashboard.md) — role dashboards and activity feed  
 - [profile.md](./profile.md) — personal profile page and self-service API  
 - [term-transition.md](./term-transition.md) — opening the next term  
+- [`sms-backend/docs/reports-insights.md`](../sms-backend/docs/reports-insights.md) — Reports & Insights tabs and APIs  
 
-**Last reviewed:** 2026-10-15
+**Last reviewed:** 2026-10-26

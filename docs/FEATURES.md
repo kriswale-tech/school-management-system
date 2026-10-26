@@ -96,13 +96,14 @@ School-wide and teacher-scoped analytics at `/reports`. See
 | Feature | Backend | Frontend | Status |
 | --- | --- | --- | --- |
 | Fee structure + items | Models + setup + product APIs | Setup + `/fees/settings` | Done |
-| Publish / apply / carry-forward | Services + `/fees/structures/` apply | Settings Apply | Done |
+| Publish / apply / carry-forward | Services + publish / apply / copy-from-previous | Settings Publish + Apply | Done |
 | StudentFee generation on apply | Service + auto on late enroll | — | Done |
 | Fees desk list + stats | Yes (`/api/v1/fees/`) | `/fees` | Done |
-| Student fee balance / history APIs | Yes (on students) | Student detail + fee detail | Done |
+| Student fee balance / history APIs | Yes (on students) | Student detail + fee detail (`?feesTab=`) | Done |
 | Record payment | Yes | Record Fees slider | Done |
 | Receipts | Model + auto on payment | Eye UI-only | Partial |
 | Fees settings | Yes | `/fees/settings` | Done |
+| Next-term fee prep | `GET /fees/next-term-prep/` | Dashboard / fees banner + settings | Done |
 | Arrears / reports | — | — | Not started |
 
 ## Assessments
@@ -141,7 +142,7 @@ Alerts are in-app only: outstanding fees (admin and accountant), unreleased resu
 | Feature | Backend | Frontend | Status |
 | --- | --- | --- | --- |
 | App shell (nav, auth gates) | — | Yes | Done |
-| Dashboard widgets | Yes (`/dashboard/admin/`, `/dashboard/teacher/`) | Yes | Done (see [dashboard.md](./dashboard.md)) |
+| Dashboard widgets | Yes (`/dashboard/admin/`, `/dashboard/teacher/`) + fees APIs for accountant | Admin / teacher / accountant / staff pages | Done (see [dashboard.md](./dashboard.md)) |
 | Activity feed | Yes (`activities` app, `GET /activities/`) | Recent Activities card | Done |
 | In-app alerts | Yes (`GET /schools/alerts/`) | Navbar bell | Done |
 
@@ -149,10 +150,12 @@ Alerts are in-app only: outstanding fees (admin and accountant), unreleased resu
 
 | Feature | Status |
 | --- | --- |
+| Role capability packs (admin / accountant / staff / teacher) | Done (`accounts/capabilities.py`) |
+| URL-persisted page tabs (`?tab=` / nested params) | Done (see [HOW_IT_WORKS.md](./HOW_IT_WORKS.md) § URL tabs) |
 | OpenAPI / Swagger | Done |
 | Backend tests (accounts, schools setup, academics, students, fees services, assessment config) | Done for built areas |
 | Frontend automated tests | Not started / minimal |
-| Fine-grained Permission matrix | Models only — unused |
+| Fine-grained Permission matrix | Models only — unused (role packs are code-level) |
 | Celery / Redis async jobs | Compose stubs only |
 | Attendance, messaging, library, inventory, payroll | Not started |
 
@@ -162,6 +165,6 @@ Alerts are in-app only: outstanding fees (admin and accountant), unreleased resu
 
 - Teacher bulk import (frontend contract): [`sms-backend/docs/frontend-teacher-bulk-import.md`](../sms-backend/docs/frontend-teacher-bulk-import.md)
 - Assessment structure per term: [assessment-config.md](./assessment-config.md)
-- Admin and teacher dashboards, activity feed: [dashboard.md](./dashboard.md)
+- Role dashboards (admin / teacher / accountant / staff), activity feed: [dashboard.md](./dashboard.md)
 - Reports & Insights: [`sms-backend/docs/reports-insights.md`](../sms-backend/docs/reports-insights.md)
 - Mark student as left: [`sms-backend/docs/mark-as-left.md`](../sms-backend/docs/mark-as-left.md)

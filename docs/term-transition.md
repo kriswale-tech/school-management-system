@@ -14,8 +14,9 @@ From 7 days before the current term’s `end_date`, and until the next term is o
 
 - **Transition** sits in the navbar, to the left of the bell, on every page. Admins only.
 - The same action is on the admin dashboard and on **Settings → Academic year** (**Open transition**).
+- **Accountants** (and admins with fee settings) also see a **fee-prep** banner on the accountant dashboard / fees surfaces. Prep status is `GET /api/v1/fees/next-term-prep/`. Accountant work is finished once the next catalog is **published** (or already applied); the admin wizard still applies and locks it. See [fees.md](./fees.md).
 
-The button stays up through the vacation. It leaves once the next term is the current term.
+The Transition button stays up through the vacation. It leaves once the next term is the current term.
 
 A popup appears only on the admin dashboard, and only while something on the checklist is still unfinished and **Settings → Alerts** has **Popup on the dashboard while opening the next term still needs action** turned on (`SchoolSettings.transition_popup_enabled`). Dismissing it lasts for that visit. Coming back to the dashboard shows it again while work remains. The navbar button does not depend on that checkbox.
 
@@ -97,8 +98,10 @@ The student profile shows **Graduated**. An admin can **Clear graduation** (`POS
 | --- | --- |
 | Preview, confirm, status | `sms-backend/schools/services/term_transition.py` |
 | APIs | `sms-backend/schools/views.py`, `schools/urls.py` |
+| Accountant fee prep | `sms-backend/fees/services/prep.py`, `GET /fees/next-term-prep/` |
 | Graduation flag | `sms-backend/students/models.py` (`is_graduated`) |
 | Wizard and saved progress | `sms-frontend/src/features/settings/components/TransitionWizard.tsx` |
 | Navbar and dashboard entry | `TransitionProvider.tsx`, `NavBar.tsx`, `TransitionNotice.tsx` |
+| Fee prep UI | `FeePrepNotice.tsx`, Fees settings publish / copy-from-previous |
 
-**Last reviewed:** 2026-10-24
+**Last reviewed:** 2026-10-26

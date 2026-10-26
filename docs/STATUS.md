@@ -1,12 +1,12 @@
 # Project status — built vs left
 
-Snapshot of the School Management System as of **2026-08-25**.
+Snapshot of the School Management System as of **2026-10-26**.
 
 ## Verdict
 
 **Core onboarding and day-to-day school administration for students and classes is largely in place.** Auth, multi-school membership, guided school setup, curriculum, students (including bulk import), class management, and teacher/staff user management are real end-to-end features.
 
-**The admin and teacher dashboards are in place** ([dashboard.md](./dashboard.md)). Parts of this snapshot are older than the assessments and fees work: scoring, the fees desk, and payments are further along than the sections below still say. Staff and accountant home screens are still placeholders.
+**Dashboards exist for admin, teacher, accountant, and staff** ([dashboard.md](./dashboard.md)). Accountant/staff capability packs are tightened; next-term fee prep and URL-persisted page tabs are in place. Parts of the older sections below may still understate assessments and fees maturity.
 
 ---
 
@@ -23,7 +23,7 @@ Snapshot of the School Management System as of **2026-08-25**.
 
 - Phone-based signup / login with OTP verify + resend (OTP printed in DEBUG; `shared/services/arkesel_sms.py` exists but is **not wired** into OTP)
 - Multi-school: `SchoolMembership`, create school, select school
-- Roles: `admin`, `teacher`, `accountant`, `staff` (role checks via permissions; fine-grained `Permission` / `RolePermission` models exist but are unused)
+- Roles: `admin`, `teacher`, `accountant`, `staff` with dedicated capability packs in `accounts/capabilities.py` (fine-grained DB `Permission` / `RolePermission` models remain unused)
 - User CRUD for school staff (`/api/v1/accounts/users/`)
 - Frontend: signup, login, OTP pages, school picker, logout
 
@@ -75,7 +75,7 @@ After setup, admins use `/settings` (tabs keep the selection in the URL). Signup
 - Teacher models: `ClassTeacher`, `TeachingAssignment`
 - Setup + accounts APIs for creating/editing/deleting school users
 - Teacher bulk import
-- Setup staff UI is real; **main app `/staff` page is a placeholder** (logic already lives under setup + shared staff components)
+- Setup staff UI is real; main app `/staff` desk + `/staff/:id` detail (bio / workspace) are in place
 
 ### Fees — data, setup, desk, and payments (partial)
 
@@ -86,7 +86,8 @@ After setup, admins use `/settings` (tabs keep the selection in the URL). Signup
 - Setup wizard fee items; student detail fee breakdown + payment history
 - Fees desk (`GET /api/v1/fees/`, `/stats/`, `/filter-options/`) + frontend `/fees` list/detail
 - Record Fees slider (list + detail); advance shown on desk rows, detail header, and record form
-- Fees settings (`/fees/settings` + `/api/v1/fees/structures/`): term catalogs, item CRUD, Apply; late enrollments auto-billed
+- Fees settings (`/fees/settings` + `/api/v1/fees/structures/`): term catalogs, item CRUD, copy-from-previous, publish, Apply; late enrollments auto-billed
+- Next-term fee prep for accountants (`GET /fees/next-term-prep/`, dashboard/fees banner) in the transition lead window
 
 **Not exposed as product features yet:** receipt PDF, Excel export, advance refund, pure advance top-up with no owing
 
@@ -109,10 +110,10 @@ Runtime scoring, class/admin assessment, and the student **Reports & Assessment*
 
 | Area | Gap |
 | --- | --- |
-| **Dashboard** | Built for admin and teacher. See [dashboard.md](./dashboard.md). Staff and accountant home is still a placeholder. |
-| **Assessments (runtime)** | Enter CA/exam scores, compute grades/positions, report cards, correction flow |
-| **Fees (operations)** | Record payments, issue receipts, fee desk list/filters, publish/apply fee structures after setup, arrears reporting |
-| **Staff main page** | Reuse setup staff components for `/staff` instead of placeholder |
+| **Dashboard** | Done for admin, teacher, accountant, and staff — see [dashboard.md](./dashboard.md). |
+| **Assessments (runtime)** | Enter CA/exam scores, compute grades/positions, report cards, correction flow (much of this exists; STATUS rows below may lag) |
+| **Fees (operations)** | Receipt PDF / Excel export / arrears reporting still open; desk, payments, publish/apply, and accountant prep are done |
+| **Staff main page** | Desk exists; polish / gaps vs setup flows may remain |
 | **Profile** | Done — see [profile.md](./profile.md). School settings are separate (school record, admin only). |
 
 ### Medium — incomplete or scaffolded
@@ -141,13 +142,14 @@ Runtime scoring, class/admin assessment, and the student **Reports & Assessment*
 | --- | --- |
 | `/auth/*` | Done |
 | `/setup/:step` | Done |
-| `/dashboard` | Admin and teacher dashboards (see [dashboard.md](./dashboard.md)). Other roles: placeholder |
-| `/students`, `/students/:id` | Done (assessment tab stub) |
-| `/classes`, `/classes/:id`, `/classes/manage` | Done |
-| `/assessments` | Stub |
-| `/fees` | Desk list (stats + table); record/settings UI-only |
+| `/dashboard` | Admin, teacher, accountant, staff (see [dashboard.md](./dashboard.md)) |
+| `/students`, `/students/:id` | Done (`?tab=` + nested `feesTab`) |
+| `/classes`, `/classes/:id`, `/classes/manage` | Done (`?tab=` on list and detail) |
+| `/assessments` | Built (class/admin flows; see assessment docs) |
+| `/fees` | Desk + record payment; settings publish/apply/prep |
 | `/fees/:studentId` | Detail (reuses student fee breakdown) |
-| `/staff` | Stub |
+| `/staff`, `/staff/:id` | Desk + detail (`?tab=` / `?view=`) |
+| `/reports` | Reports & Insights (`?tab=`) |
 | `/settings`, `/settings/:tab` | Admin: school profile, academic year, alerts, plus fees, assessments, and classes (same screens as their own routes) |
 | `/profile` | Personal profile for all roles (see [profile.md](./profile.md)) |
 
@@ -161,9 +163,11 @@ Under `/api/v1/`:
 - `schools/` — setup wizard, school profile, settings (year calendar, term transition, alerts)  
 - `academics/` — levels, classes, teachers assignment  
 - `students/` — CRUD-ish list/detail, onboard, guardians, fees read, bulk import  
-- `fees/` — desk list, stats, filter options  
+- `fees/` — desk list, stats, filter options, payments, structures (publish/apply/copy), next-term prep  
+- `reports/` — overview, teacher desk, academic/finance/enrollment/staff insights  
+- `dashboard/`, `activities/` — admin/teacher dashboards and activity feed  
 
-**Not mounted yet as product APIs:** payment write / receipts / assessments scoring.
+**Still light / deferred:** receipt PDF download, advance refund, Excel fee export.
 
 ---
 
