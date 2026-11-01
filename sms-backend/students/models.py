@@ -5,6 +5,12 @@ from shared.models import BaseModel
 
 
 class Parent(BaseModel):
+    class NotifyChannel(models.TextChoices):
+        SMS = 'sms', 'SMS'
+        EMAIL = 'email', 'Email'
+        BOTH = 'both', 'SMS and email'
+        OFF = 'off', 'Do not notify'
+
     school = models.ForeignKey(
         'schools.School',
         on_delete=models.CASCADE,
@@ -15,6 +21,12 @@ class Parent(BaseModel):
     phone_number_alt = models.CharField(max_length=15, blank=True, default='')
     email = models.EmailField(blank=True, default='')
     address = models.TextField(blank=True, default='')
+    notify_channel = models.CharField(
+        max_length=10,
+        choices=NotifyChannel.choices,
+        default=NotifyChannel.BOTH,
+        help_text='Preferred guardian outreach channels for this parent.',
+    )
 
     class Meta:
         ordering = ['name']

@@ -93,6 +93,70 @@ class StudentPaymentTargetSerializer(serializers.Serializer):
     has_advance = serializers.BooleanField()
 
 
+class DebtReminderRequestSerializer(serializers.Serializer):
+    term_id = serializers.UUIDField(required=False, allow_null=True)
+    student_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        allow_empty=False,
+    )
+
+
+class FeeDeskSelectionIdsSerializer(serializers.Serializer):
+    student_ids = serializers.ListField(child=serializers.UUIDField())
+    count = serializers.IntegerField()
+
+
+class DebtReminderGuardianPlanSerializer(serializers.Serializer):
+    parent_id = serializers.CharField()
+    parent_name = serializers.CharField()
+    channels = serializers.ListField(child=serializers.CharField())
+
+
+class DebtReminderEligibleSerializer(serializers.Serializer):
+    student_id = serializers.CharField()
+    full_name = serializers.CharField()
+    student_code = serializers.CharField()
+    balance = serializers.CharField()
+    guardians = DebtReminderGuardianPlanSerializer(many=True)
+
+
+class DebtReminderSkippedSerializer(serializers.Serializer):
+    student_id = serializers.CharField()
+    full_name = serializers.CharField(required=False)
+    balance = serializers.CharField(required=False)
+    reason = serializers.CharField()
+
+
+class DebtReminderPreviewSerializer(serializers.Serializer):
+    enabled = serializers.BooleanField()
+    audience = serializers.CharField()
+    channels = serializers.CharField(allow_null=True)
+    term_id = serializers.UUIDField()
+    term_label = serializers.CharField()
+    requested_count = serializers.IntegerField()
+    eligible_count = serializers.IntegerField()
+    skipped_count = serializers.IntegerField()
+    sms_count = serializers.IntegerField()
+    email_count = serializers.IntegerField()
+    batch_size = serializers.IntegerField()
+    eligible_ids = serializers.ListField(child=serializers.CharField())
+    eligible = DebtReminderEligibleSerializer(many=True)
+    skipped = DebtReminderSkippedSerializer(many=True)
+    eligible_truncated = serializers.BooleanField()
+    skipped_truncated = serializers.BooleanField()
+
+
+class DebtReminderSendResultSerializer(serializers.Serializer):
+    batch_id = serializers.CharField()
+    term_id = serializers.UUIDField()
+    term_label = serializers.CharField()
+    queued = serializers.BooleanField()
+    students_notified = serializers.IntegerField()
+    sms_sent = serializers.IntegerField()
+    email_sent = serializers.IntegerField()
+    skipped_count = serializers.IntegerField()
+
+
 class RecordPaymentSerializer(serializers.Serializer):
     student_id = serializers.UUIDField()
     amount = serializers.DecimalField(max_digits=10, decimal_places=2)

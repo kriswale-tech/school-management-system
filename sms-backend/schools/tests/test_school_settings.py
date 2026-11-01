@@ -145,6 +145,17 @@ class SchoolSettingsAPITests(APITestCase):
         response = self.client.get(self.alerts_url)
         self.assertEqual([item['kind'] for item in response.data], ['fees'])
 
+        staff = create_user(
+            phone_number='+233200000032',
+            email='staff@test.com',
+            school=self.school,
+            role=User.RoleChoices.STAFF,
+            is_active=True,
+        )
+        self._as(staff)
+        response = self.client.get(self.alerts_url)
+        self.assertEqual([item['kind'] for item in response.data], ['enrollments'])
+
         self._as(self.admin)
         saved = self.client.patch(
             self.settings_url,

@@ -226,6 +226,51 @@ export type AdminAssessmentDetailStudent = {
   overall_cohort_size: number | null
   subjects: ClassAssessmentSubjectRow[]
   active_correction: CorrectionRequest | null
+  has_report?: boolean
+}
+
+export type ReportReadyPreview = {
+  enabled: boolean
+  notify_mode: 'manual' | 'auto'
+  audience: 'primary' | 'all'
+  channels: 'sms' | 'email' | 'both' | null
+  term_id: string
+  term_label: string
+  stream_id: string
+  class_name: string
+  requested_count: number
+  eligible_count: number
+  skipped_count: number
+  sms_count: number
+  email_count: number
+  batch_size: number
+  eligible_ids: string[]
+  eligible: Array<{
+    student_id: string
+    report_id: string
+    full_name: string
+    student_code: string
+  }>
+  skipped: Array<{
+    student_id: string
+    full_name?: string
+    reason: string
+  }>
+  eligible_truncated: boolean
+  skipped_truncated: boolean
+}
+
+export type ReportReadySendResult = {
+  batch_id: string
+  term_id: string
+  term_label: string
+  stream_id: string
+  class_name: string
+  queued: boolean
+  students_notified: number
+  sms_sent: number
+  email_sent: number
+  skipped_count: number
 }
 
 export type StudentAssessment = {

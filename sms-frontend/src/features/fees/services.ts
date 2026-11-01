@@ -1,9 +1,13 @@
 import api from '@/app/api/api'
 import { getQueryUrl } from '@/utils/get-query-url'
 import type {
+  DebtReminderPreview,
+  DebtReminderRequest,
+  DebtReminderSendResult,
   FeeDeskFilterOptions,
   FeeDeskListResponse,
   FeeDeskQueryParams,
+  FeeDeskSelectionIds,
   FeeDeskStats,
   FeeStructureDetail,
   FeeStructureItem,
@@ -32,6 +36,14 @@ export const getFeeDeskStats = async (
   return response.data
 }
 
+export const getFeeDeskSelectionIds = async (
+  params: FeeDeskQueryParams = {},
+): Promise<FeeDeskSelectionIds> => {
+  const url = getQueryUrl(`${baseUrl}selection-ids/`, params)
+  const response = await api.get<FeeDeskSelectionIds>(url)
+  return response.data
+}
+
 export const getFeeDeskFilterOptions = async (): Promise<FeeDeskFilterOptions> => {
   const response = await api.get<FeeDeskFilterOptions>(`${baseUrl}filter-options/`)
   return response.data
@@ -50,6 +62,20 @@ export const recordPayment = async (
   payload: RecordPaymentPayload,
 ): Promise<RecordPaymentResponse> => {
   const response = await api.post<RecordPaymentResponse>(`${baseUrl}payments/`, payload)
+  return response.data
+}
+
+export const previewDebtReminders = async (
+  payload: DebtReminderRequest,
+): Promise<DebtReminderPreview> => {
+  const response = await api.post<DebtReminderPreview>(`${baseUrl}debt-reminders/preview/`, payload)
+  return response.data
+}
+
+export const sendDebtReminders = async (
+  payload: DebtReminderRequest,
+): Promise<DebtReminderSendResult> => {
+  const response = await api.post<DebtReminderSendResult>(`${baseUrl}debt-reminders/send/`, payload)
   return response.data
 }
 

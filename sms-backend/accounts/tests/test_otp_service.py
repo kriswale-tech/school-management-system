@@ -1,7 +1,8 @@
 from datetime import timedelta
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.core import mail
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from accounts.models import PhoneOtp, Profile
@@ -18,6 +19,8 @@ from accounts.services.otp import (
     verify_signup_otp,
 )
 from accounts.tests.factories import PHONE, OTP, create_phone_otp, create_user
+
+SEND_SMS_PATH = 'accounts.services.otp.send_sms'
 
 
 class SendSignupOtpTests(TestCase):
@@ -212,7 +215,13 @@ class VerifySignupOtpTests(TestCase):
 
 
 class SendLoginOtpTests(TestCase):
-    def test_creates_login_otp_for_active_user(self):
+    @patch(SEND_SMS_PATH, return_value={
+        'status': 'success',
+        'data': [{'id': 'msg-123', 'recipient': PHONE}],
+    })
+    @override_settings(DEBUG=True)
+    @patch('accounts.services.otp.print')
+    def test_creates_login_otp_for_active_user(self, mock_print, mock_sms):
         create_user(is_active=True)
 
         send_login_otp(PHONE)
@@ -223,6 +232,12 @@ class SendLoginOtpTests(TestCase):
         )
         self.assertEqual(len(phone_otp.otp), 6)
         self.assertFalse(phone_otp.is_verified)
+        mock_sms.assert_called_once()
+        self.assertIn(phone_otp.otp, mock_sms.call_args.args[1])
+        printed = ' '.join(str(call.args[0]) for call in mock_print.call_args_list)
+        self.assertIn('Login OTP SMS OK', printed)
+        self.assertIn('msg-123', printed)
+        self.assertIn(phone_otp.otp, printed)
 
     def test_rejects_unknown_phone(self):
         with self.assertRaisesMessage(OtpSendError, 'No account found for this phone number'):
@@ -237,9 +252,49 @@ class SendLoginOtpTests(TestCase):
         ):
             send_login_otp(PHONE)
 
+    @patch(SEND_SMS_PATH, return_value={'status': 'success'})
+    def test_login_sends_email_when_user_has_email(self, mock_sms):
+        create_user(is_active=True, email='teacher@school.com')
+
+        send_login_otp(PHONE)
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['teacher@school.com'])
+        phone_otp = PhoneOtp.objects.get(phone_number=PHONE, purpose=PhoneOtp.Purpose.LOGIN)
+        self.assertIn(phone_otp.otp, mail.outbox[0].body)
+        mock_sms.assert_called_once()
+
+    @patch(SEND_SMS_PATH, return_value={'status': 'success'})
+    def test_login_skips_email_without_address(self, mock_sms):
+        create_user(is_active=True, email='')
+
+        send_login_otp(PHONE)
+
+        self.assertEqual(len(mail.outbox), 0)
+        mock_sms.assert_called_once()
+
+    @patch(SEND_SMS_PATH, side_effect=RuntimeError('arkesel down'))
+    @override_settings(DEBUG=True)
+    @patch('accounts.services.otp.print')
+    def test_login_prints_otp_when_sms_fails_in_debug(self, mock_print, mock_sms):
+        create_user(is_active=True, email='')
+
+        send_login_otp(PHONE)
+
+        phone_otp = PhoneOtp.objects.get(phone_number=PHONE, purpose=PhoneOtp.Purpose.LOGIN)
+        mock_sms.assert_called_once()
+        printed = ' '.join(str(call.args[0]) for call in mock_print.call_args_list)
+        self.assertIn(phone_otp.otp, printed)
+
+    @patch(SEND_SMS_PATH, return_value={'status': 'success'})
+    def test_signup_does_not_call_arkesel(self, mock_sms):
+        send_signup_otp(PHONE)
+        mock_sms.assert_not_called()
+
 
 class ResendLoginOtpTests(TestCase):
-    def test_resend_issues_new_login_otp_for_active_user(self):
+    @patch(SEND_SMS_PATH, return_value={'status': 'success'})
+    def test_resend_issues_new_login_otp_for_active_user(self, mock_sms):
         create_user(is_active=True)
         PhoneOtp.objects.create(
             phone_number=PHONE,
@@ -258,8 +313,10 @@ class ResendLoginOtpTests(TestCase):
         )
         self.assertNotEqual(phone_otp.otp, '000000')
         self.assertEqual(phone_otp.attempts, 0)
+        mock_sms.assert_called_once()
 
-    def test_login_resend_not_blocked_by_signup_otp_cooldown(self):
+    @patch(SEND_SMS_PATH, return_value={'status': 'success'})
+    def test_login_resend_not_blocked_by_signup_otp_cooldown(self, mock_sms):
         create_user(is_active=True)
         now = timezone.now()
         PhoneOtp.objects.create(
@@ -284,6 +341,7 @@ class ResendLoginOtpTests(TestCase):
             purpose=PhoneOtp.Purpose.LOGIN,
         )
         self.assertNotEqual(phone_otp.otp, '222222')
+        mock_sms.assert_called_once()
 
 
 class VerifyLoginOtpTests(TestCase):

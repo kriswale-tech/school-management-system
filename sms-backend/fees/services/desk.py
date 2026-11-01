@@ -46,6 +46,17 @@ def list_fee_desk_rows(*, school, term):
     return annotate_advance_balance(queryset)
 
 
+def list_fee_desk_debtor_ids(*, queryset) -> list:
+    """Student UUIDs with outstanding balance in a (filtered) fee desk queryset."""
+    from django.db.models import F
+
+    return list(
+        queryset.filter(total_billed__gt=F('total_paid'))
+        .order_by('student__last_name', 'student__first_name', 'student_id')
+        .values_list('student_id', flat=True),
+    )
+
+
 def get_fee_desk_stats(*, queryset):
     """Aggregate fees stats for a (possibly filtered) enrollment queryset."""
     from django.db.models import Count, F, Q

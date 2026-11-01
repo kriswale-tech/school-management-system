@@ -39,12 +39,31 @@ export interface AcademicYearSchedulePayload {
   }[]
 }
 
+export type GuardianAudience = 'primary' | 'all'
+export type ReportParentNotifyMode = 'manual' | 'auto'
+export type GuardianChannel = 'sms' | 'email' | 'both'
+export type DebtReminderFrequency = 'end_of_month' | 'weekly' | 'biweekly'
+
 export interface SchoolSettings {
   fees_alert_enabled: boolean
   fees_alert_threshold: string
   results_alert_enabled: boolean
   enrollments_alert_enabled: boolean
   transition_popup_enabled: boolean
+  guardian_audience: GuardianAudience
+  report_parent_notify_mode: ReportParentNotifyMode
+  guardian_ward_enrolled_enabled: boolean
+  guardian_ward_enrolled_channels: GuardianChannel
+  guardian_payment_receipt_enabled: boolean
+  guardian_payment_receipt_channels: GuardianChannel
+  guardian_debt_reminder_enabled: boolean
+  guardian_debt_reminder_channels: GuardianChannel
+  guardian_debt_reminder_auto_enabled: boolean
+  guardian_debt_reminder_frequency: DebtReminderFrequency
+  guardian_report_ready_enabled: boolean
+  guardian_report_ready_channels: GuardianChannel
+  guardian_next_term_fees_enabled: boolean
+  guardian_next_term_fees_channels: GuardianChannel
 }
 
 export type TransitionUrgency = 'amber' | 'red'

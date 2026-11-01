@@ -12,8 +12,10 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 import os
 import sys
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
+
+from celery.schedules import crontab
 
 
 
@@ -40,6 +42,25 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:5173',
 ]
 CORS_ALLOW_CREDENTIALS = True
+
+# Used for notification email CTAs and the app-logo fallback image URL.
+FRONTEND_URL = os.getenv(
+    'FRONTEND_URL',
+    os.getenv('FRONTEND_BASE_URL', 'http://localhost:3003'),
+)
+
+# Absolute origin for unauthenticated guardian links (receipts, reports).
+# Compose publishes the API on host port 9000 by default.
+PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL', 'http://localhost:9000').rstrip('/')
+RECEIPT_LINK_MAX_AGE_SECONDS = int(
+    os.getenv('RECEIPT_LINK_MAX_AGE_SECONDS', str(60 * 60 * 24 * 30)),
+)
+REPORT_LINK_MAX_AGE_SECONDS = int(
+    os.getenv('REPORT_LINK_MAX_AGE_SECONDS', str(60 * 60 * 24 * 30)),
+)
+FEE_SCHEDULE_LINK_MAX_AGE_SECONDS = int(
+    os.getenv('FEE_SCHEDULE_LINK_MAX_AGE_SECONDS', str(60 * 60 * 24 * 90)),
+)
 
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3003',
@@ -73,6 +94,7 @@ INSTALLED_APPS = [
     'cloudinary_storage',
     'django_filters',
     'storages',
+    'anymail',
 
     # Local apps
     'schools',
@@ -86,6 +108,7 @@ INSTALLED_APPS = [
     'dashboard',
     'activities',
     'reports',
+    'notifications',
 ]
 
 MIDDLEWARE = [
@@ -319,3 +342,51 @@ STORAGES = {
         },
     },
 }
+
+
+# ---------------------------------------------------------------------------
+# Email (Anymail → Resend) + Celery (staff notification email + guardian SMS/email batches)
+# ---------------------------------------------------------------------------
+
+def _env_flag(name: str, default: str = 'false') -> bool:
+    return os.getenv(name, default).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+EMAIL_ENABLED = _env_flag('EMAIL_ENABLED', 'false')
+RESEND_API_KEY = os.getenv('RESEND_API_KEY', '').strip()
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@localhost')
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+ANYMAIL = {
+    'RESEND_API_KEY': RESEND_API_KEY,
+}
+
+if EMAIL_ENABLED and RESEND_API_KEY:
+    EMAIL_BACKEND = 'anymail.backends.resend.EmailBackend'
+else:
+    # Local / CI without Resend: print to console (tests override to locmem).
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://redis:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', CELERY_BROKER_URL)
+CELERY_TASK_TRACK_STARTED = True
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_ENABLE_UTC = True
+
+# Daily check; each school only sends when its frequency says today is due.
+CELERY_BEAT_SCHEDULE = {
+    'fees-auto-debt-reminders-daily': {
+        'task': 'fees.run_auto_debt_reminders',
+        'schedule': crontab(hour=8, minute=0),
+    },
+}
+
+# Run tasks inline during tests so CI does not need Redis.
+if 'test' in sys.argv:
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+    EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+    EMAIL_ENABLED = True

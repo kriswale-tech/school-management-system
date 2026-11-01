@@ -58,6 +58,10 @@ staticfiles/
 backups/
 *.sql
 
+# Celery beat local schedule DB
+celerybeat-schedule
+celerybeat-schedule.*
+
 # Environment files
 .env
 .env.*

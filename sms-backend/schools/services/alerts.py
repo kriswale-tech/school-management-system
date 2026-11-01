@@ -116,7 +116,10 @@ def list_school_alerts(*, school, membership) -> list[dict]:
                 'href': '/assessments',
             })
 
-    if preferences.enrollments_alert_enabled and role == User.RoleChoices.ADMIN:
+    if preferences.enrollments_alert_enabled and role in (
+        User.RoleChoices.ADMIN,
+        User.RoleChoices.STAFF,
+    ):
         count = ClassEnrollment.objects.filter(
             term=term,
             student__school=school,

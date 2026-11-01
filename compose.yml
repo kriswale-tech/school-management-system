@@ -13,45 +13,43 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      # redis:
-      #   condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
-  # celery-worker:
-  #   container_name: sms_celery_worker
-  #   build:
-  #     context: ./sms-backend
-  #     dockerfile: Dockerfile
-  #   command: celery -A core worker -l info
-  #   volumes:
-  #     - ./sms-backend:/app
-  #     - ./secrets:/secrets:ro
-  #   env_file:
-  #     - .env
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #   restart: unless-stopped
+  celery-worker:
+    container_name: sms_celery_worker
+    build:
+      context: ./sms-backend
+      dockerfile: Dockerfile
+    command: celery -A core worker -l info
+    volumes:
+      - ./sms-backend:/app
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
 
-  # celery-beat:
-  #   container_name: sms_celery_beat
-  #   build:
-  #     context: ./sms-backend
-  #     dockerfile: Dockerfile
-  #   command: celery -A core beat -l info
-  #   volumes:
-  #     - ./sms-backend:/app
-  #     - ./secrets:/secrets:ro
-  #   env_file:
-  #     - .env
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #   restart: unless-stopped
+  celery-beat:
+    container_name: sms_celery_beat
+    build:
+      context: ./sms-backend
+      dockerfile: Dockerfile
+    command: celery -A core beat -l info
+    volumes:
+      - ./sms-backend:/app
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
 
   frontend:
     container_name: sms_frontend
@@ -83,17 +81,19 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # redis:
-  #   container_name: sms_redis
-  #   image: redis:7-alpine
-  #   ports:
-  #     - "6379:6379"
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test: ["CMD", "redis-cli", "ping"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  # Host 6379 is already used by another local Redis container.
+  # Map SMS Redis to 6380 on the host; containers still talk on redis:6379.
+  redis:
+    container_name: sms_redis
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   sms_db_data:

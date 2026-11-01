@@ -30,6 +30,13 @@ class Activity(BaseModel):
         STUDENT_ENROLLED = 'student_enrolled', 'Student enrolled'
         STUDENT_LEFT = 'student_left', 'Student left'
         STUDENT_REACTIVATED = 'student_reactivated', 'Student reactivated'
+        STUDENT_UPDATED = 'student_updated', 'Student profile updated'
+        GUARDIAN_UPDATED = 'guardian_updated', 'Guardian updated'
+        MEMBER_INVITED = 'member_invited', 'Member invited'
+        MEMBER_UPDATED = 'member_updated', 'Member profile updated'
+        MEMBER_PHONE_CHANGED = 'member_phone_changed', 'Member phone changed'
+        MEMBER_ROLE_CHANGED = 'member_role_changed', 'Member role changed'
+        TERM_OPENED = 'term_opened', 'Term opened'
 
     school = models.ForeignKey(
         'schools.School',

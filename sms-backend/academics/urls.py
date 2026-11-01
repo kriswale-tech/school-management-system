@@ -29,6 +29,8 @@ from assessments.views import (
     AdminAssessmentOverviewView,
     AdminAssessmentReleaseView,
     AdminCorrectionReviewView,
+    AdminReportReadyPreviewView,
+    AdminReportReadySendView,
     AdminStudentCorrectionView,
     AdminStudentReportPreviewView,
     AdminStudentReportView,
@@ -156,6 +158,16 @@ urlpatterns = [
         'assessments/admin/classes/<uuid:stream_id>/release/',
         AdminAssessmentReleaseView.as_view(),
         name='academics-assessments-admin-class-release',
+    ),
+    path(
+        'assessments/admin/classes/<uuid:stream_id>/report-ready/preview/',
+        AdminReportReadyPreviewView.as_view(),
+        name='academics-assessments-admin-report-ready-preview',
+    ),
+    path(
+        'assessments/admin/classes/<uuid:stream_id>/report-ready/send/',
+        AdminReportReadySendView.as_view(),
+        name='academics-assessments-admin-report-ready-send',
     ),
     path(
         'assessments/admin/classes/<uuid:stream_id>/students/<uuid:student_id>/report/',

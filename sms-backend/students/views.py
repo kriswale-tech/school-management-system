@@ -213,6 +213,7 @@ class StudentDetailView(SchoolScopedAPIView):
         detail = update_student(
             school=self.school,
             student_id=student_id,
+            actor=request.user,
             **serializer.validated_data,
         )
         return Response(StudentDetailSerializer(detail).data)
@@ -431,6 +432,7 @@ class StudentGuardianDetailView(SchoolScopedAPIView):
             school=self.school,
             student_id=student_id,
             link_id=link_id,
+            actor=request.user,
             **serializer.validated_data,
         )
         return Response(StudentGuardianSerializer(guardian).data)

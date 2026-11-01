@@ -32,13 +32,19 @@ def record_activity(
     target_id=None,
     stream=None,
     teaching_assignment=None,
+    notify=True,
+    notify_recipients=None,
 ):
-    """Insert one feed row. Call this inside the action's transaction."""
+    """Insert one feed row. Call this inside the action's transaction.
+
+    When notify=True, Tier‑1 verbs also create personal inbox rows via the
+    notifications bridge. Pass notify_recipients for member-targeted events.
+    """
     actor_name = ''
     if actor is not None:
         actor_name = (actor.get_full_name() or '').strip()
 
-    return Activity.objects.create(
+    activity = Activity.objects.create(
         school=school,
         actor=actor,
         actor_name=actor_name,
@@ -51,6 +57,11 @@ def record_activity(
         stream=stream,
         teaching_assignment=teaching_assignment,
     )
+    if notify:
+        from notifications.services.bridge import notify_for_activity
+
+        notify_for_activity(activity, extra_recipients=notify_recipients)
+    return activity
 
 
 def list_activities(*, school, term=None):

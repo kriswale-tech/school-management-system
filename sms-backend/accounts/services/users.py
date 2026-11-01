@@ -90,7 +90,7 @@ def _ensure_not_last_admin(target: SchoolMembership) -> None:
 
 
 @transaction.atomic
-def add_school_member(school, validated_data: dict) -> SchoolMembership:
+def add_school_member(school, validated_data: dict, *, actor=None) -> SchoolMembership:
     """Add someone to a school, reusing their identity when the phone is known."""
     profile_data = {
         field: validated_data[field]
@@ -106,20 +106,41 @@ def add_school_member(school, validated_data: dict) -> SchoolMembership:
         # The person already exists elsewhere in the system; their own name and
         # profile stay authoritative, this school just gains access to them.
         membership, _ = link_user_to_school(user, school, role)
-        return membership
+    else:
+        user = User.objects.create(
+            phone_number=phone_number,
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
+            email=validated_data.get('email') or '',
+            is_active=True,
+        )
+        user.set_unusable_password()
+        user.save(update_fields=['password'])
+        Profile.objects.create(user=user, **profile_data)
 
-    user = User.objects.create(
-        phone_number=phone_number,
-        first_name=validated_data['first_name'],
-        last_name=validated_data['last_name'],
-        email=validated_data.get('email') or '',
-        is_active=True,
+        membership, _ = link_user_to_school(user, school, role)
+
+    from activities.models import Activity
+    from activities.services import record_activity
+    from schools.models import Term
+
+    name = (membership.user.get_full_name() or '').strip() or membership.user.phone_number
+    actor_name = (
+        (actor.get_full_name() or '').strip() if actor is not None else 'Someone'
+    ) or 'Someone'
+    role_label = User.RoleChoices(membership.role).label
+    term = Term.objects.filter(school=school, is_active=True).first()
+    record_activity(
+        school=school,
+        actor=actor,
+        verb=Activity.Verb.MEMBER_INVITED,
+        summary=f'{actor_name} added {name} as {role_label}.',
+        href='/staff',
+        term=term,
+        target_kind='membership',
+        target_id=membership.id,
+        notify_recipients=[membership],
     )
-    user.set_unusable_password()
-    user.save(update_fields=['password'])
-    Profile.objects.create(user=user, **profile_data)
-
-    membership, _ = link_user_to_school(user, school, role)
     return membership
 
 
@@ -283,6 +304,17 @@ def update_school_member(
         if field in validated_data
     }
 
+    from activities.models import Activity
+    from activities.services import record_activity
+    from notifications.services.recipients import admins_of
+    from schools.models import Term
+
+    term = Term.objects.filter(school=actor.school, is_active=True).first()
+    actor_user = actor.user
+    actor_name = (actor_user.get_full_name() or '').strip() or 'Someone'
+    old_role = target.role
+    role_changed = False
+
     if 'role' in validated_data:
         if actor.user_id == target.user_id:
             raise ValidationError({
@@ -300,11 +332,15 @@ def update_school_member(
                 'role': 'You do not have permission to assign this role.',
             })
 
-        target.role = validated_data['role']
-        target.save(update_fields=['role', 'updated_at'])
+        if validated_data['role'] != target.role:
+            target.role = validated_data['role']
+            target.save(update_fields=['role', 'updated_at'])
+            role_changed = True
 
     linked_existing_user = False
+    phone_changed = False
     if 'phone_number' in validated_data:
+        old_phone = target.user.phone_number
         target, linked_existing_user = change_member_phone_number(
             actor,
             target,
@@ -315,10 +351,76 @@ def update_school_member(
                 if field in validated_data
             },
         )
+        phone_changed = target.user.phone_number != old_phone or linked_existing_user
 
+    identity_changed = False
+    profile_changed = False
     if not linked_existing_user:
+        before_identity = {
+            field: getattr(target.user, field) for field in IDENTITY_FIELDS
+        }
         _update_identity(target.user, validated_data)
-        _update_profile(target.user, profile_data)
+        identity_changed = any(
+            before_identity[field] != getattr(target.user, field)
+            for field in IDENTITY_FIELDS
+            if field in validated_data
+        )
+        if profile_data:
+            profile, _ = Profile.objects.get_or_create(user=target.user)
+            before_profile = {field: getattr(profile, field) for field in profile_data}
+            _update_profile(target.user, profile_data)
+            profile.refresh_from_db()
+            profile_changed = any(
+                before_profile[field] != getattr(profile, field)
+                for field in profile_data
+            )
+
+    target_name = (target.user.get_full_name() or '').strip() or target.user.phone_number
+    editing_other = actor.user_id != target.user_id
+
+    if role_changed:
+        record_activity(
+            school=actor.school,
+            actor=actor_user,
+            verb=Activity.Verb.MEMBER_ROLE_CHANGED,
+            summary=(
+                f'{actor_name} changed {target_name}\'s role from '
+                f'{User.RoleChoices(old_role).label} to '
+                f'{User.RoleChoices(target.role).label}.'
+            ),
+            href='/staff',
+            term=term,
+            target_kind='membership',
+            target_id=target.id,
+            notify_recipients=[target],
+        )
+
+    if phone_changed and editing_other:
+        other_admins = list(admins_of(actor.school).exclude(id=actor.id))
+        record_activity(
+            school=actor.school,
+            actor=actor_user,
+            verb=Activity.Verb.MEMBER_PHONE_CHANGED,
+            summary=f'{actor_name} changed the login phone for {target_name}.',
+            href='/staff',
+            term=term,
+            target_kind='membership',
+            target_id=target.id,
+            notify_recipients=[target, *other_admins],
+        )
+
+    if editing_other and (identity_changed or profile_changed):
+        record_activity(
+            school=actor.school,
+            actor=actor_user,
+            verb=Activity.Verb.MEMBER_UPDATED,
+            summary=f'{actor_name} updated {target_name}\'s profile.',
+            href='/staff',
+            term=term,
+            target_kind='membership',
+            target_id=target.id,
+            notify_recipients=[target],
+        )
 
     return UpdateMemberResult(
         membership=target,

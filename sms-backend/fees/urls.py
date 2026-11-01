@@ -3,8 +3,11 @@ from django.urls import path
 from fees.views import (
     ApplyFeeStructureView,
     CopyFeeStructureFromPreviousView,
+    DebtReminderPreviewView,
+    DebtReminderSendView,
     FeeDeskFilterOptionsView,
     FeeDeskListView,
+    FeeDeskSelectionIdsView,
     FeeDeskStatsView,
     FeeStructureDetailView,
     FeeStructureItemCreateView,
@@ -18,9 +21,20 @@ from fees.views import (
 urlpatterns = [
     path('', FeeDeskListView.as_view(), name='fee-desk-list'),
     path('stats/', FeeDeskStatsView.as_view(), name='fee-desk-stats'),
+    path('selection-ids/', FeeDeskSelectionIdsView.as_view(), name='fee-desk-selection-ids'),
     path('filter-options/', FeeDeskFilterOptionsView.as_view(), name='fee-desk-filter-options'),
     path('next-term-prep/', NextTermFeePrepView.as_view(), name='fee-next-term-prep'),
     path('payments/', RecordPaymentView.as_view(), name='record-payment'),
+    path(
+        'debt-reminders/preview/',
+        DebtReminderPreviewView.as_view(),
+        name='debt-reminder-preview',
+    ),
+    path(
+        'debt-reminders/send/',
+        DebtReminderSendView.as_view(),
+        name='debt-reminder-send',
+    ),
     path(
         'students/<uuid:student_id>/payment-target/',
         StudentPaymentTargetView.as_view(),

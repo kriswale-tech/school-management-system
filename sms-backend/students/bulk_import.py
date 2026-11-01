@@ -194,6 +194,7 @@ def commit_student_bulk_import(
     term = get_active_term(school)
     summary = StudentBulkImportSummary(rows_total=len(rows), rows_processed=len(rows))
     failed_rows: list[dict] = []
+    ward_enrolled_notices: list[dict] = []
 
     for row in rows:
         messages: list[str] = []
@@ -211,6 +212,7 @@ def commit_student_bulk_import(
                     context=context,
                     row=row,
                     summary=summary,
+                    ward_enrolled_notices=ward_enrolled_notices,
                 )
         except ValidationError as exc:
             detail = exc.detail
@@ -240,11 +242,32 @@ def commit_student_bulk_import(
     if failed_rows:
         failures = _write_failure_export(school, failed_rows, upload_format=upload_format)
 
+    if ward_enrolled_notices:
+        _schedule_bulk_ward_enrolled_notices(ward_enrolled_notices)
+
     return StudentBulkImportResult(
         dry_run=False,
         summary=summary,
         failures=failures,
     )
+
+
+def _schedule_bulk_ward_enrolled_notices(notices: list[dict]) -> None:
+    """Queue guardian ward-enrolled notices after the import transaction commits."""
+    from students.tasks import notify_bulk_ward_enrolled_task
+
+    payload = [
+        {
+            'student_id': str(item['student_id']),
+            'class_name': item.get('class_name') or '',
+        }
+        for item in notices
+    ]
+
+    def _run():
+        notify_bulk_ward_enrolled_task.delay(payload)
+
+    transaction.on_commit(_run)
 
 
 def get_failure_export_path(school_id, token: str, upload_format: str) -> Path:
@@ -349,7 +372,15 @@ def _validate_row(context, row: ParsedStudentBulkRow) -> list[str]:
     return messages
 
 
-def _create_student_from_row(*, school, term, context, row: ParsedStudentBulkRow, summary):
+def _create_student_from_row(
+    *,
+    school,
+    term,
+    context,
+    row: ParsedStudentBulkRow,
+    summary,
+    ward_enrolled_notices: list[dict] | None = None,
+):
     stream, stream_error = context.resolve_stream(row.class_name)
     if stream_error or stream is None:
         raise ValidationError({'class_name': stream_error or 'Class not found.'})
@@ -398,6 +429,11 @@ def _create_student_from_row(*, school, term, context, row: ParsedStudentBulkRow
         is_new_student=is_new_student,
     )
     summary.students_created += 1
+    if ward_enrolled_notices is not None:
+        ward_enrolled_notices.append({
+            'student_id': student.id,
+            'class_name': stream.full_name,
+        })
 
 
 def _parse_date(value: str) -> date | None:

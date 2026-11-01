@@ -1,0 +1,17 @@
+{% if greeting %}{{ greeting }}
+
+{% endif %}{{ title }}
+
+{{ body }}
+{% if meta_label %}
+{{ meta_label }}: {{ meta_value }}
+{% endif %}
+{% if cta_url %}
+{{ cta_label|default:"Open in app" }}:
+{{ cta_url }}
+{% endif %}
+
+—
+You received this email because you have an account at {{ school_name }}.
+{% if footer_note %}{{ footer_note }}
+{% endif %}Sent via School Management System

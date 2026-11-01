@@ -36,6 +36,8 @@ import type {
   ClassTeacherAssessmentDetail,
   ClassTeacherAssessmentOverview,
   CorrectionRequest,
+  ReportReadyPreview,
+  ReportReadySendResult,
   SaveMarksPayload,
 } from './assessment/types'
 
@@ -337,6 +339,32 @@ export const releaseAdminAssessmentStudents = async (
 ): Promise<AdminAssessmentDetail> => {
   const response = await api.post<AdminAssessmentDetail>(
     `/academics/assessments/admin/classes/${streamId}/release/`,
+    payload,
+    { params: termId ? { term_id: termId } : undefined },
+  )
+  return response.data
+}
+
+export const previewReportReadyNotices = async (
+  streamId: string,
+  payload: { student_ids: string[]; term_id?: string },
+  termId?: string,
+): Promise<ReportReadyPreview> => {
+  const response = await api.post<ReportReadyPreview>(
+    `/academics/assessments/admin/classes/${streamId}/report-ready/preview/`,
+    payload,
+    { params: termId ? { term_id: termId } : undefined },
+  )
+  return response.data
+}
+
+export const sendReportReadyNotices = async (
+  streamId: string,
+  payload: { student_ids: string[]; term_id?: string },
+  termId?: string,
+): Promise<ReportReadySendResult> => {
+  const response = await api.post<ReportReadySendResult>(
+    `/academics/assessments/admin/classes/${streamId}/report-ready/send/`,
     payload,
     { params: termId ? { term_id: termId } : undefined },
   )

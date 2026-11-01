@@ -59,9 +59,17 @@ const schema = z.object({
   ),
   is_emergency_contact: z.boolean(),
   is_primary: z.boolean(),
+  notify_channel: z.enum(['sms', 'email', 'both', 'off']),
 })
 
 type EditGuardianFormValues = z.infer<typeof schema>
+
+const NOTIFY_CHANNEL_OPTIONS = [
+  { value: 'both', label: 'SMS and email' },
+  { value: 'sms', label: 'SMS only' },
+  { value: 'email', label: 'Email only' },
+  { value: 'off', label: 'Do not notify' },
+]
 
 type EditGuardianFormProps = {
   open: boolean
@@ -79,6 +87,7 @@ const mapGuardianToFormValues = (guardian: StudentGuardian): EditGuardianFormVal
   relationship: guardian.relationship,
   is_emergency_contact: guardian.is_emergency_contact,
   is_primary: guardian.is_primary,
+  notify_channel: guardian.notify_channel ?? 'both',
 })
 
 const EditGuardianForm = ({ open, studentId, guardian, onClose }: EditGuardianFormProps) => {
@@ -101,6 +110,7 @@ const EditGuardianForm = ({ open, studentId, guardian, onClose }: EditGuardianFo
       relationship: 'guardian',
       is_emergency_contact: false,
       is_primary: false,
+      notify_channel: 'both',
     },
   })
 
@@ -222,6 +232,26 @@ const EditGuardianForm = ({ open, studentId, guardian, onClose }: EditGuardianFo
                 onBlur={field.onBlur}
                 placeholder="Select relationship"
                 error={errors.relationship?.message}
+              />
+            )}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <FormLabel
+            label="Parent messages"
+            helperText="School settings still decide which events fire. Email only sends when an address is set."
+          />
+          <Controller
+            name="notify_channel"
+            control={control}
+            render={({ field }) => (
+              <SelectField
+                options={NOTIFY_CHANNEL_OPTIONS}
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                error={errors.notify_channel?.message}
               />
             )}
           />

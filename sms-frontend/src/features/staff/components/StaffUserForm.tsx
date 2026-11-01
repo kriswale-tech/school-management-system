@@ -105,6 +105,19 @@ const StaffUserForm = ({
       </div>
 
       <div className="space-y-2">
+        <FormLabel label="Email Address" className="font-normal text-base" />
+        <InputField
+          placeholder="e.g. user@school.com"
+          type="email"
+          error={errors.email?.message}
+          {...register('email')}
+        />
+        <p className="text-sm text-slate-500">
+          Optional. School notifications will be sent to this email when available.
+        </p>
+      </div>
+
+      <div className="space-y-2">
         <FormLabel label="Gender" className="font-normal text-base" />
         <Controller
           name="gender"
@@ -134,16 +147,6 @@ const StaffUserForm = ({
           type="tel"
           error={errors.phone_number_alt?.message}
           {...register('phone_number_alt')}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <FormLabel label="Email Address" className="font-normal text-base" />
-        <InputField
-          placeholder="e.g. user@school.com"
-          type="email"
-          error={errors.email?.message}
-          {...register('email')}
         />
       </div>
 

@@ -7,7 +7,7 @@ Deferred fees work. How the live product works: [fees.md](./fees.md).
 | Item | Notes |
 | --- | --- |
 | **Payment history Excel export** | Download modal UI exists on student fees → Payment History. Scope filters: All time, Academic year, Term. Generate `.xlsx` and wire the Download Excel button. |
-| **Receipt view / PDF** | Payment history receipt column shows an eye when a receipt exists (UI-only for now). Add receipt detail view and/or PDF download. |
+| **Receipt view / PDF (staff UI)** | Payment history receipt column shows an eye when a receipt exists (UI-only for now). Guardians already get a **signed public HTML receipt** link when Parent messages → Payment is enabled — see [guardian-communications.md](./guardian-communications.md). Staff in-app receipt viewer/PDF still open. |
 | **Arrears report across terms** | Balances stay on the term where they were billed. There is no single report of debtors across every past term. |
 | **Advance refund flow** | Credit model supports `refunded` status, but there is no UI/API yet to refund unused advance back to a parent (e.g. withdrawal, overpayment return). Add later: refund action, ledger entry, and indicators. |
 | **Pay with no outstanding (pure advance)** | Today you can only record a payment when there is an owing term; excess becomes advance. Recording a payment when fully paid (to top up advance only) is not supported yet. |

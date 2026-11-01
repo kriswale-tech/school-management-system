@@ -110,6 +110,67 @@ export type StudentPaymentTarget = {
   has_advance: boolean
 }
 
+export type DebtReminderRequest = {
+  term_id?: string | null
+  student_ids: string[]
+}
+
+export type DebtReminderGuardianPlan = {
+  parent_id: string
+  parent_name: string
+  channels: string[]
+}
+
+export type DebtReminderEligible = {
+  student_id: string
+  full_name: string
+  student_code: string
+  balance: string
+  guardians: DebtReminderGuardianPlan[]
+}
+
+export type DebtReminderSkipped = {
+  student_id: string
+  full_name?: string
+  balance?: string
+  reason: string
+}
+
+export type FeeDeskSelectionIds = {
+  student_ids: string[]
+  count: number
+}
+
+export type DebtReminderPreview = {
+  enabled: boolean
+  audience: 'primary' | 'all'
+  channels: 'sms' | 'email' | 'both' | null
+  term_id: string
+  term_label: string
+  requested_count: number
+  eligible_count: number
+  skipped_count: number
+  sms_count: number
+  email_count: number
+  batch_size: number
+  eligible_ids: string[]
+  eligible: DebtReminderEligible[]
+  skipped: DebtReminderSkipped[]
+  eligible_truncated: boolean
+  skipped_truncated: boolean
+}
+
+export type DebtReminderSendResult = {
+  batch_id: string
+  term_id: string
+  term_label: string
+  queued: boolean
+  students_notified: number
+  sms_sent: number
+  email_sent: number
+  skipped_count: number
+}
+
 export type RecordPaymentPayload = {
   student_id: string
   amount: string | number

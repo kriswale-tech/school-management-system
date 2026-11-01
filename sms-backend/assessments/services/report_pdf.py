@@ -193,6 +193,24 @@ def generate_student_report(
     report.generated_at = timezone.now()
     report.generated_by = getattr(membership, 'user', None)
     report.save()
+
+    from assessments.services.report_ready_notices import maybe_auto_notify_report_ready
+
+    # Reload relations needed for guardian messaging.
+    report = (
+        Report.objects.select_related(
+            'school',
+            'student',
+            'stream',
+            'term',
+            'term__academic_year',
+        ).get(pk=report.pk)
+    )
+
+    def _notify():
+        maybe_auto_notify_report_ready(report=report)
+
+    transaction.on_commit(_notify)
     return serialize_stored_report(report)
 
 

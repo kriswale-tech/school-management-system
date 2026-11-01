@@ -1,0 +1,12 @@
+{% if greeting %}{{ greeting }}
+
+{% endif %}Fees for {{ student_name }} at {{ school_name }} ({{ term_label }}) have been set.
+
+Total: GHS {{ total }}
+
+{% for item in items %}- {{ item.name }}: GHS {{ item.amount }}
+{% endfor %}
+View / download the full schedule:
+{{ schedule_url }}
+
+If you have questions, please contact the school.

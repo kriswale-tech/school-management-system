@@ -1,6 +1,7 @@
 import { Icon } from '@iconify/react'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
+import toast from 'react-hot-toast'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import ActionBar from '@/components/shared/ActionBar'
 import StatsCard from '@/components/shared/StatsCard'
@@ -11,16 +12,24 @@ import { getClasses } from '@/features/classes/services'
 import { Capability } from '@/features/auth/capabilities'
 import { useCan } from '@/features/auth/hooks/useCan'
 import FeePrepNotice from '@/features/dashboard/components/FeePrepNotice'
+import { getApiErrorMessage } from '@/utils'
+import DebtReminderModal from '../components/DebtReminderModal'
 import FeesTable from '../components/FeesTable'
 import RecordPaymentSlider from '../components/RecordPaymentSlider'
-import { getFeeDeskFilterOptions, getFeeDeskList, getFeeDeskStats } from '../services'
-import type { FeeDeskQueryParams } from '../types'
+import {
+  getFeeDeskFilterOptions,
+  getFeeDeskList,
+  getFeeDeskSelectionIds,
+  getFeeDeskStats,
+} from '../services'
+import type { FeeDeskQueryParams, FeeDeskRow } from '../types'
 import {
   FEE_DESK_FILTERS_QUERY_KEY,
   FEE_DESK_QUERY_KEY,
   FEE_DESK_STATS_QUERY_KEY,
   formatDebtorsStat,
   formatFeeAmount,
+  isFeeDeskDebtor,
 } from '../utils'
 
 const STATUS_FILTER_OPTIONS = [
@@ -44,6 +53,10 @@ const Fees = () => {
   const [termSelection, setTermSelection] = useState<FilterSelection | undefined>(undefined)
   const [page, setPage] = useState(1)
   const [recordOpen, setRecordOpen] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [reminderOpen, setReminderOpen] = useState(false)
+  const [isSelectingAll, setIsSelectingAll] = useState(false)
+  const [matchingDebtorCount, setMatchingDebtorCount] = useState<number | null>(null)
 
   const debtors = debtorsFromParam(searchParams.get('debtors'))
 
@@ -114,6 +127,61 @@ const Fees = () => {
     label: item.label,
   }))
 
+  const selectedCount = selectedIds.size
+  const selectedIdList = useMemo(() => Array.from(selectedIds), [selectedIds])
+  const pageDebtorIds = useMemo(
+    () =>
+      (data?.results ?? [])
+        .filter((row) => isFeeDeskDebtor(row.remaining_balance))
+        .map((row) => row.id),
+    [data?.results],
+  )
+  const allMatchingSelected =
+    matchingDebtorCount !== null &&
+    matchingDebtorCount > 0 &&
+    selectedCount >= matchingDebtorCount &&
+    pageDebtorIds.every((id) => selectedIds.has(id))
+
+  const toggleRow = (row: FeeDeskRow) => {
+    if (!isFeeDeskDebtor(row.remaining_balance)) return
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(row.id)) next.delete(row.id)
+      else next.add(row.id)
+      return next
+    })
+  }
+
+  const selectAllMatching = async () => {
+    if (isSelectingAll) return
+    setIsSelectingAll(true)
+    try {
+      const result = await getFeeDeskSelectionIds(statsParams)
+      setMatchingDebtorCount(result.count)
+      setSelectedIds(new Set(result.student_ids.map(String)))
+      if (result.count === 0) {
+        toast('No debtors match the current filters')
+      }
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Unable to select all debtors'))
+    } finally {
+      setIsSelectingAll(false)
+    }
+  }
+
+  const clearSelection = () => {
+    setSelectedIds(new Set())
+    setMatchingDebtorCount(null)
+  }
+
+  const toggleSelectAllMatching = async () => {
+    if (allMatchingSelected) {
+      clearSelection()
+      return
+    }
+    await selectAllMatching()
+  }
+
   return (
     <div className="space-y-6">
       <FeePrepNotice variant="banner" />
@@ -123,6 +191,7 @@ const Fees = () => {
           onChange={(value) => {
             setSearch(value)
             setPage(1)
+            clearSelection()
           }}
         />
         <FilterComponent
@@ -134,6 +203,7 @@ const Fees = () => {
           onChange={(value) => {
             setClassLevel(value)
             setPage(1)
+            clearSelection()
           }}
         />
         <FilterComponent
@@ -145,6 +215,7 @@ const Fees = () => {
           onChange={(value) => {
             setTermSelection(value)
             setPage(1)
+            clearSelection()
           }}
         />
         <FilterComponent
@@ -155,6 +226,7 @@ const Fees = () => {
           placeholder="All Students"
           onChange={(value) => {
             setDebtors(value)
+            clearSelection()
           }}
         />
         {canRecordPayment ? (
@@ -196,6 +268,41 @@ const Fees = () => {
         />
       </div>
 
+      {canRecordPayment && selectedCount > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 custom-shadow-md">
+          <p className="text-sm text-slate-700">
+            <span className="font-medium text-slate-900">{selectedCount}</span> student
+            {selectedCount === 1 ? '' : 's'} selected
+            {matchingDebtorCount !== null && allMatchingSelected ? (
+              <span className="ml-2 text-slate-500">(all matching debtors)</span>
+            ) : null}
+            <button
+              type="button"
+              className="ml-3 text-sm text-sky-700 hover:underline"
+              onClick={clearSelection}
+            >
+              Clear
+            </button>
+          </p>
+          <Button
+            type="button"
+            className="max-w-fit py-2 text-sm"
+            onClick={() => setReminderOpen(true)}
+          >
+            <Icon icon="hugeicons:mail-01" className="size-4" />
+            Remind parents
+          </Button>
+        </div>
+      ) : null}
+
+      {canRecordPayment && selectedCount === 0 ? (
+        <p className="text-sm text-slate-500">
+          Select debtors in the table to send parent fee reminders. Use the header checkbox to
+          select all matching debtors across pages
+          {debtors !== true ? ' (tip: filter Status → Debtors only)' : ''}.
+        </p>
+      ) : null}
+
       <FeesTable
         rows={data?.results ?? []}
         isLoading={!filtersReady || isLoading}
@@ -204,9 +311,25 @@ const Fees = () => {
         onViewRow={(row) => {
           navigate(`/fees/${row.id}`)
         }}
+        selectionEnabled={canRecordPayment}
+        selectedIds={selectedIds}
+        onToggleRow={toggleRow}
+        selectAllChecked={allMatchingSelected}
+        selectAllIndeterminate={selectedCount > 0 && !allMatchingSelected}
+        selectAllLoading={isSelectingAll}
+        onToggleSelectAll={toggleSelectAllMatching}
       />
       {canRecordPayment ? (
         <RecordPaymentSlider open={recordOpen} onClose={() => setRecordOpen(false)} />
+      ) : null}
+      {canRecordPayment ? (
+        <DebtReminderModal
+          open={reminderOpen}
+          termId={term === '' ? null : String(term)}
+          studentIds={selectedIdList}
+          onClose={() => setReminderOpen(false)}
+          onSent={clearSelection}
+        />
       ) : null}
     </div>
   )

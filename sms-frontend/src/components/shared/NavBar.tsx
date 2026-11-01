@@ -4,6 +4,7 @@ import { useAuth } from '@/features/auth/hooks'
 import { getAcademicYearAndTerm } from '@/features/setup/academic-year-and-term/services'
 import type { TermApiKey } from '@/features/setup/academic-year-and-term/types'
 import ProfileComponent from './ProfileComponent'
+import NotificationsMenu from '@/features/notifications/components/NotificationsMenu'
 import AlertsMenu from '@/features/settings/components/AlertsMenu'
 import { useTransitionWizard } from '@/features/settings/hooks/useTransitionWizard'
 import { getTransitionStatus, TRANSITION_STATUS_QUERY_KEY } from '@/features/settings/services'
@@ -67,7 +68,7 @@ const NavBar = () => {
         ) : null}
       </div>
 
-      {/* Notification and Profile */}
+      {/* Alerts, notifications, and profile */}
       <div className="flex items-center gap-2">
         {isAdmin && transitionWizard && transition?.visible ? (
           <button
@@ -84,6 +85,7 @@ const NavBar = () => {
           </button>
         ) : null}
         <AlertsMenu />
+        <NotificationsMenu />
         <ProfileComponent />
       </div>
     </nav>

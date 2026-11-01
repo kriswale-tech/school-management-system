@@ -1,0 +1,7 @@
+{% if greeting %}{{ greeting }}
+
+{% endif %}This is a fees reminder from {{ school_name }}.
+
+{{ student_name }} has an outstanding balance of GHS {{ balance }} for {{ term_label }}.
+
+Please contact the school to arrange payment.

@@ -96,7 +96,7 @@ const AlertsSection = () => {
               setDraftOverride({ ...draft, enrollments_alert_enabled: event.target.checked })
             }
           >
-            New enrollments for admins
+            New enrollments for admins and staff
           </CheckboxField>
           <CheckboxField
             checked={draft.transition_popup_enabled}

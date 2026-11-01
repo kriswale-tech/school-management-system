@@ -1,6 +1,6 @@
 # Project status — built vs left
 
-Snapshot of the School Management System as of **2026-10-26**.
+Snapshot of the School Management System as of **2026-10-27**.
 
 ## Verdict
 
@@ -21,7 +21,7 @@ Snapshot of the School Management System as of **2026-10-26**.
 
 ### Auth & accounts (done)
 
-- Phone-based signup / login with OTP verify + resend (OTP printed in DEBUG; `shared/services/arkesel_sms.py` exists but is **not wired** into OTP)
+- Phone-based signup / login with OTP verify + resend. **Login OTP** is sent via Arkesel SMS (primary) and email when the user has one; if SMS fails in DEBUG the code is printed to the console. **Signup OTP** is still DEBUG-console only for now.
 - Multi-school: `SchoolMembership`, create school, select school
 - Roles: `admin`, `teacher`, `accountant`, `staff` with dedicated capability packs in `accounts/capabilities.py` (fine-grained DB `Permission` / `RolePermission` models remain unused)
 - User CRUD for school staff (`/api/v1/accounts/users/`)
@@ -49,7 +49,9 @@ After setup, admins use `/settings` (tabs keep the selection in the URL). Signup
 - **School profile** — name, contact, logo, and the prefix used on new student IDs (`GET`/`PATCH /schools/school/`). Existing student IDs stay as they are.
 - **Academic year** — every year and its three terms. The current term is marked. Past years are view-only. Adding the next year saves dates only; the current term stays current. New terms with no assessment setup receive a copy of the latest previous setup.
 - **Open the next term** — wizard from the navbar, the admin dashboard, and Academic year. Places pupils, marks leavers graduated, copies teachers, applies the next fee catalog, then makes that term current. See [term-transition.md](./term-transition.md).
-- **Alerts** — in-app rules for outstanding fees, unreleased results, and new enrollments. The navbar bell lists the ones that apply to the signed-in role. One more switch controls the dashboard popup while opening the next term still needs action.
+- **Alerts** — in-app rules for outstanding fees, unreleased results, and new enrollments (admin + staff). Navbar **bell** lists the ones that apply to the signed-in role. One more switch controls the dashboard popup while opening the next term still needs action.
+- **Parent messages** — guardian SMS/email policy (audience, channels, event toggles) + SMS credits placeholder. Ward enrolled, receipts, debt reminders, and report ready are live; see [guardian-communications.md](./guardian-communications.md).
+- **Notifications** — personal in-app inbox (`notifications` app) on the navbar **inbox** icon for workflow and identity events (assignments, results pipeline, enrollments, member/student profile changes, term opened). See [notifications.md](./notifications.md). Email/Celery delivery is next.
 - **Fees, assessments, and classes** — the same screens as `/fees/settings`, `/assessments/settings`, and `/classes/manage`, also opened from `/settings/fees`, `/settings/assessments`, and `/settings/classes`. Those original routes stay in place.
 
 ### Academics / curriculum (done)
@@ -120,7 +122,7 @@ Runtime scoring, class/admin assessment, and the student **Reports & Assessment*
 
 | Area | Gap |
 | --- | --- |
-| **OTP delivery** | Wire existing Arkesel client into `send_otp` (or another SMS provider) |
+| **OTP delivery** | Login uses Arkesel SMS (+ email if set); signup still DEBUG-console only |
 | **Fine-grained permissions** | `Permission` / `RolePermission` unused; access is coarse role flags |
 | **Fees/Assessments apps** | Empty `views.py`; no dedicated URL includes under `core/urls.py` |
 | **Celery / Redis** | Commented out in Compose — needed if async bulk jobs / SMS queues are planned |
@@ -166,17 +168,19 @@ Under `/api/v1/`:
 - `fees/` — desk list, stats, filter options, payments, structures (publish/apply/copy), next-term prep  
 - `reports/` — overview, teacher desk, academic/finance/enrollment/staff insights  
 - `dashboard/`, `activities/` — admin/teacher dashboards and activity feed  
+- `notifications/` — personal in-app inbox (list, unread count, mark read) + guardian delivery log
+- Guardian communications — ward enrolled (onboard + bulk import), payment receipt links, manual + automatic debt reminders (end-of-month default), report-ready signed links, next-term fee schedules; Celery batch SMS/email (100) + beat; see [guardian-communications.md](./guardian-communications.md)
 
-**Still light / deferred:** receipt PDF download, advance refund, Excel fee export.
+**Still light / deferred:** staff receipt PDF in app, advance refund, Excel fee export; SMS credits UI (per school here + platform admin elsewhere).
 
 ---
 
 ## Suggested next build order
 
-1. Fees operations API + `/fees` UI (record payment → receipt → student balance stays correct)  
-2. Assessment scoring models/APIs + teacher/admin UI + student reports tab  
-3. ~~Real dashboard~~ Done for admin and teacher ([dashboard.md](./dashboard.md))  
-4. Promote `/staff` from stub  
-5. SMS OTP provider + optional Celery for bulk/async work  
+1. Turn on Resend in prod/staging (`EMAIL_ENABLED=true` + verified `DEFAULT_FROM_EMAIL`) — see [notifications.md](./notifications.md)  
+2. SMS credits — see [guardian-communications.md](./guardian-communications.md)  
+3. Signup OTP via Arkesel (login already wired)  
+4. Tier 2 staff notification events + preferences  
+5. Remaining fees polish (receipt PDF, refunds, Excel export)
 
 See also [FEATURES.md](./FEATURES.md) for a domain-by-domain checklist and [ARCHITECTURE.md](./ARCHITECTURE.md) for how the pieces fit.

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment receipt</title>
+</head>
+<body style="margin:0; padding:0; background-color:#eef2f6; font-family:'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a;">
+  <span style="display:none !important; visibility:hidden; opacity:0; color:transparent; height:0; width:0; overflow:hidden;">
+    {{ preheader }}
+  </span>
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#eef2f6;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="width:560px; max-width:560px;">
+          <tr>
+            <td align="center" style="padding:0 0 20px 0;">
+              <img
+                src="{{ app_logo_url }}"
+                alt="App logo"
+                width="140"
+                style="display:block; width:140px; height:auto; max-height:56px;"
+              >
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#ffffff; border-radius:18px; border:1px solid #e2e8f0; overflow:hidden;">
+                <tr>
+                  <td style="height:4px; background-color:#0369a1; font-size:0; line-height:0;">&nbsp;</td>
+                </tr>
+                <tr>
+                  <td style="padding:32px 36px;">
+                    {% if greeting %}
+                    <p style="margin:0 0 16px 0; font-size:15px; line-height:1.6; color:#334155;">{{ greeting }}</p>
+                    {% endif %}
+                    <h1 style="margin:0 0 12px 0; font-size:22px; font-weight:700; letter-spacing:-0.02em; color:#0f172a;">
+                      Payment received
+                    </h1>
+                    <p style="margin:0 0 12px 0; font-size:15px; line-height:1.65; color:#475569;">
+                      We received <strong style="color:#0f172a;">GHS {{ amount }}</strong> for
+                      <strong style="color:#0f172a;">{{ student_name }}</strong> at
+                      <strong style="color:#0f172a;">{{ school_name }}</strong>.
+                    </p>
+                    <p style="margin:0 0 24px 0; font-size:14px; line-height:1.6; color:#64748b;">
+                      Receipt {{ receipt_number }}
+                    </p>
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="border-radius:10px; background-color:#0369a1;">
+                          <a
+                            href="{{ receipt_url }}"
+                            style="display:inline-block; padding:12px 20px; font-size:14px; font-weight:600; color:#ffffff; text-decoration:none;"
+                          >
+                            View receipt
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="margin:24px 0 0 0; font-size:12px; line-height:1.6; color:#94a3b8;">
+                      If the button does not work, open this link:<br>
+                      <a href="{{ receipt_url }}" style="color:#0369a1; word-break:break-all;">{{ receipt_url }}</a>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:24px 12px 8px 12px;">
+              <p style="margin:0; font-size:11px; line-height:1.5; color:#94a3b8;">
+                Sent via School Management System
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

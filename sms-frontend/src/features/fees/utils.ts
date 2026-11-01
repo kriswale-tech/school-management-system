@@ -32,3 +32,6 @@ export const formatFeeTransactionDate = (value: string | null) => {
 
 export const formatDebtorsStat = (debtors: number, totalStudents: number) =>
   `${debtors}/${totalStudents}`
+
+export const isFeeDeskDebtor = (remainingBalance: string | number) =>
+  Number(remainingBalance) > 0

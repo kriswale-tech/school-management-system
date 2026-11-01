@@ -46,6 +46,15 @@ const relationshipSchema = z.enum(
   { message: 'Relationship is required' },
 )
 
+const notifyChannelSchema = z.enum(['sms', 'email', 'both', 'off'])
+
+const NOTIFY_CHANNEL_OPTIONS = [
+  { value: 'both', label: 'SMS and email' },
+  { value: 'sms', label: 'SMS only' },
+  { value: 'email', label: 'Email only' },
+  { value: 'off', label: 'Do not notify' },
+]
+
 const schema = z.discriminatedUnion('mode', [
   z.object({
     mode: z.literal('new'),
@@ -57,6 +66,7 @@ const schema = z.discriminatedUnion('mode', [
       .refine((value) => !value || z.string().email().safeParse(value).success, {
         message: 'Invalid email address',
       }),
+    notify_channel: notifyChannelSchema,
     relationship: relationshipSchema,
     is_primary: z.boolean(),
     is_emergency_contact: z.boolean(),
@@ -67,6 +77,7 @@ const schema = z.discriminatedUnion('mode', [
     name: z.string(),
     phone_number: z.string(),
     email: z.string(),
+    notify_channel: notifyChannelSchema,
     relationship: relationshipSchema,
     is_primary: z.boolean(),
     is_emergency_contact: z.boolean(),
@@ -81,6 +92,7 @@ const DEFAULT_VALUES: AddGuardianFormValues = {
   name: '',
   phone_number: '',
   email: '',
+  notify_channel: 'both',
   relationship: 'guardian',
   is_primary: false,
   is_emergency_contact: false,
@@ -219,6 +231,7 @@ const AddGuardianFormContent = ({ studentId, onClose }: AddGuardianFormContentPr
       createGuardian({
         parent_id: values.parent_id,
         relationship: values.relationship,
+        notify_channel: values.notify_channel,
         ...flags,
       })
       return
@@ -228,6 +241,7 @@ const AddGuardianFormContent = ({ studentId, onClose }: AddGuardianFormContentPr
       name: values.name,
       phone_number: values.phone_number,
       email: values.email || undefined,
+      notify_channel: values.notify_channel,
       relationship: values.relationship,
       ...flags,
     })
@@ -319,6 +333,26 @@ const AddGuardianFormContent = ({ studentId, onClose }: AddGuardianFormContentPr
                 onBlur={field.onBlur}
                 placeholder="Select relationship"
                 error={errors.relationship?.message}
+              />
+            )}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <FormLabel
+            label="Parent messages"
+            helperText="Preferred channels for this parent. School settings still control which events fire."
+          />
+          <Controller
+            name="notify_channel"
+            control={control}
+            render={({ field }) => (
+              <SelectField
+                options={NOTIFY_CHANNEL_OPTIONS}
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                error={errors.notify_channel?.message}
               />
             )}
           />

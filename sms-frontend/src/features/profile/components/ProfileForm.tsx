@@ -86,6 +86,9 @@ const ProfileForm = ({ user, isSubmitting = false, photoDirty = false, onSubmit 
             error={errors.email?.message}
             {...register('email')}
           />
+          <p className="text-sm text-slate-500">
+            Optional. School notifications will be sent to this email when available.
+          </p>
         </div>
       </section>
 

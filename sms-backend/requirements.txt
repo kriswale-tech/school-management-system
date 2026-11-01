@@ -1,11 +1,13 @@
 asgiref==3.11.1
 attrs==26.1.0
 boto3==1.40.61
+celery==5.5.3
 certifi==2026.6.17
 charset-normalizer==3.4.7
 cloudinary==1.44.2
 coverage==7.14.1
 Django==5.2.14
+django-anymail[resend]==13.0.1
 django-cloudinary-storage==0.3.0
 django-cors-headers==4.9.0
 django-filter==26.1
@@ -22,6 +24,7 @@ pillow==12.2.0
 psycopg2-binary==2.9.12
 PyJWT==2.13.0
 PyYAML==6.0.3
+redis==6.2.0
 referencing==0.37.0
 requests==2.34.2
 rpds-py==2026.5.1

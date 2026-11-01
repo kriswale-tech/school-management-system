@@ -43,6 +43,20 @@ class SchoolSettingsSerializer(serializers.ModelSerializer):
             'report_show_address',
             'report_show_phones',
             'report_show_email',
+            'guardian_audience',
+            'report_parent_notify_mode',
+            'guardian_ward_enrolled_enabled',
+            'guardian_ward_enrolled_channels',
+            'guardian_payment_receipt_enabled',
+            'guardian_payment_receipt_channels',
+            'guardian_debt_reminder_enabled',
+            'guardian_debt_reminder_channels',
+            'guardian_debt_reminder_auto_enabled',
+            'guardian_debt_reminder_frequency',
+            'guardian_report_ready_enabled',
+            'guardian_report_ready_channels',
+            'guardian_next_term_fees_enabled',
+            'guardian_next_term_fees_channels',
         ]
 
     def validate_fees_alert_threshold(self, value):

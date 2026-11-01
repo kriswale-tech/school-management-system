@@ -5,6 +5,7 @@ import { TabComponent } from '@/components/shared'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import AcademicYearSection from '../components/AcademicYearSection'
 import AlertsSection from '../components/AlertsSection'
+import ParentMessagesSection from '../components/ParentMessagesSection'
 import ProfileSection from '../components/ProfileSection'
 
 const FeeSettings = lazy(() => import('@/features/fees/pages/FeeSettings'))
@@ -15,6 +16,7 @@ const TABS = [
   { label: 'School profile', slug: 'school-profile' },
   { label: 'Academic year', slug: 'academic-year' },
   { label: 'Alerts', slug: 'alerts' },
+  { label: 'Parent messages', slug: 'parent-messages' },
   { label: 'Fees', slug: 'fees' },
   { label: 'Assessments', slug: 'assessments' },
   { label: 'Classes', slug: 'classes' },
@@ -52,6 +54,7 @@ const SettingsPage = () => {
           {tab === 'school-profile' ? <ProfileSection /> : null}
           {tab === 'academic-year' ? <AcademicYearSection /> : null}
           {tab === 'alerts' ? <AlertsSection /> : null}
+          {tab === 'parent-messages' ? <ParentMessagesSection /> : null}
           {tab === 'fees' || tab === 'assessments' || tab === 'classes' ? (
             <Suspense fallback={<LoadingSpinner className="mx-auto" />}>
               {tab === 'fees' ? <FeeSettings embedded /> : null}

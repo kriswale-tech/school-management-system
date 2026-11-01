@@ -53,7 +53,7 @@ const AlertsMenu = () => {
       {isOpen ? (
         <div
           role="menu"
-          className="absolute right-0 z-50 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-2 shadow-lg"
+          className="absolute right-0 z-50 mt-2 max-h-[28rem] w-96 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-lg"
         >
           <p className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-slate-500">
             Alerts

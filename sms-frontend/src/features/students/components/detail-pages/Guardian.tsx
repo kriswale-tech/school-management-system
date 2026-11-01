@@ -67,6 +67,14 @@ const Guardian = ({ studentId, guardians }: GuardianProps) => {
         ) : (
           <div className="space-y-4">
             {sortedGuardians.map((guardian) => {
+              const notifyLabel =
+                {
+                  sms: 'SMS',
+                  email: 'Email',
+                  both: 'SMS and email',
+                  off: 'Do not notify',
+                }[guardian.notify_channel] ?? guardian.notify_channel
+
               const fields = [
                 { label: 'Full Name', value: guardian.name },
                 { label: 'Primary Phone', value: guardian.phone_number },
@@ -76,6 +84,7 @@ const Guardian = ({ studentId, guardians }: GuardianProps) => {
                 },
                 { label: 'Email', value: guardian.email || '—' },
                 { label: 'Address', value: guardian.address?.trim() || '—' },
+                { label: 'Parent messages', value: notifyLabel },
                 {
                   label: 'Relationship',
                   value: getRelationshipLabel(guardian.relationship),

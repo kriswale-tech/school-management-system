@@ -1,5 +1,7 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from accounts.capabilities import Capability
@@ -19,10 +21,17 @@ from assessments.serializers import (
     CorrectionActionSerializer,
     CorrectionReviewSerializer,
     PublishStudentsSerializer,
+    ReportReadyPreviewSerializer,
+    ReportReadyRequestSerializer,
+    ReportReadySendResultSerializer,
     SaveMarksSerializer,
     StoredStudentReportSerializer,
     StudentReportPreviewSerializer,
     AssessmentSettingsSerializer,
+)
+from assessments.services.report_ready_notices import (
+    preview_report_ready_notices,
+    send_report_ready_notices,
 )
 from assessments.services.admin_overview import (
     get_admin_assessment_detail,
@@ -414,6 +423,68 @@ class AdminStudentReportGenerateView(SchoolScopedAPIView):
             term_id=request.query_params.get('term_id') or None,
         )
         return Response(StoredStudentReportSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Assessments'],
+    summary='Preview guardian report-ready notices',
+    request=ReportReadyRequestSerializer,
+    responses={200: ReportReadyPreviewSerializer},
+)
+class AdminReportReadyPreviewView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.ASSESSMENTS_RELEASE
+
+    def post(self, request, stream_id):
+        serializer = ReportReadyRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            payload = preview_report_ready_notices(
+                school=self.school,
+                stream_id=stream_id,
+                term_id=(
+                    serializer.validated_data.get('term_id')
+                    or request.query_params.get('term_id')
+                    or None
+                ),
+                student_ids=serializer.validated_data['student_ids'],
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError(
+                exc.message_dict if hasattr(exc, 'message_dict') else exc.messages,
+            )
+        return Response(ReportReadyPreviewSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Assessments'],
+    summary='Send guardian report-ready notices',
+    request=ReportReadyRequestSerializer,
+    responses={200: ReportReadySendResultSerializer},
+)
+class AdminReportReadySendView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.ASSESSMENTS_RELEASE
+
+    def post(self, request, stream_id):
+        serializer = ReportReadyRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            payload = send_report_ready_notices(
+                school=self.school,
+                stream_id=stream_id,
+                term_id=(
+                    serializer.validated_data.get('term_id')
+                    or request.query_params.get('term_id')
+                    or None
+                ),
+                student_ids=serializer.validated_data['student_ids'],
+            )
+        except DjangoValidationError as exc:
+            if hasattr(exc, 'message_dict'):
+                raise ValidationError(exc.message_dict)
+            raise ValidationError({'detail': list(exc.messages)})
+        return Response(ReportReadySendResultSerializer(payload).data)
 
 
 @extend_schema(

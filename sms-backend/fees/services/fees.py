@@ -249,6 +249,7 @@ def apply_fee_structure(fee_structure):
 
     from activities.models import Activity
     from activities.services import record_activity
+    from fees.services.next_term_notices import schedule_next_term_fee_notices_for_structure
 
     term = fee_structure.term
     record_activity(
@@ -264,6 +265,7 @@ def apply_fee_structure(fee_structure):
         target_kind='fee_structure',
         target_id=fee_structure.id,
     )
+    schedule_next_term_fee_notices_for_structure(fee_structure_id=fee_structure.id)
     return fee_structure
 
 
@@ -303,12 +305,18 @@ def ensure_enrollment_fees(enrollment):
     StudentFee.objects.bulk_create(rows, ignore_conflicts=True)
 
     from fees.services.credits import apply_available_credits_for_student
+    from fees.services.next_term_notices import schedule_next_term_fee_notice_for_student
 
     apply_available_credits_for_student(
         student=enrollment.student,
         term=enrollment.term,
         recorded_by=fee_structure.created_by,
         school=fee_structure.school,
+    )
+    # Late enrollment after structure apply — same notice as bulk apply (idempotent).
+    schedule_next_term_fee_notice_for_student(
+        student_id=enrollment.student_id,
+        term_id=enrollment.term_id,
     )
     return rows
 

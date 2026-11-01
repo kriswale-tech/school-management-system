@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.conf import settings
 from django.urls import reverse
@@ -271,6 +272,7 @@ class AdminSignupFlowTests(AccountsAPITestCase):
         self.assertIsNotNone(me_response.data['profile'])
 
 
+@patch('accounts.services.otp.send_sms', return_value={'status': 'success'})
 class LoginViewTests(AccountsAPITestCase):
     def setUp(self):
         self.url = reverse('login')
@@ -279,7 +281,7 @@ class LoginViewTests(AccountsAPITestCase):
         self.access_cookie = settings.SIMPLE_JWT['AUTH_COOKIE']
         self.refresh_cookie = settings.SIMPLE_JWT['AUTH_COOKIE_REFRESH']
 
-    def test_login_sends_otp_for_active_user(self):
+    def test_login_sends_otp_for_active_user(self, mock_sms):
         create_user(is_active=True)
 
         response = self.client.post(self.url, {
@@ -294,16 +296,18 @@ class LoginViewTests(AccountsAPITestCase):
                 purpose=PhoneOtp.Purpose.LOGIN,
             ).exists(),
         )
+        mock_sms.assert_called_once()
 
-    def test_login_rejects_unknown_phone(self):
+    def test_login_rejects_unknown_phone(self, mock_sms):
         response = self.client.post(self.url, {
             'phone_number': LOCAL_PHONE,
         }, format='json')
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data['message'], 'No account found for this phone number')
+        mock_sms.assert_not_called()
 
-    def test_login_rejects_inactive_user(self):
+    def test_login_rejects_inactive_user(self, mock_sms):
         create_user(is_active=False)
 
         response = self.client.post(self.url, {
@@ -315,8 +319,9 @@ class LoginViewTests(AccountsAPITestCase):
             response.data['message'],
             'Account is not verified. Please complete signup.',
         )
+        mock_sms.assert_not_called()
 
-    def test_login_verify_sets_auth_cookies(self):
+    def test_login_verify_sets_auth_cookies(self, mock_sms):
         create_user(is_active=True)
         create_phone_otp(purpose=PhoneOtp.Purpose.LOGIN)
 
@@ -331,7 +336,7 @@ class LoginViewTests(AccountsAPITestCase):
         self.assertIn(self.refresh_cookie, response.cookies)
         self.assertIn('csrftoken', response.cookies)
 
-    def test_login_resend_returns_429_during_cooldown(self):
+    def test_login_resend_returns_429_during_cooldown(self, mock_sms):
         create_user(is_active=True)
         create_phone_otp(
             purpose=PhoneOtp.Purpose.LOGIN,
@@ -344,14 +349,16 @@ class LoginViewTests(AccountsAPITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
         self.assertIn('retry_after_seconds', response.data)
+        mock_sms.assert_not_called()
 
-    def test_full_login_flow(self):
+    def test_full_login_flow(self, mock_sms):
         create_user(is_active=True)
 
         login_response = self.client.post(self.url, {
             'phone_number': LOCAL_PHONE,
         }, format='json')
         self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+        mock_sms.assert_called_once()
 
         otp = PhoneOtp.objects.get(
             phone_number=PHONE,

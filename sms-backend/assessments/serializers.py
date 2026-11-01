@@ -270,6 +270,64 @@ class AdminAssessmentDetailStudentSerializer(serializers.Serializer):
     overall_cohort_size = serializers.IntegerField(allow_null=True)
     subjects = AssessmentSubjectRowSerializer(many=True)
     active_correction = CorrectionRequestSerializer(allow_null=True)
+    has_report = serializers.BooleanField(required=False, default=False)
+
+
+class ReportReadyRequestSerializer(serializers.Serializer):
+    student_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        allow_empty=False,
+    )
+    term_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class ReportReadyEligibleSerializer(serializers.Serializer):
+    student_id = serializers.CharField()
+    report_id = serializers.CharField()
+    full_name = serializers.CharField()
+    student_code = serializers.CharField()
+    guardians = serializers.ListField(child=serializers.DictField())
+
+
+class ReportReadySkippedSerializer(serializers.Serializer):
+    student_id = serializers.CharField()
+    full_name = serializers.CharField(required=False, allow_blank=True)
+    reason = serializers.CharField()
+
+
+class ReportReadyPreviewSerializer(serializers.Serializer):
+    enabled = serializers.BooleanField()
+    notify_mode = serializers.CharField()
+    audience = serializers.CharField()
+    channels = serializers.CharField(allow_null=True)
+    term_id = serializers.UUIDField()
+    term_label = serializers.CharField()
+    stream_id = serializers.UUIDField()
+    class_name = serializers.CharField()
+    requested_count = serializers.IntegerField()
+    eligible_count = serializers.IntegerField()
+    skipped_count = serializers.IntegerField()
+    sms_count = serializers.IntegerField()
+    email_count = serializers.IntegerField()
+    batch_size = serializers.IntegerField()
+    eligible_ids = serializers.ListField(child=serializers.CharField())
+    eligible = ReportReadyEligibleSerializer(many=True)
+    skipped = ReportReadySkippedSerializer(many=True)
+    eligible_truncated = serializers.BooleanField()
+    skipped_truncated = serializers.BooleanField()
+
+
+class ReportReadySendResultSerializer(serializers.Serializer):
+    batch_id = serializers.CharField()
+    term_id = serializers.UUIDField()
+    term_label = serializers.CharField()
+    stream_id = serializers.UUIDField()
+    class_name = serializers.CharField()
+    queued = serializers.BooleanField()
+    students_notified = serializers.IntegerField()
+    sms_sent = serializers.IntegerField()
+    email_sent = serializers.IntegerField()
+    skipped_count = serializers.IntegerField()
 
 
 class AdminAssessmentDetailSerializer(serializers.Serializer):

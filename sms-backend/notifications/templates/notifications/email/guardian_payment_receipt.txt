@@ -1,0 +1,8 @@
+{% if greeting %}{{ greeting }}
+
+{% endif %}Payment of GHS {{ amount }} has been received for {{ student_name }} at {{ school_name }}.
+
+Receipt: {{ receipt_number }}
+Download: {{ receipt_url }}
+
+If you did not expect this message, please contact the school.

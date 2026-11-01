@@ -405,7 +405,13 @@ class AddUserSerializer(serializers.Serializer):
         return _formatted_phone(value)
 
     def create(self, validated_data):
-        return add_school_member(self.context['school'], validated_data)
+        request = self.context.get('request')
+        actor = getattr(request, 'user', None) if request is not None else None
+        return add_school_member(
+            self.context['school'],
+            validated_data,
+            actor=actor,
+        )
 
 
 class UpdateUserSerializer(serializers.Serializer):

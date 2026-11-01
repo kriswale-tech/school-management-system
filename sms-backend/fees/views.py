@@ -9,8 +9,12 @@ from accounts.permissions import HasActiveSchool, HasCapability, IsAdmin
 from core.pagination import StandardResultsSetPagination, paginated_schema
 from fees.serializers import (
     CreateFeeStructureItemSerializer,
+    DebtReminderPreviewSerializer,
+    DebtReminderRequestSerializer,
+    DebtReminderSendResultSerializer,
     FeeDeskFilterOptionsSerializer,
     FeeDeskRowSerializer,
+    FeeDeskSelectionIdsSerializer,
     FeeDeskStatsSerializer,
     FeeItemSettingsSerializer,
     FeeStructureDetailSerializer,
@@ -20,9 +24,11 @@ from fees.serializers import (
     StudentPaymentTargetSerializer,
     UpdateFeeStructureItemSerializer,
 )
+from fees.services.debt_reminders import preview_debt_reminders, send_debt_reminders
 from fees.services.desk import (
     get_fee_desk_stats,
     get_fee_filter_options,
+    list_fee_desk_debtor_ids,
     list_fee_desk_rows,
     resolve_fee_desk_term,
 )
@@ -139,6 +145,37 @@ class FeeDeskStatsView(SchoolScopedAPIView):
         return Response(FeeDeskStatsSerializer(stats).data)
 
 
+class FeeDeskSelectionIdsView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.FEES_RECORD_PAYMENT
+
+    @extend_schema(
+        tags=['Fees'],
+        summary='Fee desk debtor IDs for current filters',
+        description=(
+            'Returns every student id with an outstanding balance in the filtered '
+            'fee desk set (not paginated). Used for select-all parent reminders.'
+        ),
+        parameters=[
+            OpenApiParameter(name='search', type=str),
+            OpenApiParameter(name='class_level', type=str),
+            OpenApiParameter(name='stream', type=str),
+            OpenApiParameter(name='debtors', type=bool),
+            OpenApiParameter(name='term', type=str),
+        ],
+        responses={200: FeeDeskSelectionIdsSerializer},
+    )
+    def get(self, request):
+        _term, queryset = _filtered_fee_desk_queryset(request, self.school)
+        student_ids = list_fee_desk_debtor_ids(queryset=queryset)
+        return Response(
+            FeeDeskSelectionIdsSerializer({
+                'student_ids': student_ids,
+                'count': len(student_ids),
+            }).data,
+        )
+
+
 class FeeDeskFilterOptionsView(SchoolScopedAPIView):
     @extend_schema(
         tags=['Fees'],
@@ -203,6 +240,64 @@ class RecordPaymentView(SchoolScopedAPIView):
             RecordPaymentResponseSerializer(result).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class DebtReminderPreviewView(SchoolScopedAPIView):
+    required_capability = Capability.FEES_RECORD_PAYMENT
+    permission_classes = [HasActiveSchool, HasCapability]
+
+    @extend_schema(
+        tags=['Fees'],
+        summary='Preview guardian debt reminders',
+        description=(
+            'Estimates SMS/email attempts for the selected students without sending. '
+            'Only students with an outstanding balance for the term are eligible.'
+        ),
+        request=DebtReminderRequestSerializer,
+        responses={200: DebtReminderPreviewSerializer},
+    )
+    def post(self, request):
+        serializer = DebtReminderRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = preview_debt_reminders(
+                school=self.school,
+                term_id=serializer.validated_data.get('term_id'),
+                student_ids=serializer.validated_data['student_ids'],
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.message_dict if hasattr(exc, 'message_dict') else exc.messages)
+        return Response(DebtReminderPreviewSerializer(result).data)
+
+
+class DebtReminderSendView(SchoolScopedAPIView):
+    required_capability = Capability.FEES_RECORD_PAYMENT
+    permission_classes = [HasActiveSchool, HasCapability]
+
+    @extend_schema(
+        tags=['Fees'],
+        summary='Send guardian debt reminders',
+        description=(
+            'Sends SMS/email fee reminders to guardians for the selected students. '
+            'Debt reminders must be enabled under school parent-message settings.'
+        ),
+        request=DebtReminderRequestSerializer,
+        responses={200: DebtReminderSendResultSerializer},
+    )
+    def post(self, request):
+        serializer = DebtReminderRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = send_debt_reminders(
+                school=self.school,
+                term_id=serializer.validated_data.get('term_id'),
+                student_ids=serializer.validated_data['student_ids'],
+            )
+        except DjangoValidationError as exc:
+            if hasattr(exc, 'message_dict'):
+                raise ValidationError(exc.message_dict)
+            raise ValidationError({'detail': list(exc.messages)})
+        return Response(DebtReminderSendResultSerializer(result).data)
 
 
 class FeeStructureDetailView(SchoolScopedAPIView):

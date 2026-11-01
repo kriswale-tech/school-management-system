@@ -656,14 +656,28 @@ def confirm_transition(
     else:
         _bill_target(school, target, user)
 
+    from activities.models import Activity
+    from activities.services import record_activity
     from schools.services.academic_calendar import activate_term
 
-    return activate_term(
+    calendar = activate_term(
         school,
         target.id,
         acknowledge_warnings=True,
         today=today,
     )
+    actor_name = (user.get_full_name() or '').strip() or 'Admin'
+    record_activity(
+        school=school,
+        actor=user,
+        verb=Activity.Verb.TERM_OPENED,
+        summary=f'{actor_name} opened {target.name}.',
+        href='/dashboard',
+        term=target,
+        target_kind='term',
+        target_id=target.id,
+    )
+    return calendar
 
 
 def _unmatched_subject_notes(active, resolved):

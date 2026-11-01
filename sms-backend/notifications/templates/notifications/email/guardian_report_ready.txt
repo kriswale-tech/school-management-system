@@ -1,0 +1,7 @@
+{% if greeting %}{{ greeting }}
+
+{% endif %}{{ student_name }}'s report for {{ term_label }} at {{ school_name }} is ready.
+
+Download: {{ report_url }}
+
+If you have questions, please contact the school.

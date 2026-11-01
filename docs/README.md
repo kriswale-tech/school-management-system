@@ -15,9 +15,12 @@ Project status and reference docs for the SMS monorepo (`sms-backend` + `sms-fro
 | [subject-assessment-workspace.md](./subject-assessment-workspace.md) | Subject markbook + class-teacher Assessments page |
 | [dashboard.md](./dashboard.md) | Admin, teacher, accountant, and staff dashboards, plus the activity feed |
 | [profile.md](./profile.md) | Personal profile page, self-service fields, and `/accounts/me/` PATCH |
+| [notifications.md](./notifications.md) | In-app personal inbox vs alerts vs activities; Tier 1 events; email templates |
+| [guardian-communications.md](./guardian-communications.md) | Parent SMS/email outreach (ward enrolled + settings); distinct from staff inbox |
+| [email-previews/notification-email-preview.html](./email-previews/notification-email-preview.html) | Visual preview of the shared notification email layout |
 
 Related backend-only notes live under [`sms-backend/docs/`](../sms-backend/docs/) (e.g. Reports & Insights, teacher bulk import).
 
 URL tab conventions for page-level panels are summarized in [HOW_IT_WORKS.md](./HOW_IT_WORKS.md) (§ URL tabs).
 
-**Last reviewed:** 2026-10-26
+**Last reviewed:** 2026-11-01

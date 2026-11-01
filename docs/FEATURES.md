@@ -17,7 +17,7 @@ Checklist by domain. Status values:
 | Login + OTP | Yes | Yes | Done |
 | Resend OTP / cooldown | Yes | Yes | Done |
 | Update my profile | `PATCH /accounts/me/` | `/profile` | Done |
-| SMS delivery of OTP | Arkesel client unused; DEBUG print only | — | Partial |
+| SMS delivery of OTP | Login: Arkesel SMS (+ email if set); signup: DEBUG print only | — | Partial |
 | Update school profile (post-setup) | `GET`/`PATCH /schools/school/` | Settings → School profile | Done |
 | Create school / multi-school | Yes | Yes | Done |
 | Select active school | Yes | Yes | Done |
@@ -128,6 +128,7 @@ Signup setup is unchanged. These screens edit the school after the wizard, under
 | Year calendar | `GET`/`POST /schools/settings/academic-years/`, `PATCH …/<year_id>/` | `/settings/academic-year` | Done |
 | Open the next term | `GET /schools/transition/`, `GET …/preview/`, `POST …/confirm/` | Navbar, dashboard, Academic year wizard | Done (see [term-transition.md](./term-transition.md)) |
 | In-app alerts | `GET`/`PATCH /schools/settings/`, `GET /schools/alerts/` | `/settings/alerts` + navbar bell | Done |
+| Personal notifications | `GET`/`POST /notifications/` (inbox, unread, mark read) | Navbar inbox icon | Done (in-app; see [notifications.md](./notifications.md)). Email/Celery not started |
 | Fee catalog | Same as `/fees/settings` | `/settings/fees` and `/fees/settings` | Done |
 | Assessment structure | Same as `/assessments/settings` | `/settings/assessments` and `/assessments/settings` | Done |
 | Classes and subjects | Same as `/classes/manage` | `/settings/classes` and `/classes/manage` | Done |
@@ -136,7 +137,7 @@ The calendar lists every year. Past years are view-only. **Add** saves the next 
 
 **Open the next term** places continuing pupils, marks the last class graduated at year end, copies teachers, applies the next fee catalog, and then turns that term on. See [term-transition.md](./term-transition.md) (includes deferred BECE / final-year exam decision). Standalone `POST …/terms/<term_id>/activate/` is disabled (403); activation only runs inside transition confirm.
 
-Alerts are in-app only: outstanding fees (admin and accountant), unreleased results (admin and class teachers), and new enrollments (admin). The transition popup on the dashboard has its own checkbox.
+Alerts are in-app only: outstanding fees (admin and accountant), unreleased results (admin and class teachers), and new enrollments (admin and staff). The transition popup on the dashboard has its own checkbox. Personal event notifications are separate — see [notifications.md](./notifications.md). Guardian SMS/email is a third surface — see [guardian-communications.md](./guardian-communications.md).
 
 ## Dashboard & shell
 
@@ -145,7 +146,9 @@ Alerts are in-app only: outstanding fees (admin and accountant), unreleased resu
 | App shell (nav, auth gates) | — | Yes | Done |
 | Dashboard widgets | Yes (`/dashboard/admin/`, `/dashboard/teacher/`) + fees APIs for accountant | Admin / teacher / accountant / staff pages | Done (see [dashboard.md](./dashboard.md)) |
 | Activity feed | Yes (`activities` app, `GET /activities/`) | Recent Activities card | Done |
-| In-app alerts | Yes (`GET /schools/alerts/`) | Navbar bell | Done |
+| In-app alerts | Yes (`GET /schools/alerts/`) | Navbar bell → Alerts | Done |
+| Personal notifications | Yes (`notifications` app) | Navbar inbox icon | Done (in-app Tier 1 + email when enabled) |
+| Parent messages (guardians) | Ward enrolled, receipts, debt reminders (manual + auto), report ready, next-term fees | Settings → Parent messages + Fees / Assessment desks | Partial |
 
 ## Cross-cutting
 
@@ -157,8 +160,17 @@ Alerts are in-app only: outstanding fees (admin and accountant), unreleased resu
 | Backend tests (accounts, schools setup, academics, students, fees services, assessment config) | Done for built areas |
 | Frontend automated tests | Not started / minimal |
 | Fine-grained Permission matrix | Models only — unused (role packs are code-level) |
-| Celery / Redis async jobs | Compose stubs only |
+| Celery / Redis async jobs | Done for notification email (`sms_redis` host `:6380`, `sms_celery_worker`) |
 | Attendance, messaging, library, inventory, payroll | Not started |
+| Notification email (Anymail → Resend) | Wired; gated by `EMAIL_ENABLED` (see [notifications.md](./notifications.md)) |
+| Login OTP SMS/email | Done for login (Arkesel + email); signup still DEBUG-only |
+| Guardian ward-enrolled SMS/email | Yes — onboard + bulk import; see [guardian-communications.md](./guardian-communications.md) |
+| Guardian payment + signed receipt link | Partial — opt-in setting; public HTML receipt |
+| Guardian manual debt reminders | Partial — Fees desk selection + preview/send |
+| Guardian report-ready signed links | Partial — Assessment details + auto-on-generate mode |
+| Guardian next-term fee schedules | Partial — on structure apply + signed per-student HTML |
+| Guardian auto debt reminders | Partial — Celery beat; school frequency (default end of month) |
+| SMS credits billing UI | Not started (placeholder in Settings → Parent messages) |
 
 ---
 

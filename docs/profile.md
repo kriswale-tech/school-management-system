@@ -8,7 +8,7 @@ Every signed-in user with an active school can open **`/profile`** from the head
 | --- | --- |
 | Summary | Photo, name, role, active school, login phone (read-only), **last active** in this school, other schools and roles |
 | Photo | Upload a new profile picture (multipart save) |
-| Account | First name, last name, email |
+| Account | First name, last name, email (optional; help text notes this is where school notifications will be sent) |
 | Personal | Gender, alternate phone, date of birth, address, bio (optional) |
 
 **Last active** comes from `SchoolMembership.last_active_at` for the school you are working in. It updates when you use that school; it is not a global “last login” across all schools.

@@ -197,12 +197,17 @@ def _get_or_create_parent(*, school, guardian):
     except ValueError as exc:
         raise ValidationError({'phone_number': str(exc)}) from exc
 
+    notify_channel = guardian.get('notify_channel') or Parent.NotifyChannel.BOTH
+    if notify_channel not in Parent.NotifyChannel.values:
+        notify_channel = Parent.NotifyChannel.BOTH
+
     parent, created = Parent.objects.get_or_create(
         school=school,
         phone_number=phone,
         defaults={
             'name': guardian['name'].strip(),
             'email': (guardian.get('email') or '').strip(),
+            'notify_channel': notify_channel,
         },
     )
     if not created:
@@ -215,6 +220,9 @@ def _get_or_create_parent(*, school, guardian):
         if email and not parent.email:
             parent.email = email
             updates.append('email')
+        if 'notify_channel' in guardian and parent.notify_channel != notify_channel:
+            parent.notify_channel = notify_channel
+            updates.append('notify_channel')
         if updates:
             parent.save(update_fields=[*updates, 'updated_at'])
     return parent
@@ -283,6 +291,12 @@ def onboard_student(
         term=term,
         stream=stream,
         is_new_student=is_new_student,
+    )
+    from notifications.services.guardians import schedule_ward_enrolled_notice
+
+    schedule_ward_enrolled_notice(
+        student_id=student.id,
+        class_name=stream.full_name,
     )
     return get_enrollment_for_student(school=school, term=term, student=student)
 
@@ -394,6 +408,7 @@ def build_student_detail(*, school, student, term=None):
             'phone_number_alt': link.parent.phone_number_alt,
             'email': link.parent.email,
             'address': link.parent.address,
+            'notify_channel': link.parent.notify_channel,
             'relationship': link.relationship,
             'is_primary': link.is_primary,
             'is_emergency_contact': link.is_emergency_contact,
@@ -436,7 +451,7 @@ def build_student_detail(*, school, student, term=None):
 
 
 @transaction.atomic
-def update_student(*, school, student_id, **fields):
+def update_student(*, school, student_id, actor=None, **fields):
     student = get_student(school=school, student_id=student_id)
     allowed = {
         'first_name',
@@ -453,10 +468,39 @@ def update_student(*, school, student_id, **fields):
             continue
         if key in ('first_name', 'last_name', 'other_names', 'address') and isinstance(value, str):
             value = value.strip()
+        if getattr(student, key) == value:
+            continue
         setattr(student, key, value)
         updates.append(key)
     if updates:
         student.save(update_fields=[*updates, 'updated_at'])
+        from activities.models import Activity
+        from activities.services import record_activity
+
+        term = Term.objects.filter(school=school, is_active=True).first()
+        enrollment = (
+            ClassEnrollment.objects.filter(student=student, term=term)
+            .select_related('stream')
+            .first()
+            if term is not None
+            else None
+        )
+        name = _student_display_name(student)
+        actor_name = (
+            (actor.get_full_name() or '').strip() if actor is not None else 'Someone'
+        ) or 'Someone'
+        changed = ', '.join(updates)
+        record_activity(
+            school=school,
+            actor=actor,
+            verb=Activity.Verb.STUDENT_UPDATED,
+            summary=f'{actor_name} updated {name} ({changed}).',
+            href=f'/students/{student.id}',
+            term=term,
+            target_kind='student',
+            target_id=student.id,
+            stream=enrollment.stream if enrollment else None,
+        )
     return build_student_detail(
         school=school,
         student=get_student(school=school, student_id=student.id),
@@ -685,6 +729,7 @@ def _serialize_guardian_link(link):
         'phone_number_alt': link.parent.phone_number_alt,
         'email': link.parent.email,
         'address': link.parent.address,
+        'notify_channel': link.parent.notify_channel,
         'relationship': link.relationship,
         'is_primary': link.is_primary,
         'is_emergency_contact': link.is_emergency_contact,
@@ -697,6 +742,12 @@ def add_student_guardian(*, school, student_id, guardian):
     parent = _resolve_parent(school=school, guardian=guardian)
     if StudentParent.objects.filter(student=student, parent=parent).exists():
         raise ValidationError({'detail': 'This guardian is already linked to the student.'})
+
+    notify_channel = guardian.get('notify_channel')
+    if notify_channel and notify_channel in Parent.NotifyChannel.values:
+        if parent.notify_channel != notify_channel:
+            parent.notify_channel = notify_channel
+            parent.save(update_fields=['notify_channel', 'updated_at'])
 
     make_primary = guardian.get('is_primary', False)
     if make_primary:
@@ -714,12 +765,12 @@ def add_student_guardian(*, school, student_id, guardian):
 
 
 @transaction.atomic
-def update_student_guardian(*, school, student_id, link_id, **fields):
+def update_student_guardian(*, school, student_id, link_id, actor=None, **fields):
     link = _get_student_parent_link(school=school, student_id=student_id, link_id=link_id)
     parent = link.parent
 
     parent_updates = []
-    for key in ('name', 'phone_number', 'phone_number_alt', 'email', 'address'):
+    for key in ('name', 'phone_number', 'phone_number_alt', 'email', 'address', 'notify_channel'):
         if key not in fields:
             continue
         value = fields[key]
@@ -736,10 +787,15 @@ def update_student_guardian(*, school, student_id, link_id, **fields):
                 raise ValidationError({
                     'phone_number': 'Another parent in this school already uses this phone number.',
                 })
+        elif key == 'notify_channel':
+            if value not in Parent.NotifyChannel.values:
+                raise ValidationError({'notify_channel': 'Invalid notification channel.'})
         elif isinstance(value, str) and key != 'email':
             value = value.strip()
         elif key == 'email' and isinstance(value, str):
             value = value.strip()
+        if getattr(parent, key) == value:
+            continue
         setattr(parent, key, value)
         parent_updates.append(key)
     if parent_updates:
@@ -747,11 +803,13 @@ def update_student_guardian(*, school, student_id, link_id, **fields):
 
     link_updates = []
     if 'relationship' in fields:
-        link.relationship = fields['relationship']
-        link_updates.append('relationship')
+        if link.relationship != fields['relationship']:
+            link.relationship = fields['relationship']
+            link_updates.append('relationship')
     if 'is_emergency_contact' in fields:
-        link.is_emergency_contact = fields['is_emergency_contact']
-        link_updates.append('is_emergency_contact')
+        if link.is_emergency_contact != fields['is_emergency_contact']:
+            link.is_emergency_contact = fields['is_emergency_contact']
+            link_updates.append('is_emergency_contact')
     if fields.get('is_primary') is True and not link.is_primary:
         StudentParent.objects.filter(student_id=student_id, is_primary=True).update(
             is_primary=False,
@@ -765,6 +823,35 @@ def update_student_guardian(*, school, student_id, link_id, **fields):
 
     if link_updates:
         link.save(update_fields=[*link_updates, 'updated_at'])
+
+    if parent_updates or link_updates:
+        from activities.models import Activity
+        from activities.services import record_activity
+
+        student = link.student
+        term = Term.objects.filter(school=school, is_active=True).first()
+        enrollment = (
+            ClassEnrollment.objects.filter(student=student, term=term)
+            .select_related('stream')
+            .first()
+            if term is not None
+            else None
+        )
+        name = _student_display_name(student)
+        actor_name = (
+            (actor.get_full_name() or '').strip() if actor is not None else 'Someone'
+        ) or 'Someone'
+        record_activity(
+            school=school,
+            actor=actor,
+            verb=Activity.Verb.GUARDIAN_UPDATED,
+            summary=f'{actor_name} updated a guardian for {name}.',
+            href=f'/students/{student.id}',
+            term=term,
+            target_kind='student',
+            target_id=student.id,
+            stream=enrollment.stream if enrollment else None,
+        )
 
     link.refresh_from_db()
     return _serialize_guardian_link(

@@ -3,11 +3,15 @@ import secrets
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
+from django.template.loader import render_to_string
 from django.utils import timezone
 
 from accounts.helpers import generate_otp
 from accounts.models import PhoneOtp, Profile, SchoolMembership, User
+from notifications.services.email_context import default_app_logo_url
+from shared.services.arkesel_sms import send_sms
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +40,7 @@ def _otp_expires_at():
     return timezone.now() + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
 
 
-def send_otp(phone_number: str, purpose: str) -> None:
+def _store_otp(phone_number: str, purpose: str) -> str:
     now = timezone.now()
     otp = generate_otp()
     PhoneOtp.objects.update_or_create(
@@ -50,11 +54,103 @@ def send_otp(phone_number: str, purpose: str) -> None:
             'sent_at': now,
         },
     )
+    return otp
 
-    if settings.DEBUG:
-        print(f"OTP ({purpose}) for {phone_number}: {otp}")
 
-    logger.info("OTP issued for %s (%s)", phone_number, purpose)
+def send_otp(phone_number: str, purpose: str) -> None:
+    """Store an OTP. Signup keeps DEBUG console print; login uses deliver path."""
+    otp = _store_otp(phone_number, purpose)
+
+    if purpose == PhoneOtp.Purpose.SIGNUP and settings.DEBUG:
+        print(f'OTP ({purpose}) for {phone_number}: {otp}')
+
+    logger.info('OTP issued for %s (%s)', phone_number, purpose)
+
+
+def _arkesel_message_id(payload: dict | None) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+    if payload.get('message_id'):
+        return str(payload['message_id'])
+    data = payload.get('data')
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        for key in ('id', 'message_id', 'sms_id'):
+            if data[0].get(key):
+                return str(data[0][key])
+    if isinstance(data, dict):
+        for key in ('id', 'message_id', 'sms_id'):
+            if data.get(key):
+                return str(data[key])
+    return None
+
+
+def _send_login_otp_sms(phone_number: str, otp: str) -> dict | None:
+    """Send login OTP by SMS. Returns Arkesel payload on success, else None."""
+    sender = getattr(settings, 'ARKESEL_SMS_SENDER', None) or 'SCHOOLASST'
+    message = (
+        f'Your {sender} login code is {otp}. '
+        f'It expires in {settings.OTP_EXPIRY_MINUTES} minutes.'
+    )
+    try:
+        return send_sms(phone_number, message)
+    except Exception:
+        logger.exception('Failed to send login OTP SMS to %s', phone_number)
+        return None
+
+
+def _send_login_otp_email(user: User, otp: str) -> None:
+    email = (user.email or '').strip()
+    if not email:
+        return
+
+    name = (user.get_full_name() or '').strip()
+    context = {
+        'otp': otp,
+        'expiry_minutes': settings.OTP_EXPIRY_MINUTES,
+        'greeting': f'Hi {name},' if name else '',
+        'app_logo_url': default_app_logo_url(),
+        'preheader': f'Your login code is {otp}',
+    }
+    try:
+        text_body = render_to_string('accounts/email/login_otp.txt', context)
+        html_body = render_to_string('accounts/email/login_otp.html', context)
+        message = EmailMultiAlternatives(
+            subject='Your login code',
+            body=text_body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[email],
+        )
+        message.attach_alternative(html_body, 'text/html')
+        message.send(fail_silently=False)
+    except Exception:
+        logger.exception('Failed to send login OTP email to %s', email)
+
+
+def _deliver_login_otp(user: User, otp: str) -> None:
+    """SMS primary; email if present; DEBUG console for success or SMS failure."""
+    sms_result = _send_login_otp_sms(user.phone_number, otp)
+    _send_login_otp_email(user, otp)
+
+    if not settings.DEBUG:
+        return
+
+    if sms_result is not None:
+        message_id = _arkesel_message_id(sms_result)
+        status = sms_result.get('status') if isinstance(sms_result, dict) else None
+        parts = [f'Login OTP SMS OK for {user.phone_number}']
+        if status:
+            parts.append(f'status={status}')
+        if message_id:
+            parts.append(f'id={message_id}')
+        parts.append(f'OTP={otp}')
+        print(' | '.join(parts))
+        return
+
+    print(f'OTP (login) for {user.phone_number}: {otp}')
+    logger.warning(
+        'Login OTP SMS failed for %s; printed to console (DEBUG)',
+        user.phone_number,
+    )
 
 
 def _check_resend_cooldown(phone_number: str, purpose: str) -> None:
@@ -111,11 +207,16 @@ def send_login_otp(phone_number: str) -> None:
         raise OtpSendError('No account found for this phone number')
     if not user.is_active:
         raise OtpSendError('Account is not verified. Please complete signup.')
-    send_otp(phone_number, PhoneOtp.Purpose.LOGIN)
+
+    otp = _store_otp(phone_number, PhoneOtp.Purpose.LOGIN)
+    logger.info('OTP issued for %s (%s)', phone_number, PhoneOtp.Purpose.LOGIN)
+    _deliver_login_otp(user, otp)
 
 
 def resend_login_otp(phone_number: str) -> None:
-    resend_otp(phone_number, PhoneOtp.Purpose.LOGIN)
+    _validate_resend(phone_number, PhoneOtp.Purpose.LOGIN)
+    _check_resend_cooldown(phone_number, PhoneOtp.Purpose.LOGIN)
+    send_login_otp(phone_number)
 
 
 def _increment_otp_attempts(phone_otp_id) -> None:

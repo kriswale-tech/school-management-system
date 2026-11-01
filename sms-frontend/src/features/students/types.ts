@@ -117,6 +117,8 @@ export type StudentClassAssignment = {
   is_default: boolean
 }
 
+export type GuardianNotifyChannel = 'sms' | 'email' | 'both' | 'off'
+
 export type StudentGuardian = {
   id: string
   parent_id: string
@@ -125,6 +127,7 @@ export type StudentGuardian = {
   phone_number_alt: string
   email: string
   address: string
+  notify_channel: GuardianNotifyChannel
   relationship: GuardianRelationship
   is_primary: boolean
   is_emergency_contact: boolean
@@ -175,6 +178,7 @@ export type GuardianCreatePayload =
   | {
       parent_id: string
       relationship: GuardianRelationship
+      notify_channel?: GuardianNotifyChannel
       is_primary?: boolean
       is_emergency_contact?: boolean
     }
@@ -182,6 +186,7 @@ export type GuardianCreatePayload =
       name: string
       phone_number: string
       email?: string
+      notify_channel?: GuardianNotifyChannel
       relationship: GuardianRelationship
       is_primary?: boolean
       is_emergency_contact?: boolean
@@ -193,6 +198,7 @@ export type GuardianUpdatePayload = {
   phone_number_alt?: string
   email?: string
   address?: string
+  notify_channel?: GuardianNotifyChannel
   relationship?: GuardianRelationship
   is_primary?: boolean
   is_emergency_contact?: boolean

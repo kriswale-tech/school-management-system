@@ -24,7 +24,7 @@ Phone + OTP  →  Pick school  →  Finish setup (first time)  →  Use the app
 Someone creates a school for the first time:
 
 1. Enter name, email, phone, and **school name**.
-2. Receive a 6-digit OTP (in development it is printed in the backend console; SMS is not fully wired yet).
+2. Receive a 6-digit OTP (signup still prints to the backend console in development; login OTPs go out by SMS, and email when available).
 3. Verify the OTP.
 4. The system creates:
    - their **user** account
@@ -37,7 +37,7 @@ Someone creates a school for the first time:
 ### 2. Login (returning users)
 
 1. Enter phone number.
-2. Get OTP → verify.
+2. Get OTP by SMS (and email if the account has one) → verify.
 3. If they only belong to **one** school → they go straight in.
 4. If they belong to **several** schools → they must **choose a school** first.
 
@@ -208,7 +208,7 @@ Every role opens **`/profile`** from the header. You can update photo, name, ema
 ### Students
 
 - List and search students  
-- Onboard a student (bio, class, guardians)  
+- Onboard a student (bio, class, guardians) — can SMS/email guardians when enabled (Settings → Parent messages; [guardian-communications.md](./guardian-communications.md))  
 - Bulk import  
 - Student detail (bio, guardians, fee balance/history, reports & assessment)  
 

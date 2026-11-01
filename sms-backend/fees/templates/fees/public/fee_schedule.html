@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fee schedule — {{ student_name }}</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      padding: 24px 16px;
+      background: #eef2f6;
+      color: #0f172a;
+      font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .sheet {
+      max-width: 640px;
+      margin: 0 auto;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .accent { height: 4px; background: #0369a1; }
+    .inner { padding: 28px 32px; }
+    h1 {
+      margin: 0 0 4px;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+    }
+    .muted {
+      color: #64748b;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .amount {
+      margin: 24px 0 8px;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      font-size: 14px;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 0;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: top;
+    }
+    th {
+      color: #64748b;
+      font-weight: 500;
+    }
+    td.amount-cell {
+      text-align: right;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+    .item-desc {
+      display: block;
+      margin-top: 2px;
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 400;
+    }
+    tfoot td {
+      border-bottom: 0;
+      padding-top: 16px;
+      font-weight: 700;
+    }
+    .actions {
+      margin: 24px auto 0;
+      max-width: 640px;
+      text-align: center;
+    }
+    .actions button {
+      border: 0;
+      border-radius: 8px;
+      background: #0369a1;
+      color: #fff;
+      padding: 10px 16px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    @media print {
+      body { background: #fff; padding: 0; }
+      .actions { display: none; }
+      .sheet { border: 0; border-radius: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <div class="accent"></div>
+    <div class="inner">
+      <h1>{{ school_name }}</h1>
+      <p class="muted">
+        {% if school_address %}{{ school_address }}<br>{% endif %}
+        {% if school_phone %}{{ school_phone }}{% endif %}
+        {% if school_phone and school_email %} · {% endif %}
+        {% if school_email %}{{ school_email }}{% endif %}
+      </p>
+
+      <p class="amount">GHS {{ total }}</p>
+      <p class="muted" style="margin-top:0; margin-bottom:8px;">
+        Fee schedule for {{ student_name }} ({{ student_code }})
+      </p>
+      <p class="muted" style="margin-top:0;">{{ term_label }}</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th style="text-align:right;">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          <tr>
+            <td>
+              {{ item.name }}
+              {% if item.description %}
+              <span class="item-desc">{{ item.description }}</span>
+              {% endif %}
+            </td>
+            <td class="amount-cell">GHS {{ item.amount }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>Total</td>
+            <td class="amount-cell">GHS {{ total }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+  <div class="actions">
+    <button type="button" onclick="window.print()">Print / save as PDF</button>
+  </div>
+</body>
+</html>

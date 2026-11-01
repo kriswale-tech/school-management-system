@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Icon } from '@iconify/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -20,6 +21,7 @@ import type {
 import { getApiErrorMessage, mergeClasses } from '@/utils'
 import BulkReleaseModal from './components/BulkReleaseModal'
 import CorrectionModal from './components/CorrectionModal'
+import ReportReadyModal from './components/ReportReadyModal'
 
 type StatusFilter = 'all' | 'ready_for_you' | 'released' | 'needs_correction'
 
@@ -73,6 +75,8 @@ const AdminAssessmentDetail = () => {
   const [remarksByStudent, setRemarksByStudent] = useState<Record<string, string>>({})
   const [bulkOpen, setBulkOpen] = useState(false)
   const [correctionOpen, setCorrectionOpen] = useState(false)
+  const [notifyOpen, setNotifyOpen] = useState(false)
+  const [notifyIds, setNotifyIds] = useState<Set<string>>(() => new Set())
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: DETAIL_QUERY_KEY(streamId ?? '', termId ?? ''),
@@ -160,6 +164,28 @@ const AdminAssessmentDetail = () => {
     data?.students.filter((student) => student.status === 'ready_for_you').map((student) => student.id) ??
     []
 
+  const canNotifyParents = canRelease
+  const isNotifyEligible = (student: AdminAssessmentDetailStudent) =>
+    student.status === 'released' && Boolean(student.has_report)
+
+  const notifySelectableIds = (data?.students ?? [])
+    .filter((student) => student.status === 'released' && Boolean(student.has_report))
+    .map((student) => student.id)
+
+  const notifySelectedCount = notifyIds.size
+  const notifySelectedList = useMemo(() => Array.from(notifyIds), [notifyIds])
+
+  const toggleNotifyRow = (studentId: string) => {
+    setNotifyIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(studentId)) next.delete(studentId)
+      else next.add(studentId)
+      return next
+    })
+  }
+
+  const clearNotifySelection = () => setNotifyIds(new Set())
+
   const pillTabs: Array<{ key: StatusFilter; label: string; count: number }> = [
     { key: 'all', label: 'All', count: data?.students_count ?? 0 },
     { key: 'ready_for_you', label: 'Ready for you', count: data?.ready_for_you_count ?? 0 },
@@ -174,6 +200,8 @@ const AdminAssessmentDetail = () => {
   const weights = data?.weights
   const canReleaseSelected = selectedStudent?.status === 'ready_for_you' && canRelease
   const canGenerateReport = selectedStudent?.status === 'released'
+  const canNotifySelected =
+    canNotifyParents && selectedStudent != null && isNotifyEligible(selectedStudent)
   const canCorrectSelected =
     canRelease &&
     selectedStudent &&
@@ -253,6 +281,35 @@ const AdminAssessmentDetail = () => {
               })}
             </div>
 
+            {canNotifyParents && notifySelectedCount > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                <p className="text-sm text-slate-700">
+                  <span className="font-medium text-slate-900">{notifySelectedCount}</span> selected
+                  <button
+                    type="button"
+                    className="ml-2 text-sm text-sky-700 hover:underline"
+                    onClick={clearNotifySelection}
+                  >
+                    Clear
+                  </button>
+                </p>
+                <Button
+                  type="button"
+                  className="max-w-fit py-1.5 text-sm"
+                  onClick={() => setNotifyOpen(true)}
+                >
+                  <Icon icon="hugeicons:mail-01" className="size-4" />
+                  Notify parents
+                </Button>
+              </div>
+            ) : null}
+
+            {canNotifyParents && notifySelectedCount === 0 && notifySelectableIds.length > 0 ? (
+              <p className="text-xs text-slate-500">
+                Select released students with a generated report to notify parents.
+              </p>
+            ) : null}
+
             <ul className="space-y-2 overflow-y-auto">
               {filteredStudents.length === 0 ? (
                 <li className="text-sm text-slate-500 py-6 text-center">
@@ -261,38 +318,60 @@ const AdminAssessmentDetail = () => {
               ) : (
                 filteredStudents.map((student) => {
                   const selected = student.id === resolvedStudentId
+                  const notifyEligible = isNotifyEligible(student)
                   return (
                     <li key={student.id}>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedStudentId(student.id)}
+                      <div
                         className={mergeClasses(
-                          'w-full rounded-lg border px-3 py-3 text-left transition-colors cursor-pointer',
+                          'flex items-start gap-2 rounded-lg border px-3 py-3 transition-colors',
                           selected
                             ? 'border-slate-900 bg-slate-50'
                             : 'border-slate-200 bg-white hover:border-slate-300',
                         )}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-slate-900 truncate">
-                              {student.full_name}
-                            </p>
-                            <p className="text-xs text-slate-500 mt-0.5">{student.student_id}</p>
+                        {canNotifyParents && notifyEligible ? (
+                          <input
+                            type="checkbox"
+                            className="mt-1 size-4 shrink-0 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                            checked={notifyIds.has(student.id)}
+                            onChange={() => toggleNotifyRow(student.id)}
+                            onClick={(event) => event.stopPropagation()}
+                            aria-label={`Select ${student.full_name} for parent notice`}
+                          />
+                        ) : canNotifyParents ? (
+                          <span className="mt-1 size-4 shrink-0" aria-hidden />
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStudentId(student.id)}
+                          className="min-w-0 flex-1 text-left cursor-pointer"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-slate-900 truncate">
+                                {student.full_name}
+                              </p>
+                              <p className="text-xs text-slate-500 mt-0.5">{student.student_id}</p>
+                            </div>
+                            <div className="flex shrink-0 flex-col items-end gap-1">
+                              <span className={statusChipClass(student.status)}>
+                                {statusLabel(student.status)}
+                              </span>
+                              {student.has_report ? (
+                                <span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700">
+                                  Report ready
+                                </span>
+                              ) : null}
+                              {student.active_correction?.kind === 'reopen_request' &&
+                              student.active_correction.status === 'open' ? (
+                                <span className="inline-flex rounded-md bg-orange-50 px-2 py-0.5 text-[10px] font-medium text-orange-800">
+                                  Reopen requested
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
-                          <div className="flex shrink-0 flex-col items-end gap-1">
-                          <span className={statusChipClass(student.status)}>
-                            {statusLabel(student.status)}
-                          </span>
-                          {student.active_correction?.kind === 'reopen_request' &&
-                          student.active_correction.status === 'open' ? (
-                            <span className="inline-flex rounded-md bg-orange-50 px-2 py-0.5 text-[10px] font-medium text-orange-800">
-                              Reopen requested
-                            </span>
-                          ) : null}
-                          </div>
-                        </div>
-                      </button>
+                        </button>
+                      </div>
                     </li>
                   )
                 })
@@ -555,7 +634,20 @@ const AdminAssessmentDetail = () => {
                             )
                           }}
                         >
-                          Generate report
+                          {selectedStudent.has_report ? 'View report' : 'Generate report'}
+                        </Button>
+                      ) : null}
+                      {canNotifySelected ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="max-w-fit py-2 text-sm"
+                          onClick={() => {
+                            setNotifyIds(new Set([selectedStudent.id]))
+                            setNotifyOpen(true)
+                          }}
+                        >
+                          Notify parents
                         </Button>
                       ) : null}
                       {canCorrectSelected ? (
@@ -606,6 +698,17 @@ const AdminAssessmentDetail = () => {
         onClose={() => setCorrectionOpen(false)}
         onConfirm={(payload) => correctStudent(payload)}
       />
+
+      {canNotifyParents && streamId ? (
+        <ReportReadyModal
+          open={notifyOpen}
+          streamId={streamId}
+          termId={termId}
+          studentIds={notifySelectedList}
+          onClose={() => setNotifyOpen(false)}
+          onSent={clearNotifySelection}
+        />
+      ) : null}
     </div>
   )
 }

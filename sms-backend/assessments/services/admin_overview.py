@@ -396,6 +396,22 @@ def _serialize_stream_assessment_students(*, school, stream, term, config, bands
     for student in students:
         student['active_correction'] = by_student.get(student['id'])
 
+    from assessments.models import Report
+
+    report_student_ids = {
+        str(student_id)
+        for student_id in Report.objects.filter(
+            school=school,
+            stream_id=stream.id,
+            term_id=term.id,
+        )
+        .exclude(file='')
+        .exclude(file__isnull=True)
+        .values_list('student_id', flat=True)
+    }
+    for student in students:
+        student['has_report'] = student['id'] in report_student_ids
+
     _apply_positions(students=students, uses_position=config.uses_position())
     return students
 

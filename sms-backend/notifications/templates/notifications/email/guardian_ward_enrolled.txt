@@ -1,0 +1,7 @@
+{% if greeting %}{{ greeting }}
+
+{% endif %}{{ student_name }} has been enrolled at {{ school_name }}{% if class_name %} ({{ class_name }}){% endif %}.
+
+You are listed as a guardian on their school record.
+
+If you have questions, please contact the school.

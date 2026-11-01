@@ -1,7 +1,7 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from students.models import Student, StudentParent
+from students.models import Parent, Student, StudentParent
 
 
 class StudentClassLevelSerializer(serializers.Serializer):
@@ -104,6 +104,11 @@ class GuardianInputSerializer(serializers.Serializer):
         default='',
     )
     email = serializers.EmailField(required=False, allow_blank=True, default='')
+    notify_channel = serializers.ChoiceField(
+        choices=Parent.NotifyChannel.choices,
+        required=False,
+        default=Parent.NotifyChannel.BOTH,
+    )
     relationship = serializers.ChoiceField(choices=StudentParent.RelationshipChoices.choices)
 
     def validate(self, attrs):
@@ -125,6 +130,7 @@ class GuardianInputSerializer(serializers.Serializer):
             'name': name,
             'phone_number': phone_number,
             'email': (attrs.get('email') or '').strip(),
+            'notify_channel': attrs.get('notify_channel') or Parent.NotifyChannel.BOTH,
             'relationship': attrs['relationship'],
         }
 
@@ -161,6 +167,7 @@ class StudentGuardianSerializer(serializers.Serializer):
     phone_number_alt = serializers.CharField(allow_blank=True)
     email = serializers.EmailField(allow_blank=True)
     address = serializers.CharField(allow_blank=True)
+    notify_channel = serializers.ChoiceField(choices=Parent.NotifyChannel.choices)
     relationship = serializers.CharField()
     is_primary = serializers.BooleanField()
     is_emergency_contact = serializers.BooleanField()
@@ -222,6 +229,10 @@ class GuardianUpdateSerializer(serializers.Serializer):
     )
     email = serializers.EmailField(required=False, allow_blank=True)
     address = serializers.CharField(required=False, allow_blank=True)
+    notify_channel = serializers.ChoiceField(
+        choices=Parent.NotifyChannel.choices,
+        required=False,
+    )
     relationship = serializers.ChoiceField(
         choices=StudentParent.RelationshipChoices.choices,
         required=False,
@@ -238,6 +249,11 @@ class GuardianCreateSerializer(GuardianInputSerializer):
         base = super().validate(attrs)
         base['is_primary'] = attrs.get('is_primary', False)
         base['is_emergency_contact'] = attrs.get('is_emergency_contact', False)
+        if 'notify_channel' in attrs and 'parent_id' not in base:
+            base['notify_channel'] = attrs.get('notify_channel') or Parent.NotifyChannel.BOTH
+        elif 'notify_channel' in attrs and 'parent_id' in base:
+            # Existing parent: allow updating channel when explicitly provided.
+            base['notify_channel'] = attrs['notify_channel']
         return base
 
 

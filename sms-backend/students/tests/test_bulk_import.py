@@ -1,6 +1,9 @@
 import io
+from unittest.mock import patch
 
+from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from django.urls import reverse
 from openpyxl import load_workbook
 from rest_framework import status
@@ -8,11 +11,15 @@ from rest_framework.test import APITestCase
 
 from academics.models import ClassLevel, ClassStream, Level
 from accounts.tests.factories import create_user, set_client_auth_cookies, user_school
+from notifications.models import GuardianDelivery
 from schools.models import AcademicYear, Term
+from schools.services.settings import get_school_settings
 from shared.services.spreadsheets import build_csv_bytes
 from students.bulk_template import IMPORT_HEADERS
 from students.models import Student
 from students.tests.factories import ensure_default_stream
+
+SEND_SMS_PATH = 'shared.services.arkesel_sms.send_sms_to_recipients'
 
 
 class StudentBulkImportTests(APITestCase):
@@ -182,3 +189,101 @@ class StudentBulkImportTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['summary']['rows_with_errors'], 1)
         self.assertIn('not found', response.data['rows'][0]['messages'][0].lower())
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
+    @patch(SEND_SMS_PATH, return_value={'status': 'success', 'data': [{'id': 'bulk-1'}]})
+    def test_commit_notifies_guardians_for_imported_students(self, mock_sms):
+        get_school_settings(self.school)
+        csv_bytes = build_csv_bytes(
+            headers=IMPORT_HEADERS,
+            rows=[
+                {
+                    'first_name': 'Ama',
+                    'last_name': 'Boateng',
+                    'other_names': '',
+                    'gender': 'female',
+                    'date_of_birth': '2015-03-12',
+                    'admission_date': '2025-09-01',
+                    'is_new_student': '',
+                    'class_name': 'JHS 1 A',
+                    'guardian_name': 'Akosua Boateng',
+                    'guardian_phone': '0244111222',
+                    'guardian_email': 'akosua@example.com',
+                    'guardian_relationship': 'mother',
+                },
+                {
+                    'first_name': 'Yaw',
+                    'last_name': 'Owusu',
+                    'other_names': '',
+                    'gender': 'male',
+                    'date_of_birth': '2014-05-01',
+                    'admission_date': '2025-09-01',
+                    'is_new_student': 'true',
+                    'class_name': 'JHS 1 A',
+                    'guardian_name': '',
+                    'guardian_phone': '',
+                    'guardian_email': '',
+                    'guardian_relationship': '',
+                },
+            ],
+        )
+        upload = SimpleUploadedFile('students.csv', csv_bytes, content_type='text/csv')
+        mail.outbox.clear()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                f'{self.upload_url}?dry_run=false',
+                {'file': upload},
+                format='multipart',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['summary']['rows_succeeded'], 2)
+        mock_sms.assert_called_once()
+        guardian_mail = [
+            message for message in mail.outbox
+            if message.to == ['akosua@example.com']
+        ]
+        self.assertEqual(len(guardian_mail), 1)
+        self.assertIn('enrolled', guardian_mail[0].subject.lower())
+        self.assertEqual(
+            GuardianDelivery.objects.filter(
+                event_type=GuardianDelivery.EventType.WARD_ENROLLED,
+                status=GuardianDelivery.Status.SENT,
+            ).count(),
+            2,
+        )
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
+    @patch(SEND_SMS_PATH, return_value={'status': 'success'})
+    def test_dry_run_does_not_notify_guardians(self, mock_sms):
+        get_school_settings(self.school)
+        csv_bytes = build_csv_bytes(
+            headers=IMPORT_HEADERS,
+            rows=[{
+                'first_name': 'Ama',
+                'last_name': 'Boateng',
+                'gender': 'female',
+                'date_of_birth': '2015-03-12',
+                'admission_date': '2025-09-01',
+                'class_name': 'JHS 1 A',
+                'guardian_name': 'Akosua Boateng',
+                'guardian_phone': '0244111222',
+                'guardian_email': 'akosua@example.com',
+                'guardian_relationship': 'mother',
+            }],
+        )
+        upload = SimpleUploadedFile('students.csv', csv_bytes, content_type='text/csv')
+        mail.outbox.clear()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                f'{self.upload_url}?dry_run=true',
+                {'file': upload},
+                format='multipart',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_sms.assert_not_called()
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(GuardianDelivery.objects.count(), 0)

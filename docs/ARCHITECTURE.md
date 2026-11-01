@@ -4,7 +4,7 @@
 
 ```
 School-Management-System/
-├── compose.yml          # Postgres + backend + frontend (Redis/Celery commented out)
+├── compose.yml          # Postgres + backend + frontend + Redis + Celery worker
 ├── .env                 # Shared env for Compose
 ├── requirements.txt     # Root pin (backend also has its own deps via Dockerfile)
 ├── docs/                # Project docs (this folder)
@@ -22,7 +22,9 @@ School-Management-System/
 | Auth | Phone OTP + JWT in HTTP-only cookies; school membership on token/request |
 | Media | Cloudinary (profile/school logos configured via settings) |
 | Frontend | React 19, Vite, TypeScript, TanStack Query, React Router 7, Tailwind 4, Zustand, Zod + RHF |
-| Local run | Docker Compose — backend `:9000→8000`, frontend `:3003→5173`, DB `:5434→5432` |
+| Local run | Docker Compose — backend `:9000→8000`, frontend `:3003→5173`, DB `:5434→5432`, Redis `:6380→6379`, Celery worker |
+| Email | django-anymail → Resend (notification delivery; gated by `EMAIL_ENABLED`) |
+| Async | Celery + Redis (notification email tasks for now) |
 
 ## Multi-school model
 
@@ -45,13 +47,15 @@ School-Management-System/
 | `assessments` | Assessment config, markbook, approvals, releases, corrections |
 | `dashboard` | Admin and teacher home aggregations (read-only) |
 | `activities` | School activity feed. Domain services write via `record_activity`; dashboards read |
+| `notifications` | Staff in-app inbox (Tier‑1 + Celery email) and guardian outbound log (`GuardianDelivery`) via `services/guardians.py` |
+| `reports` | School-wide and teacher-scoped analytics |
 | `shared` | `BaseModel`, helpers, shared exceptions/services |
 
 ## Frontend feature modules
 
 Under `sms-frontend/src/features/`:
 
-`auth`, `setup`, `dashboard`, `students`, `classes`, `assessments`, `fees`, `staff`
+`auth`, `setup`, `dashboard`, `students`, `classes`, `assessments`, `fees`, `staff`, `settings`, `notifications` (services), `reports`, `profile`
 
 Shared UI lives in `src/components/` (layout, curriculum accordion, data-table, bulk-upload, etc.). API client: `src/app/api/api.ts`.
 
@@ -64,12 +68,13 @@ Shared UI lives in `src/components/` (layout, curriculum accordion, data-table, 
 
 ## Auth notes
 
-- OTP is generated and stored on `PhoneOtp`; in `DEBUG`, OTP is printed to the server console.
-- An Arkesel SMS helper lives at `shared/services/arkesel_sms.py` but is **not called** from the OTP flow yet.
+- OTP is generated and stored on `PhoneOtp`.
+- **Login OTP:** Arkesel SMS (`shared/services/arkesel_sms.py`) is primary; email is sent when the user has an address; if SMS fails in `DEBUG`, the code is printed to the console.
+- **Signup OTP:** still DEBUG-console only for now.
 - Access uses **capabilities** on `/me` (`accounts.capabilities` + `accounts.services.capabilities`), derived from membership role and teacher assignments. UI uses `useCan`; teachers get assignment-scoped class lists via `accounts.services.access_scope`.
 - Fine-grained `Permission` + `RolePermission` tables remain unused.
 
-## Infra not yet enabled
+## Infra notes
 
-- Redis and Celery worker/beat are present in `compose.yml` but **commented out**.
-- Useful later for SMS send, large bulk imports, scheduled term rollover, etc.
+- Redis + Celery worker run in Compose (host Redis mapped to **6380**). Used for staff notification email and guardian SMS/email (batched outbound + beat for auto debt reminders).
+- Also used for bulk-import ward-enrolled notices and fee-structure apply notices.

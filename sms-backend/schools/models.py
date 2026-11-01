@@ -133,7 +133,25 @@ class Term(BaseModel):
 
 
 class SchoolSettings(BaseModel):
-    """In-app alert rules and report-card fields for one school."""
+    """In-app alert rules, report-card fields, and guardian outreach for one school."""
+
+    class GuardianAudience(models.TextChoices):
+        PRIMARY = 'primary', 'Primary guardian only'
+        ALL = 'all', 'All guardians'
+
+    class ReportParentNotifyMode(models.TextChoices):
+        MANUAL = 'manual', 'Staff triggered'
+        AUTO = 'auto', 'Automatic on release'
+
+    class GuardianChannel(models.TextChoices):
+        SMS = 'sms', 'SMS'
+        EMAIL = 'email', 'Email'
+        BOTH = 'both', 'SMS and email'
+
+    class DebtReminderFrequency(models.TextChoices):
+        END_OF_MONTH = 'end_of_month', 'End of each month'
+        WEEKLY = 'weekly', 'Weekly (Mondays)'
+        BIWEEKLY = 'biweekly', 'Every 2 weeks (Mondays)'
 
     school = models.OneToOneField(
         'School',
@@ -157,6 +175,74 @@ class SchoolSettings(BaseModel):
     report_show_address = models.BooleanField(default=True)
     report_show_phones = models.BooleanField(default=True)
     report_show_email = models.BooleanField(default=True)
+
+    guardian_audience = models.CharField(
+        max_length=10,
+        choices=GuardianAudience.choices,
+        default=GuardianAudience.PRIMARY,
+        help_text='Which linked guardians receive parent messages by default.',
+    )
+    report_parent_notify_mode = models.CharField(
+        max_length=10,
+        choices=ReportParentNotifyMode.choices,
+        default=ReportParentNotifyMode.MANUAL,
+        help_text='Whether report-ready messages go out automatically or only when staff send them.',
+    )
+    guardian_ward_enrolled_enabled = models.BooleanField(
+        default=True,
+        help_text='Notify guardians when a ward is added to the school.',
+    )
+    guardian_ward_enrolled_channels = models.CharField(
+        max_length=10,
+        choices=GuardianChannel.choices,
+        default=GuardianChannel.BOTH,
+    )
+    guardian_payment_receipt_enabled = models.BooleanField(
+        default=False,
+        help_text='Placeholder: payment + receipt link to guardians (not wired yet).',
+    )
+    guardian_payment_receipt_channels = models.CharField(
+        max_length=10,
+        choices=GuardianChannel.choices,
+        default=GuardianChannel.BOTH,
+    )
+    guardian_debt_reminder_enabled = models.BooleanField(
+        default=False,
+        help_text='Allow debt reminders to guardians (manual Fees desk and optional automation).',
+    )
+    guardian_debt_reminder_channels = models.CharField(
+        max_length=10,
+        choices=GuardianChannel.choices,
+        default=GuardianChannel.BOTH,
+    )
+    guardian_debt_reminder_auto_enabled = models.BooleanField(
+        default=False,
+        help_text='Automatically remind guardians of outstanding balances on a schedule.',
+    )
+    guardian_debt_reminder_frequency = models.CharField(
+        max_length=20,
+        choices=DebtReminderFrequency.choices,
+        default=DebtReminderFrequency.END_OF_MONTH,
+        help_text='How often automatic debt reminders are sent (default: end of each month).',
+    )
+    guardian_report_ready_enabled = models.BooleanField(
+        default=False,
+        help_text='Placeholder: report download link to guardians (not wired yet).',
+    )
+    guardian_report_ready_channels = models.CharField(
+        max_length=10,
+        choices=GuardianChannel.choices,
+        default=GuardianChannel.BOTH,
+    )
+    guardian_next_term_fees_enabled = models.BooleanField(
+        default=False,
+        help_text='Placeholder: next-term fees notice to guardians (not wired yet).',
+    )
+    guardian_next_term_fees_channels = models.CharField(
+        max_length=10,
+        choices=GuardianChannel.choices,
+        default=GuardianChannel.BOTH,
+    )
 
     def __str__(self):
         return f'Settings for {self.school.name}'
