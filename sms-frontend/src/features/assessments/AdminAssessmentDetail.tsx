@@ -201,7 +201,7 @@ const AdminAssessmentDetail = () => {
   const canReleaseSelected = selectedStudent?.status === 'ready_for_you' && canRelease
   const canGenerateReport = selectedStudent?.status === 'released'
   const canNotifySelected =
-    canNotifyParents && selectedStudent != null && isNotifyEligible(selectedStudent)
+    Boolean(canNotifyParents && selectedStudent && isNotifyEligible(selectedStudent))
   const canCorrectSelected =
     canRelease &&
     selectedStudent &&

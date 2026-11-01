@@ -667,11 +667,12 @@ def confirm_transition(
         today=today,
     )
     actor_name = (user.get_full_name() or '').strip() or 'Admin'
+    term_label = f'{target.get_term_display()} {target.academic_year.academic_year}'
     record_activity(
         school=school,
         actor=user,
         verb=Activity.Verb.TERM_OPENED,
-        summary=f'{actor_name} opened {target.name}.',
+        summary=f'{actor_name} opened {term_label}.',
         href='/dashboard',
         term=target,
         target_kind='term',

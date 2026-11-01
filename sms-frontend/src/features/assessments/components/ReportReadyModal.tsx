@@ -74,21 +74,19 @@ const ReportReadyModal = ({
   })
 
   useEffect(() => {
-    if (!open) {
-      setPreview(null)
-      return
-    }
-    if (!studentIdsKey) return
+    if (!open || !studentIdsKey) return
     loadPreview()
   }, [open, studentIdsKey, loadPreview])
 
+  const displayPreview = open ? preview : null
+
   return (
     <Modal open={open} title="Notify parents — report ready" onClose={onClose} scrollable className="max-w-lg">
-      {isPreviewing || !preview ? (
+      {isPreviewing || !displayPreview ? (
         <LoadingSpinner className="mx-auto my-8" />
       ) : (
         <div className="space-y-5">
-          {!preview.enabled ? (
+          {!displayPreview.enabled ? (
             <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               Report-ready messages are turned off. Enable them under Settings → Parent messages.
             </p>
@@ -96,54 +94,56 @@ const ReportReadyModal = ({
 
           <p className="text-sm text-slate-600">
             Send download links for{' '}
-            <span className="font-medium text-slate-900">{preview.eligible_count}</span> student
-            {preview.eligible_count === 1 ? '' : 's'} with generated reports ({preview.class_name} ·{' '}
-            {preview.term_label}).
+            <span className="font-medium text-slate-900">{displayPreview.eligible_count}</span> student
+            {displayPreview.eligible_count === 1 ? '' : 's'} with generated reports (
+            {displayPreview.class_name} · {displayPreview.term_label}).
           </p>
 
           <dl className="grid grid-cols-[140px_1fr] gap-x-3 gap-y-2 text-sm">
             <dt className="text-slate-500">Mode setting</dt>
             <dd>
-              {preview.notify_mode === 'auto' ? 'Automatic on generate' : 'Staff triggered'}
+              {displayPreview.notify_mode === 'auto'
+                ? 'Automatic on generate'
+                : 'Staff triggered'}
             </dd>
             <dt className="text-slate-500">Audience</dt>
-            <dd>{audienceLabel(preview.audience)}</dd>
+            <dd>{audienceLabel(displayPreview.audience)}</dd>
             <dt className="text-slate-500">Channels</dt>
-            <dd>{channelsLabel(preview.channels)}</dd>
+            <dd>{channelsLabel(displayPreview.channels)}</dd>
             <dt className="text-slate-500">Estimated SMS</dt>
-            <dd>{preview.sms_count}</dd>
+            <dd>{displayPreview.sms_count}</dd>
             <dt className="text-slate-500">Estimated email</dt>
-            <dd>{preview.email_count}</dd>
+            <dd>{displayPreview.email_count}</dd>
             <dt className="text-slate-500">Skipped</dt>
-            <dd>{preview.skipped_count}</dd>
+            <dd>{displayPreview.skipped_count}</dd>
           </dl>
 
-          {preview.eligible.length > 0 ? (
+          {displayPreview.eligible.length > 0 ? (
             <div className="space-y-2">
               <p className="text-sm font-medium text-slate-800">Eligible students</p>
               <ul className="max-h-40 overflow-y-auto rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                {preview.eligible.map((row) => (
+                {displayPreview.eligible.map((row) => (
                   <li key={row.student_id} className="py-1">
                     {row.full_name}
                   </li>
                 ))}
-                {preview.eligible_truncated ? (
+                {displayPreview.eligible_truncated ? (
                   <li className="py-1 text-slate-500">…and more</li>
                 ) : null}
               </ul>
             </div>
           ) : null}
 
-          {preview.skipped.length > 0 ? (
+          {displayPreview.skipped.length > 0 ? (
             <div className="space-y-2">
               <p className="text-sm font-medium text-slate-800">Skipped</p>
               <ul className="max-h-32 overflow-y-auto rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600">
-                {preview.skipped.map((row) => (
+                {displayPreview.skipped.map((row) => (
                   <li key={`${row.student_id}-${row.reason}`} className="py-1">
                     {row.full_name || row.student_id}: {row.reason}
                   </li>
                 ))}
-                {preview.skipped_truncated ? (
+                {displayPreview.skipped_truncated ? (
                   <li className="py-1 text-slate-500">…and more</li>
                 ) : null}
               </ul>
@@ -158,7 +158,7 @@ const ReportReadyModal = ({
               type="button"
               loading={isSending}
               loadingText="Sending..."
-              disabled={!preview.enabled || preview.eligible_count === 0}
+              disabled={!displayPreview.enabled || displayPreview.eligible_count === 0}
               onClick={() => send()}
             >
               Notify parents
