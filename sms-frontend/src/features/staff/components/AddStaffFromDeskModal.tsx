@@ -37,7 +37,7 @@ const AddStaffFromDeskModal = ({
       setSessionKey((value) => value + 1)
       setFormOpen(true)
     }
-  }, [open, singleRole?.value])
+  }, [open, singleRole])
 
   const selectedOption =
     roleOptions.find((option) => option.value === role) ?? singleRole

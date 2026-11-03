@@ -4,7 +4,9 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from fees.models import Payment, Receipt
+from django.db.models import Sum
+
+from fees.models import Payment, PaymentAllocation, Receipt, StudentFee
 from fees.services.credits import create_credit_from_excess, get_student_advance_balance
 from fees.services.fees import get_student_term_balance
 from schools.models import Term
@@ -15,25 +17,71 @@ def _term_label(term):
     return f'{term.academic_year.academic_year} · {term.get_term_display()}'
 
 
-def get_earliest_outstanding_term(*, school, student):
-    """Return the earliest term (by start_date) where the student still owes fees."""
+def get_student_all_time_balance(*, student) -> dict:
+    """Lifetime billed/paid and remaining balance for a student."""
+    billed = (
+        StudentFee.objects.filter(student=student).aggregate(total=Sum('amount'))['total']
+        or Decimal('0.00')
+    )
+    paid = (
+        Payment.objects.filter(student=student).aggregate(total=Sum('amount'))['total']
+        or Decimal('0.00')
+    )
+    return {
+        'total_billed': billed,
+        'total_paid': paid,
+        'balance': max(billed - paid, Decimal('0.00')),
+    }
+
+
+def list_student_outstanding_term_balances(*, school, student) -> list[dict]:
+    """Terms (earliest first) where the student still has a positive balance."""
     terms = (
         Term.objects.filter(school=school)
         .select_related('academic_year')
         .order_by('start_date')
     )
+    rows = []
     for term in terms:
-        balance = get_student_term_balance(student=student, term=term)
-        if balance['balance'] > 0:
-            return term, balance
-    return None, None
+        balance = get_student_term_balance(student=student, term=term)['balance']
+        if balance > 0:
+            rows.append({
+                'term': term,
+                'term_label': _term_label(term),
+                'balance': balance,
+            })
+    return rows
+
+
+def format_outstanding_terms_summary(rows: list[dict], *, max_terms: int = 4) -> str:
+    """Compact "Term: GHS x; …" string for SMS / preview."""
+    if not rows:
+        return ''
+    parts = [
+        f"{row['term_label']}: GHS {row['balance']:.2f}"
+        for row in rows[:max_terms]
+    ]
+    leftover = len(rows) - max_terms
+    if leftover > 0:
+        parts.append(f'+{leftover} more')
+    return '; '.join(parts)
+
+
+def get_earliest_outstanding_term(*, school, student):
+    """Return the earliest term (by start_date) where the student still owes fees."""
+    rows = list_student_outstanding_term_balances(school=school, student=student)
+    if not rows:
+        return None, None
+    first = rows[0]
+    return first['term'], get_student_term_balance(student=student, term=first['term'])
 
 
 def build_student_payment_target(*, school, student):
     """Payment target context for the record-payment form."""
     from students.services import get_enrollment_for_student, get_active_term
 
-    term, balance = get_earliest_outstanding_term(school=school, student=student)
+    outstanding_rows = list_student_outstanding_term_balances(school=school, student=student)
+    all_time = get_student_all_time_balance(student=student)
     active_term = get_active_term(
         school,
         detail='Set an active term before recording payments.',
@@ -56,6 +104,14 @@ def build_student_payment_target(*, school, student):
     ).strip()
 
     advance_balance = get_student_advance_balance(student=student)
+    outstanding_terms = [
+        {
+            'term_id': row['term'].id,
+            'term_label': row['term_label'],
+            'balance': row['balance'],
+        }
+        for row in outstanding_rows
+    ]
 
     payload = {
         'student_id': student.id,
@@ -68,15 +124,19 @@ def build_student_payment_target(*, school, student):
         'target_term': None,
         'outstanding_balance': Decimal('0.00'),
         'has_outstanding': False,
+        'all_time_outstanding': all_time['balance'],
+        'has_all_time_outstanding': all_time['balance'] > 0,
+        'outstanding_terms': outstanding_terms,
         'advance_balance': advance_balance,
         'has_advance': advance_balance > 0,
     }
 
-    if term is None:
+    if not outstanding_rows:
         return payload
 
+    term = outstanding_rows[0]['term']
     payload['has_outstanding'] = True
-    payload['outstanding_balance'] = balance['balance']
+    payload['outstanding_balance'] = outstanding_rows[0]['balance']
     payload['target_term'] = {
         'id': term.id,
         'term': term.term,
@@ -111,8 +171,9 @@ def record_student_payment(
     payment_notes='',
 ):
     """
-    Record a payment against the earliest term with an outstanding balance.
-    Any excess becomes available advance credit for later terms.
+    Apply a payment oldest-owing-term first (waterfall).
+
+    Only leftover after every owing term is cleared becomes advance credit.
     """
     if amount is None or amount <= 0:
         raise ValidationError({'amount': 'Payment amount must be greater than zero.'})
@@ -122,19 +183,36 @@ def record_student_payment(
             'payment_method': 'Advance credit applications are system-generated only.',
         })
 
-    term, balance = get_earliest_outstanding_term(school=school, student=student)
-    if term is None:
+    owing_rows = list_student_outstanding_term_balances(school=school, student=student)
+    if not owing_rows:
         raise ValidationError({
             'student': 'This student has no outstanding fees to pay.',
         })
 
-    owing = balance['balance']
-    applied_amount = min(amount, owing)
-    excess_amount = amount - applied_amount
+    remaining = amount
+    planned_allocations = []
+    for row in owing_rows:
+        if remaining <= 0:
+            break
+        apply_amount = min(remaining, row['balance'])
+        if apply_amount <= 0:
+            continue
+        planned_allocations.append({
+            'term': row['term'],
+            'term_label': row['term_label'],
+            'amount': apply_amount,
+        })
+        remaining -= apply_amount
 
-    payment = Payment.objects.create(
+    if not planned_allocations:
+        raise ValidationError({
+            'student': 'This student has no outstanding fees to pay.',
+        })
+
+    primary_term = planned_allocations[0]['term']
+    payment = Payment(
         student=student,
-        term=term,
+        term=primary_term,
         amount=amount,
         payment_method=payment_method,
         paid_at=paid_at,
@@ -142,6 +220,19 @@ def record_student_payment(
         payment_notes=payment_notes or '',
         recorded_by=recorded_by,
     )
+    payment.save(skip_default_allocation=True)
+    allocation_payload = []
+    for plan in planned_allocations:
+        PaymentAllocation.objects.create(
+            payment=payment,
+            term=plan['term'],
+            amount=plan['amount'],
+        )
+        allocation_payload.append({
+            'term_id': plan['term'].id,
+            'term_label': plan['term_label'],
+            'amount': plan['amount'],
+        })
 
     receipt = Receipt.objects.create(
         payment=payment,
@@ -149,6 +240,7 @@ def record_student_payment(
         issued_by=recorded_by,
     )
 
+    excess_amount = remaining
     credit = None
     if excess_amount > 0:
         credit = create_credit_from_excess(
@@ -158,11 +250,12 @@ def record_student_payment(
             source_payment=payment,
         )
 
+    amount_applied = amount - excess_amount
     _record_payment_activity(
         school=school,
         student=student,
         amount=amount,
-        term=term,
+        term=payment.term,
         recorded_by=recorded_by,
         payment=payment,
     )
@@ -174,22 +267,23 @@ def record_student_payment(
         payment_id=payment.id,
         receipt_id=receipt.id,
         receipt_number=receipt.receipt_number,
-        amount=payment.amount,
+        amount=amount,
     )
 
     return {
         'payment_id': payment.id,
         'receipt_id': receipt.id,
         'receipt_number': receipt.receipt_number,
-        'term_id': term.id,
-        'term_label': _term_label(term),
-        'amount': payment.amount,
-        'amount_applied': applied_amount,
+        'term_id': payment.term_id,
+        'term_label': _term_label(payment.term),
+        'amount': amount,
+        'amount_applied': amount_applied,
         'advance_created': excess_amount,
-        'outstanding_after': max(owing - applied_amount, Decimal('0.00')),
+        'outstanding_after': get_student_all_time_balance(student=student)['balance'],
         'advance_balance': get_student_advance_balance(student=student),
         'credit_id': credit.id if credit else None,
         'paid_at': payment.paid_at,
+        'allocations': allocation_payload,
     }
 
 

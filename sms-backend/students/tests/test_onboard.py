@@ -184,3 +184,61 @@ class StudentOnboardViewTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('parent_id', response.data['raw_detail'])
+
+    def test_onboard_accepts_optional_student_id(self):
+        payload = {
+            'student_id': 'ADM-42',
+            'first_name': 'Ama',
+            'last_name': 'Mensah',
+            'gender': 'female',
+            'date_of_birth': '2015-03-12',
+            'admission_date': '2025-09-01',
+            'guardians': [
+                {
+                    'name': 'Akosua Mensah',
+                    'phone_number': '0244111222',
+                    'relationship': 'mother',
+                },
+            ],
+            'stream_id': str(self.named_stream.id),
+            'is_new_student': True,
+        }
+
+        response = self.client.post(self.url, payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['student_id'], 'ADM-42')
+        self.assertTrue(Student.objects.filter(student_id='ADM-42').exists())
+
+    def test_onboard_rejects_duplicate_student_id(self):
+        Student.objects.create(
+            school=self.school,
+            student_id='ADM-42',
+            first_name='Existing',
+            last_name='Student',
+            gender='male',
+            date_of_birth=date(2014, 1, 1),
+            admission_date=date(2025, 9, 1),
+        )
+        payload = {
+            'student_id': 'ADM-42',
+            'first_name': 'Ama',
+            'last_name': 'Mensah',
+            'gender': 'female',
+            'date_of_birth': '2015-03-12',
+            'admission_date': '2025-09-01',
+            'guardians': [
+                {
+                    'name': 'Akosua Mensah',
+                    'phone_number': '0244111222',
+                    'relationship': 'mother',
+                },
+            ],
+            'stream_id': str(self.named_stream.id),
+            'is_new_student': True,
+        }
+
+        response = self.client.post(self.url, payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('student_id', response.data['raw_detail'])

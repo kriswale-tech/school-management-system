@@ -83,18 +83,27 @@ class PaymentTargetTermSerializer(serializers.Serializer):
     label = serializers.CharField()
 
 
+class OutstandingTermBalanceSerializer(serializers.Serializer):
+    term_id = serializers.UUIDField()
+    term_label = serializers.CharField()
+    balance = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+
 class StudentPaymentTargetSerializer(serializers.Serializer):
     student_id = serializers.UUIDField()
     student = PaymentTargetStudentSerializer()
     target_term = PaymentTargetTermSerializer(allow_null=True)
     outstanding_balance = serializers.DecimalField(max_digits=12, decimal_places=2)
     has_outstanding = serializers.BooleanField()
+    all_time_outstanding = serializers.DecimalField(max_digits=12, decimal_places=2)
+    has_all_time_outstanding = serializers.BooleanField()
+    outstanding_terms = OutstandingTermBalanceSerializer(many=True)
     advance_balance = serializers.DecimalField(max_digits=12, decimal_places=2)
     has_advance = serializers.BooleanField()
 
 
 class DebtReminderRequestSerializer(serializers.Serializer):
-    term_id = serializers.UUIDField(required=False, allow_null=True)
+    term_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     student_ids = serializers.ListField(
         child=serializers.UUIDField(),
         allow_empty=False,
@@ -117,6 +126,7 @@ class DebtReminderEligibleSerializer(serializers.Serializer):
     full_name = serializers.CharField()
     student_code = serializers.CharField()
     balance = serializers.CharField()
+    terms_summary = serializers.CharField(required=False, allow_null=True)
     guardians = DebtReminderGuardianPlanSerializer(many=True)
 
 
@@ -131,7 +141,8 @@ class DebtReminderPreviewSerializer(serializers.Serializer):
     enabled = serializers.BooleanField()
     audience = serializers.CharField()
     channels = serializers.CharField(allow_null=True)
-    term_id = serializers.UUIDField()
+    all_time = serializers.BooleanField()
+    term_id = serializers.CharField()
     term_label = serializers.CharField()
     requested_count = serializers.IntegerField()
     eligible_count = serializers.IntegerField()
@@ -144,17 +155,46 @@ class DebtReminderPreviewSerializer(serializers.Serializer):
     skipped = DebtReminderSkippedSerializer(many=True)
     eligible_truncated = serializers.BooleanField()
     skipped_truncated = serializers.BooleanField()
+    sample_sms = serializers.CharField(allow_blank=True)
+    sample_email_subject = serializers.CharField(allow_blank=True)
+    sample_email_body = serializers.CharField(allow_blank=True)
 
 
 class DebtReminderSendResultSerializer(serializers.Serializer):
     batch_id = serializers.CharField()
-    term_id = serializers.UUIDField()
+    all_time = serializers.BooleanField()
+    term_id = serializers.CharField()
     term_label = serializers.CharField()
     queued = serializers.BooleanField()
     students_notified = serializers.IntegerField()
     sms_sent = serializers.IntegerField()
     email_sent = serializers.IntegerField()
     skipped_count = serializers.IntegerField()
+
+
+class ReceiptAllocationSerializer(serializers.Serializer):
+    term_label = serializers.CharField()
+    amount = serializers.CharField()
+
+
+class ReceiptDetailSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    school_name = serializers.CharField()
+    school_logo_url = serializers.CharField(allow_null=True, required=False)
+    school_phone = serializers.CharField(allow_blank=True, allow_null=True)
+    school_email = serializers.CharField(allow_blank=True)
+    school_address = serializers.CharField(allow_blank=True)
+    student_name = serializers.CharField()
+    student_id = serializers.CharField()
+    receipt_number = serializers.CharField()
+    amount = serializers.CharField()
+    payment_method = serializers.CharField()
+    payment_reference = serializers.CharField(allow_blank=True)
+    paid_at = serializers.DateTimeField()
+    issued_at = serializers.DateTimeField()
+    received_by = serializers.CharField(allow_blank=True)
+    term_label = serializers.CharField()
+    allocations = ReceiptAllocationSerializer(many=True)
 
 
 class RecordPaymentSerializer(serializers.Serializer):
@@ -177,6 +217,12 @@ class RecordPaymentSerializer(serializers.Serializer):
         return value
 
 
+class PaymentAllocationSerializer(serializers.Serializer):
+    term_id = serializers.UUIDField()
+    term_label = serializers.CharField()
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+
 class RecordPaymentResponseSerializer(serializers.Serializer):
     payment_id = serializers.UUIDField()
     receipt_id = serializers.UUIDField()
@@ -190,6 +236,7 @@ class RecordPaymentResponseSerializer(serializers.Serializer):
     advance_balance = serializers.DecimalField(max_digits=12, decimal_places=2)
     credit_id = serializers.UUIDField(allow_null=True)
     paid_at = serializers.DateTimeField()
+    allocations = PaymentAllocationSerializer(many=True)
 
 
 class FeeStructureSettingsSerializer(serializers.Serializer):

@@ -14,6 +14,7 @@ from fees.views import (
     FeeStructureItemDetailView,
     NextTermFeePrepView,
     PublishFeeStructureView,
+    ReceiptDetailView,
     RecordPaymentView,
     StudentPaymentTargetView,
 )
@@ -25,6 +26,11 @@ urlpatterns = [
     path('filter-options/', FeeDeskFilterOptionsView.as_view(), name='fee-desk-filter-options'),
     path('next-term-prep/', NextTermFeePrepView.as_view(), name='fee-next-term-prep'),
     path('payments/', RecordPaymentView.as_view(), name='record-payment'),
+    path(
+        'receipts/<uuid:receipt_id>/',
+        ReceiptDetailView.as_view(),
+        name='fee-receipt-detail',
+    ),
     path(
         'debt-reminders/preview/',
         DebtReminderPreviewView.as_view(),

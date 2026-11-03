@@ -49,7 +49,7 @@ After setup, admins use `/settings` (tabs keep the selection in the URL). Signup
 - **School profile** — name, contact, logo, and the prefix used on new student IDs (`GET`/`PATCH /schools/school/`). Existing student IDs stay as they are.
 - **Academic year** — every year and its three terms. The current term is marked. Past years are view-only. Adding the next year saves dates only; the current term stays current. New terms with no assessment setup receive a copy of the latest previous setup.
 - **Open the next term** — wizard from the navbar, the admin dashboard, and Academic year. Places pupils, marks leavers graduated, copies teachers, applies the next fee catalog, then makes that term current. See [term-transition.md](./term-transition.md).
-- **Alerts** — in-app rules for outstanding fees, unreleased results, and new enrollments (admin + staff). Navbar **bell** lists the ones that apply to the signed-in role. One more switch controls the dashboard popup while opening the next term still needs action.
+- **Alerts** — in-app rules for outstanding fees, unreleased results, new enrollments, and missing guardians (admin + staff). Navbar **bell** lists the ones that apply to the signed-in role. One more switch controls the dashboard popup while opening the next term still needs action.
 - **Parent messages** — guardian SMS/email policy (audience, channels, event toggles) + SMS credits placeholder. Ward enrolled, receipts, debt reminders, and report ready are live; see [guardian-communications.md](./guardian-communications.md).
 - **Notifications** — personal in-app inbox (`notifications` app) on the navbar **inbox** icon for workflow and identity events (assignments, results pipeline, enrollments, member/student profile changes, term opened). See [notifications.md](./notifications.md). Email/Celery delivery is next.
 - **Fees, assessments, and classes** — the same screens as `/fees/settings`, `/assessments/settings`, and `/classes/manage`, also opened from `/settings/fees`, `/settings/assessments`, and `/settings/classes`. Those original routes stay in place.
@@ -83,15 +83,16 @@ After setup, admins use `/settings` (tabs keep the selection in the URL). Signup
 
 **Built:**
 
-- Models: `FeeStructure`, `FeeItem`, `StudentFee`, `Payment`, `Receipt`, `StudentFeeCredit` (advance)
-- Services: publish/apply structure, carry-forward, balances, history, record payment, excess → advance, auto-apply advance on next term apply
-- Setup wizard fee items; student detail fee breakdown + payment history
-- Fees desk (`GET /api/v1/fees/`, `/stats/`, `/filter-options/`) + frontend `/fees` list/detail
-- Record Fees slider (list + detail); advance shown on desk rows, detail header, and record form
+- Models: `FeeStructure`, `FeeItem`, `StudentFee`, `Payment`, `PaymentAllocation`, `Receipt`, `StudentFeeCredit` (advance)
+- Services: publish/apply structure, carry-forward, balances, history, waterfall record payment, excess → advance, auto-apply advance on next term apply
+- Setup wizard fee items; student detail fee breakdown + payment history (receipt # / received by / search + Excel export)
+- Fees desk (`GET /api/v1/fees/`, `/stats/`, `/filter-options/`, default `term=all`) + frontend `/fees` list/detail
+- Record Fees slider (list + detail) with success → print receipt / record another; advance shown on desk rows, detail header, and record form
+- Staff receipt detail (`GET /fees/receipts/:id/`) + print/PDF; public guardian receipt HTML unchanged
 - Fees settings (`/fees/settings` + `/api/v1/fees/structures/`): term catalogs, item CRUD, copy-from-previous, publish, Apply; late enrollments auto-billed
 - Next-term fee prep for accountants (`GET /fees/next-term-prep/`, dashboard/fees banner) in the transition lead window
 
-**Not exposed as product features yet:** receipt PDF, Excel export, advance refund, pure advance top-up with no owing
+**Not exposed as product features yet:** advance refund, pure advance top-up with no owing
 
 ### Assessments — config only (partial)
 
@@ -165,13 +166,13 @@ Under `/api/v1/`:
 - `schools/` — setup wizard, school profile, settings (year calendar, term transition, alerts)  
 - `academics/` — levels, classes, teachers assignment  
 - `students/` — CRUD-ish list/detail, onboard, guardians, fees read, bulk import  
-- `fees/` — desk list, stats, filter options, payments, structures (publish/apply/copy), next-term prep  
+- `fees/` — desk list, stats, filter options, payments, receipt detail, structures (publish/apply/copy), next-term prep  
 - `reports/` — overview, teacher desk, academic/finance/enrollment/staff insights  
-- `dashboard/`, `activities/` — admin/teacher dashboards and activity feed  
+- `dashboard/`, `activities/` — role dashboards and time-ordered activity feed (optional `?term=`)  
 - `notifications/` — personal in-app inbox (list, unread count, mark read) + guardian delivery log
 - Guardian communications — ward enrolled (onboard + bulk import), payment receipt links, manual + automatic debt reminders (end-of-month default), report-ready signed links, next-term fee schedules; Celery batch SMS/email (100) + beat; see [guardian-communications.md](./guardian-communications.md)
 
-**Still light / deferred:** staff receipt PDF in app, advance refund, Excel fee export; SMS credits UI (per school here + platform admin elsewhere).
+**Still light / deferred:** advance refund; SMS credits UI (per school here + platform admin elsewhere).
 
 ---
 
@@ -181,6 +182,6 @@ Under `/api/v1/`:
 2. SMS credits — see [guardian-communications.md](./guardian-communications.md)  
 3. Signup OTP via Arkesel (login already wired)  
 4. Tier 2 staff notification events + preferences  
-5. Remaining fees polish (receipt PDF, refunds, Excel export)
+5. Remaining fees polish (advance refunds, pure advance top-up)
 
 See also [FEATURES.md](./FEATURES.md) for a domain-by-domain checklist and [ARCHITECTURE.md](./ARCHITECTURE.md) for how the pieces fit.

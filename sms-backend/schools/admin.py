@@ -17,6 +17,7 @@ class SchoolSettingsAdmin(admin.ModelAdmin):
         'fees_alert_threshold',
         'results_alert_enabled',
         'enrollments_alert_enabled',
+        'guardians_alert_enabled',
         'transition_popup_enabled',
         'guardian_ward_enrolled_enabled',
         'guardian_audience',

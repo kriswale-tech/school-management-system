@@ -28,18 +28,13 @@ const VERB_LABELS: Record<string, string> = {
   student_reactivated: 'Student reactivated',
 }
 
-type ActivityTabProps = {
-  termId: string
-}
-
-const ActivityTab = ({ termId }: ActivityTabProps) => {
+const ActivityTab = () => {
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
 
   const { data, isLoading, isError, error, isFetching } = useQuery({
-    queryKey: [REPORTS_ACTIVITIES_QUERY_KEY, termId, page],
-    queryFn: () => getActivities({ term: termId || undefined, page, page_size: 20 }),
-    enabled: Boolean(termId),
+    queryKey: [REPORTS_ACTIVITIES_QUERY_KEY, page],
+    queryFn: () => getActivities({ page, page_size: 20 }),
   })
 
   const activities = data?.results ?? []
@@ -49,11 +44,11 @@ const ActivityTab = ({ termId }: ActivityTabProps) => {
       <div className="border-b border-slate-100 px-4 py-4 sm:px-6">
         <h2 className="text-base font-medium text-slate-900">Activity</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Recent changes this term, and who made them.
+          Recent changes across terms, and who made them.
         </p>
       </div>
 
-      {!termId || isLoading ? (
+      {isLoading ? (
         <p className="px-4 py-10 text-center text-sm text-slate-500 sm:px-6">
           Loading activities…
         </p>
@@ -63,7 +58,7 @@ const ActivityTab = ({ termId }: ActivityTabProps) => {
         </p>
       ) : activities.length === 0 ? (
         <p className="px-4 py-10 text-center text-sm text-slate-500 sm:px-6">
-          No activity recorded for this term yet.
+          No activity recorded yet.
         </p>
       ) : (
         <ul className="divide-y divide-slate-100">

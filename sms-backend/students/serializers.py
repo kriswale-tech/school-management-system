@@ -46,7 +46,14 @@ class StudentListSerializer(serializers.Serializer):
     stream = StudentStreamSerializer()
     is_new_student = serializers.BooleanField()
     payment_status = serializers.CharField()
+    missing_guardian = serializers.SerializerMethodField()
     primary_parent = serializers.SerializerMethodField()
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_missing_guardian(self, obj) -> bool:
+        if hasattr(obj, 'has_guardian'):
+            return not bool(obj.has_guardian)
+        return not obj.student.parent_links.exists()
 
     @extend_schema_field(PrimaryParentSerializer(allow_null=True))
     def get_primary_parent(self, obj):
@@ -114,10 +121,13 @@ class GuardianInputSerializer(serializers.Serializer):
     def validate(self, attrs):
         parent_id = attrs.get('parent_id')
         if parent_id:
-            return {
+            result = {
                 'parent_id': parent_id,
                 'relationship': attrs['relationship'],
             }
+            if 'notify_channel' in attrs:
+                result['notify_channel'] = attrs['notify_channel']
+            return result
 
         name = (attrs.get('name') or '').strip()
         phone_number = (attrs.get('phone_number') or '').strip()
@@ -136,6 +146,13 @@ class GuardianInputSerializer(serializers.Serializer):
 
 
 class StudentOnboardSerializer(serializers.Serializer):
+    student_id = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        default='',
+        help_text='Optional school-assigned student ID. Auto-generated when blank.',
+    )
     first_name = serializers.CharField(max_length=255)
     last_name = serializers.CharField(max_length=255)
     other_names = serializers.CharField(
@@ -203,6 +220,7 @@ class MarkStudentLeftSerializer(serializers.Serializer):
 
 
 class StudentUpdateSerializer(serializers.Serializer):
+    student_id = serializers.CharField(max_length=255, required=False)
     first_name = serializers.CharField(max_length=255, required=False)
     last_name = serializers.CharField(max_length=255, required=False)
     other_names = serializers.CharField(
@@ -295,6 +313,12 @@ class StudentPaymentReceiptSerializer(serializers.Serializer):
     receipt_number = serializers.CharField()
 
 
+class StudentPaymentAllocationSerializer(serializers.Serializer):
+    term_id = serializers.UUIDField()
+    term_label = serializers.CharField()
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+
 class StudentPaymentSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     term_id = serializers.UUIDField()
@@ -307,4 +331,6 @@ class StudentPaymentSerializer(serializers.Serializer):
     payment_method_display = serializers.CharField()
     paid_at = serializers.DateTimeField()
     payment_reference = serializers.CharField(allow_blank=True)
+    received_by = serializers.CharField(allow_blank=True)
+    allocations = StudentPaymentAllocationSerializer(many=True)
     receipt = StudentPaymentReceiptSerializer(allow_null=True)

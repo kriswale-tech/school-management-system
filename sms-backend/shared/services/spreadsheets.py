@@ -1,6 +1,7 @@
 import csv
 import io
 import re
+from datetime import date, datetime
 from typing import Any
 
 from openpyxl import Workbook, load_workbook
@@ -24,6 +25,12 @@ def normalize_header(value: Any) -> str:
 def normalize_cell(value: Any) -> str:
     if value is None:
         return ''
+    # Excel date cells arrive as datetime/date; keep ISO so locale display
+    # formats (e.g. MM/DD/YYYY) do not break importers that expect YYYY-MM-DD.
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
     return str(value).strip()
 
 

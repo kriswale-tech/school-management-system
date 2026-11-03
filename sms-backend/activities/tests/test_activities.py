@@ -229,3 +229,41 @@ class ActivityFeedTests(APITestCase):
         set_client_auth_cookies(self.client, teacher)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_feed_includes_activity_from_other_terms_by_default(self):
+        other_term = Term.objects.create(
+            school=self.school,
+            academic_year=self.academic_year,
+            term=Term.TermChoices.SECOND_TERM,
+            start_date=date(2026, 1, 10),
+            end_date=date(2026, 4, 10),
+            is_active=False,
+        )
+        prior = record_activity(
+            school=self.school,
+            verb=Activity.Verb.PAYMENT_RECORDED,
+            summary='Payment recorded for prior-term debt',
+            actor=self.admin,
+            term=other_term,
+            href='/fees',
+        )
+        current = record_activity(
+            school=self.school,
+            verb=Activity.Verb.PAYMENT_RECORDED,
+            summary='Payment recorded for current term',
+            actor=self.admin,
+            term=self.term,
+            href='/fees',
+        )
+
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = {row['id'] for row in response.data['results']}
+        self.assertIn(str(prior.id), ids)
+        self.assertIn(str(current.id), ids)
+
+        filtered = self.client.get(self.url, {'term': str(self.term.id)})
+        self.assertEqual(filtered.status_code, status.HTTP_200_OK)
+        filtered_ids = {row['id'] for row in filtered.data['results']}
+        self.assertIn(str(current.id), filtered_ids)
+        self.assertNotIn(str(prior.id), filtered_ids)

@@ -86,7 +86,8 @@ const DebtReminderModal = ({
             Remind guardians for{' '}
             <span className="font-medium text-slate-900">{displayPreview.eligible_count}</span>{' '}
             eligible student{displayPreview.eligible_count === 1 ? '' : 's'} with outstanding fees (
-            {displayPreview.term_label}).
+            {displayPreview.term_label}
+            {displayPreview.all_time ? ' — total owing with term summary' : ''}).
           </p>
 
           <dl className="grid grid-cols-[140px_1fr] gap-x-3 gap-y-2 text-sm">
@@ -102,6 +103,33 @@ const DebtReminderModal = ({
             <dd>{displayPreview.skipped_count}</dd>
           </dl>
 
+          {displayPreview.sample_sms || displayPreview.sample_email_body ? (
+            <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-3">
+              <p className="text-sm font-medium text-slate-800">Message preview</p>
+              {displayPreview.sample_sms ? (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">SMS</p>
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                    {displayPreview.sample_sms}
+                  </p>
+                </div>
+              ) : null}
+              {displayPreview.sample_email_body ? (
+                <div className="space-y-1 pt-2 border-t border-slate-200">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Email
+                    {displayPreview.sample_email_subject
+                      ? ` · ${displayPreview.sample_email_subject}`
+                      : ''}
+                  </p>
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                    {displayPreview.sample_email_body}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           {displayPreview.eligible.length > 0 ? (
             <div className="space-y-2">
               <p className="text-sm font-medium text-slate-800">Eligible students</p>
@@ -109,6 +137,9 @@ const DebtReminderModal = ({
                 {displayPreview.eligible.map((row) => (
                   <li key={row.student_id} className="py-1">
                     {row.full_name} — GHS {row.balance}
+                    {row.terms_summary ? (
+                      <span className="block text-xs text-slate-500">{row.terms_summary}</span>
+                    ) : null}
                   </li>
                 ))}
                 {displayPreview.eligible_truncated ? (

@@ -6,6 +6,7 @@ from django.db.models import (
     Case,
     CharField,
     DecimalField,
+    Exists,
     F,
     OuterRef,
     Prefetch,
@@ -18,7 +19,7 @@ from django.db.models.functions import Coalesce
 from rest_framework.exceptions import NotFound, ValidationError
 
 from academics.models import ClassStream
-from fees.models import Payment, StudentFee
+from fees.models import StudentFee
 from schools.models import Term
 from shared.helpers import format_phone_number
 from students.models import ClassEnrollment, Parent, Student, StudentParent
@@ -79,17 +80,36 @@ def generate_student_id(*, school) -> str:
     return f'{prefix}-{max_n + 1:04d}'
 
 
+def normalize_provided_student_id(value: str | None) -> str:
+    return (value or '').strip()
+
+
+def assert_student_id_available(*, school, student_id: str, exclude_student_id=None) -> None:
+    queryset = Student.objects.filter(school=school, student_id=student_id)
+    if exclude_student_id is not None:
+        queryset = queryset.exclude(id=exclude_student_id)
+    if queryset.exists():
+        raise ValidationError({
+            'student_id': 'A student with this ID already exists for this school.',
+        })
+
+
+def resolve_student_id(*, school, student_id: str | None = '') -> str:
+    """Use a school-provided ID when present; otherwise auto-generate."""
+    provided = normalize_provided_student_id(student_id)
+    if provided:
+        assert_student_id_available(school=school, student_id=provided)
+        return provided
+    return generate_student_id(school=school)
+
+
 def _annotate_payment_totals(queryset, *, term):
     """Annotate billed/paid via subqueries to avoid join multiplication."""
+    from fees.services.ledger import paid_toward_term_subquery
+
     decimal_field = DecimalField(max_digits=12, decimal_places=2)
     billed_sq = (
         StudentFee.objects.filter(student_id=OuterRef('student_id'), term=term)
-        .values('student_id')
-        .annotate(total=Sum('amount'))
-        .values('total')[:1]
-    )
-    paid_sq = (
-        Payment.objects.filter(student_id=OuterRef('student_id'), term=term)
         .values('student_id')
         .annotate(total=Sum('amount'))
         .values('total')[:1]
@@ -100,11 +120,7 @@ def _annotate_payment_totals(queryset, *, term):
             Value(Decimal('0.00')),
             output_field=decimal_field,
         ),
-        total_paid=Coalesce(
-            Subquery(paid_sq, output_field=decimal_field),
-            Value(Decimal('0.00')),
-            output_field=decimal_field,
-        ),
+        total_paid=paid_toward_term_subquery(term=term),
     )
 
 
@@ -145,8 +161,21 @@ def list_enrollments_for_term(*, school, term):
         'student__last_name',
         'student__first_name',
     )
+    queryset = _annotate_has_guardian(queryset)
     queryset = _annotate_payment_totals(queryset, term=term)
     return _annotate_payment_status(queryset)
+
+
+def _annotate_has_guardian(queryset):
+    return queryset.annotate(
+        has_guardian=Exists(
+            StudentParent.objects.filter(student_id=OuterRef('student_id')),
+        ),
+    )
+
+
+def count_students_missing_guardian(*, school, term) -> int:
+    return list_enrollments_for_term(school=school, term=term).filter(has_guardian=False).count()
 
 
 def get_enrollment_for_student(*, school, term, student):
@@ -234,6 +263,11 @@ def _resolve_parent(*, school, guardian):
         parent = Parent.objects.filter(school=school, id=parent_id).first()
         if parent is None:
             raise ValidationError({'parent_id': 'Parent not found in this school.'})
+        notify_channel = guardian.get('notify_channel')
+        if notify_channel and notify_channel in Parent.NotifyChannel.values:
+            if parent.notify_channel != notify_channel:
+                parent.notify_channel = notify_channel
+                parent.save(update_fields=['notify_channel', 'updated_at'])
         return parent
     return _get_or_create_parent(school=school, guardian=guardian)
 
@@ -251,17 +285,18 @@ def onboard_student(
     stream_id,
     is_new_student,
     other_names='',
+    student_id='',
 ):
     if not guardians:
         raise ValidationError({'guardians': 'At least one guardian is required.'})
 
     term = get_active_term(school)
     stream = _resolve_stream(school=school, stream_id=stream_id)
-    student_id = generate_student_id(school=school)
+    resolved_student_id = resolve_student_id(school=school, student_id=student_id)
 
     student = Student.objects.create(
         school=school,
-        student_id=student_id,
+        student_id=resolved_student_id,
         first_name=first_name.strip(),
         last_name=last_name.strip(),
         other_names=(other_names or '').strip(),
@@ -461,13 +496,26 @@ def update_student(*, school, student_id, actor=None, **fields):
         'date_of_birth',
         'admission_date',
         'address',
+        'student_id',
     }
     updates = []
     for key, value in fields.items():
         if key not in allowed:
             continue
-        if key in ('first_name', 'last_name', 'other_names', 'address') and isinstance(value, str):
+        if key in ('first_name', 'last_name', 'other_names', 'address', 'student_id') and isinstance(
+            value,
+            str,
+        ):
             value = value.strip()
+        if key == 'student_id':
+            if not value:
+                raise ValidationError({'student_id': 'Student ID cannot be blank.'})
+            if value != student.student_id:
+                assert_student_id_available(
+                    school=school,
+                    student_id=value,
+                    exclude_student_id=student.id,
+                )
         if getattr(student, key) == value:
             continue
         setattr(student, key, value)

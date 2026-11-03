@@ -72,6 +72,15 @@ const Bio = ({ student }: BioProps) => {
       label: 'Class',
       value: student.class_assignment?.display_name ?? '—',
     },
+    {
+      label: 'Enrollment',
+      value:
+        student.is_new_student === true
+          ? 'New student'
+          : student.is_new_student === false
+            ? 'Continuing student'
+            : '—',
+    },
     { label: 'Status', value: statusLabel(student) },
   ]
 

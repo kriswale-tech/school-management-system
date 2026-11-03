@@ -55,11 +55,12 @@ Checklist by domain. Status values:
 
 | Feature | Backend | Frontend | Status |
 | --- | --- | --- | --- |
-| List + stats + filters | Yes | Yes | Done |
+| List + stats + filters | Yes | Yes | Done — includes `missing_guardian` filter + list badge |
 | Onboard (bio, class, guardians) | Yes | Multi-step form | Done |
 | Detail bio edit | Yes | Yes | Done |
 | Guardians CRUD / parent reuse | Yes | Yes | Done |
-| Bulk import | Yes | Yes | Done |
+| Bulk import | Yes | Yes | Done — optional `student_id` (skip existing); dates prefer `YYYY-MM-DD`; see [`student-bulk-import.md`](../sms-backend/docs/student-bulk-import.md) |
+| Optional school student ID | Yes (onboard/update/bulk) | Yes (onboard + edit bio) | Done |
 | Class enrollment per term | Yes | Via onboard / class views | Done |
 | Fees on student (read) | Yes | Yes | Done |
 | Reports & assessment tab | Yes (`GET /students/:id/assessments/`) | Student detail tab | Done |
@@ -90,7 +91,7 @@ School-wide and teacher-scoped analytics at `/reports`. See
 | Academic charts + structure KPIs | by-class, heatmap, grades, trends | Academic tab | Done |
 | Finance / enrollment / fees×risk | reports APIs | Tabs | Done |
 | Teachers load insights | `GET /reports/staff-capacity/` | Teachers tab (links to `/staff/:id`) | Done |
-| Activity feed (role-scoped) | `GET /activities/` (`reports.view`) | Insights → Activity (`?tab=activity`) | Done |
+| Activity feed (role-scoped) | `GET /activities/` time-ordered; optional `?term=` | Insights → Activity (`?tab=activity`) | Done |
 
 ## Fees
 
@@ -101,7 +102,9 @@ School-wide and teacher-scoped analytics at `/reports`. See
 | StudentFee generation on apply | Service + auto on late enroll | — | Done |
 | Fees desk list + stats | Yes (`/api/v1/fees/`) | `/fees` | Done |
 | Student fee balance / history APIs | Yes (on students) | Student detail + fee detail (`?feesTab=`) | Done |
-| Record payment | Yes | Record Fees slider | Done |
+| Record payment (waterfall + allocations) | Yes | Record Fees slider + print receipt | Done |
+| Staff receipt detail / print | `GET /fees/receipts/:id/` | Payment History + print/PDF | Done |
+| Payment history Excel export | `GET /students/:id/payments/export/` | Download modal | Done |
 | Receipts | Model + auto on payment | Eye UI-only | Partial |
 | Fees settings | Yes | `/fees/settings` | Done |
 | Next-term fee prep | `GET /fees/next-term-prep/` | Dashboard / fees banner + settings | Done |
@@ -137,7 +140,7 @@ The calendar lists every year. Past years are view-only. **Add** saves the next 
 
 **Open the next term** places continuing pupils, marks the last class graduated at year end, copies teachers, applies the next fee catalog, and then turns that term on. See [term-transition.md](./term-transition.md) (includes deferred BECE / final-year exam decision). Standalone `POST …/terms/<term_id>/activate/` is disabled (403); activation only runs inside transition confirm.
 
-Alerts are in-app only: outstanding fees (admin and accountant), unreleased results (admin and class teachers), and new enrollments (admin and staff). The transition popup on the dashboard has its own checkbox. Personal event notifications are separate — see [notifications.md](./notifications.md). Guardian SMS/email is a third surface — see [guardian-communications.md](./guardian-communications.md).
+Alerts are in-app only: outstanding fees (admin and accountant), unreleased results (admin and class teachers), new enrollments (admin and staff), and missing guardians (admin and staff). The transition popup on the dashboard has its own checkbox. Personal event notifications are separate — see [notifications.md](./notifications.md). Guardian SMS/email is a third surface — see [guardian-communications.md](./guardian-communications.md).
 
 ## Dashboard & shell
 
@@ -145,7 +148,7 @@ Alerts are in-app only: outstanding fees (admin and accountant), unreleased resu
 | --- | --- | --- | --- |
 | App shell (nav, auth gates) | — | Yes | Done |
 | Dashboard widgets | Yes (`/dashboard/admin/`, `/dashboard/teacher/`) + fees APIs for accountant | Admin / teacher / accountant / staff pages | Done (see [dashboard.md](./dashboard.md)) |
-| Activity feed | Yes (`activities` app, `GET /activities/`) | Recent Activities card | Done |
+| Activity feed | Yes (`activities` app, `GET /activities/`, across terms by default) | Recent Activities card | Done |
 | In-app alerts | Yes (`GET /schools/alerts/`) | Navbar bell → Alerts | Done |
 | Personal notifications | Yes (`notifications` app) | Navbar inbox icon | Done (in-app Tier 1 + email when enabled) |
 | Parent messages (guardians) | Ward enrolled, receipts, debt reminders (manual + auto), report ready, next-term fees | Settings → Parent messages + Fees / Assessment desks | Partial |
@@ -177,6 +180,7 @@ Alerts are in-app only: outstanding fees (admin and accountant), unreleased resu
 ## Existing deep-dive notes
 
 - Teacher bulk import (frontend contract): [`sms-backend/docs/frontend-teacher-bulk-import.md`](../sms-backend/docs/frontend-teacher-bulk-import.md)
+- Student bulk import (dates + guardians): [`sms-backend/docs/student-bulk-import.md`](../sms-backend/docs/student-bulk-import.md)
 - Assessment structure per term: [assessment-config.md](./assessment-config.md)
 - Role dashboards (admin / teacher / accountant / staff), activity feed: [dashboard.md](./dashboard.md)
 - Reports & Insights: [`sms-backend/docs/reports-insights.md`](../sms-backend/docs/reports-insights.md)

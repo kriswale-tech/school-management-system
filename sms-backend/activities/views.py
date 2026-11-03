@@ -20,13 +20,14 @@ class ActivityListView(SchoolScopedAPIView):
         description=(
             'Newest-first activity feed for the active school, scoped to the '
             'caller\'s role (admin: all; accountant: fees; staff: non-fees; '
-            'teacher: assigned classes/subjects). Defaults to the active term.'
+            'teacher: assigned classes/subjects). Time-ordered by default; '
+            'pass term to optionally narrow to activities tagged with that term.'
         ),
         parameters=[
             OpenApiParameter(
                 name='term',
                 type=str,
-                description='Term UUID. Defaults to the active term.',
+                description='Optional term UUID. When omitted, returns recent activity across terms.',
             ),
             OpenApiParameter(name='page', type=int),
             OpenApiParameter(name='page_size', type=int),
@@ -34,7 +35,7 @@ class ActivityListView(SchoolScopedAPIView):
         responses={200: paginated_schema(ActivitySerializer, name='PaginatedActivities')},
     )
     def get(self, request):
-        term = _resolve_term(self.school, request.query_params.get('term'))
+        term = _resolve_optional_term(self.school, request.query_params.get('term'))
         queryset = list_activities_for_membership(
             membership=request.membership,
             school=self.school,
@@ -45,12 +46,12 @@ class ActivityListView(SchoolScopedAPIView):
         return paginator.get_paginated_response(ActivitySerializer(page, many=True).data)
 
 
-def _resolve_term(school, term_id):
-    if term_id:
-        term = Term.objects.filter(school=school, id=term_id).first()
-        if term is None:
-            from rest_framework.exceptions import ValidationError
+def _resolve_optional_term(school, term_id):
+    if not term_id:
+        return None
+    term = Term.objects.filter(school=school, id=term_id).first()
+    if term is None:
+        from rest_framework.exceptions import ValidationError
 
-            raise ValidationError({'term': 'Term not found in this school.'})
-        return term
-    return Term.objects.filter(school=school, is_active=True).first()
+        raise ValidationError({'term': 'Term not found in this school.'})
+    return term

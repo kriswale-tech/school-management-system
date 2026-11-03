@@ -14,6 +14,7 @@ class StudentBulkImportPreviewSummarySerializer(serializers.Serializer):
     rows_with_errors = serializers.IntegerField()
     rows_with_warnings = serializers.IntegerField()
     students_to_create = serializers.IntegerField()
+    students_to_skip = serializers.IntegerField()
     guardians_to_link = serializers.IntegerField()
 
 
@@ -23,6 +24,7 @@ class StudentBulkImportConfirmSummarySerializer(serializers.Serializer):
     rows_succeeded = serializers.IntegerField()
     rows_failed = serializers.IntegerField()
     students_created = serializers.IntegerField()
+    students_skipped = serializers.IntegerField()
     guardians_linked = serializers.IntegerField()
 
 

@@ -19,7 +19,7 @@ Project status and reference docs for the SMS monorepo (`sms-backend` + `sms-fro
 | [guardian-communications.md](./guardian-communications.md) | Parent SMS/email outreach (ward enrolled + settings); distinct from staff inbox |
 | [email-previews/notification-email-preview.html](./email-previews/notification-email-preview.html) | Visual preview of the shared notification email layout |
 
-Related backend-only notes live under [`sms-backend/docs/`](../sms-backend/docs/) (e.g. Reports & Insights, teacher bulk import).
+Related backend-only notes live under [`sms-backend/docs/`](../sms-backend/docs/) (e.g. Reports & Insights, teacher bulk import, [student bulk import](../sms-backend/docs/student-bulk-import.md)).
 
 URL tab conventions for page-level panels are summarized in [HOW_IT_WORKS.md](./HOW_IT_WORKS.md) (§ URL tabs).
 

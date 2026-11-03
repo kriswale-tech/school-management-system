@@ -1,5 +1,10 @@
 import type { AllClassesLevel, ClassEntry } from '@/features/classes/types'
-import type { GuardianRelationship, StudentGender, StudentOnboardPayload } from '@/features/students/types'
+import type {
+  GuardianNotifyChannel,
+  GuardianRelationship,
+  StudentGender,
+  StudentOnboardPayload,
+} from '@/features/students/types'
 
 export type StudentFormStepId = 'basic' | 'guardian' | 'placement'
 
@@ -11,10 +16,12 @@ export type GuardianFormValues = {
   name: string
   phone_number: string
   email: string
+  notify_channel: GuardianNotifyChannel
   relationship: GuardianRelationship | ''
 }
 
 export type StudentFormValues = {
+  student_id: string
   first_name: string
   last_name: string
   other_names: string

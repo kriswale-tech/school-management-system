@@ -32,11 +32,14 @@ const BulkUploadStudents = ({ onSuccess }: BulkUploadStudentsProps) => {
   const [previewResult, setPreviewResult] = useState<BulkUploadPreviewResult | null>(null)
   const [failures, setFailures] = useState<StudentBulkImportFailuresInfo | null>(null)
   const [failureInfo, setFailureInfo] = useState<BulkUploadFailureInfo | null>(null)
+  const [selectionResetKey, setSelectionResetKey] = useState(0)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const resetResults = () => {
     setPreviewResult(null)
     setFailures(null)
     setFailureInfo(null)
+    setSuccessMessage(null)
   }
 
   const downloadTemplateMutation = useMutation({
@@ -52,6 +55,7 @@ const BulkUploadStudents = ({ onSuccess }: BulkUploadStudentsProps) => {
       setPreviewResult(mapPreviewResponseToBulkUploadResult(response))
       setFailures(null)
       setFailureInfo(null)
+      setSuccessMessage(null)
     },
     onError: (error) => {
       toast.error(getApiErrorMessage(error, 'Unable to validate file'))
@@ -62,6 +66,7 @@ const BulkUploadStudents = ({ onSuccess }: BulkUploadStudentsProps) => {
     mutationFn: confirmStudentBulkImport,
     onSuccess: async (response) => {
       const { summary, failures: importFailures } = response
+      const skipped = summary.students_skipped ?? 0
 
       if (importFailures) {
         setFailures(importFailures)
@@ -69,18 +74,26 @@ const BulkUploadStudents = ({ onSuccess }: BulkUploadStudentsProps) => {
           label: getFailureDownloadLabel(importFailures.count, importFailures.format),
         })
         toast.error(`${summary.rows_failed} row(s) failed to import`)
+        setSuccessMessage(
+          `Imported ${summary.students_created} student(s)` +
+            (skipped ? `, skipped ${skipped} existing` : '') +
+            `. Download failed rows to review the rest.`,
+        )
       } else {
         setFailures(null)
         setFailureInfo(null)
-        toast.success(
-          `Imported ${summary.rows_succeeded} student(s)` +
-            (summary.guardians_linked
-              ? ` with ${summary.guardians_linked} guardian(s) linked`
-              : ''),
-        )
+        const message =
+          `Imported ${summary.students_created} student(s)` +
+          (summary.guardians_linked
+            ? ` with ${summary.guardians_linked} guardian(s) linked`
+            : '') +
+          (skipped ? `, skipped ${skipped} existing` : '')
+        setSuccessMessage(`${message}. Choose another file to continue.`)
+        toast.success(message)
       }
 
       setPreviewResult(null)
+      setSelectionResetKey((value) => value + 1)
       await queryClient.invalidateQueries({ queryKey: ['students'] })
       onSuccess?.()
     },
@@ -120,6 +133,8 @@ const BulkUploadStudents = ({ onSuccess }: BulkUploadStudentsProps) => {
       previewResult={previewResult}
       previewHint={STUDENT_BULK_UPLOAD_PREVIEW_HINT}
       failureInfo={failureInfo}
+      selectionResetKey={selectionResetKey}
+      successMessage={successMessage}
       validateLoading={previewMutation.isPending}
       uploadLoading={confirmMutation.isPending}
       downloadFailedRowsLoading={downloadFailuresMutation.isPending}

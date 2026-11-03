@@ -100,12 +100,21 @@ export type PaymentTargetTerm = {
   label: string
 }
 
+export type OutstandingTermBalance = {
+  term_id: string
+  term_label: string
+  balance: string
+}
+
 export type StudentPaymentTarget = {
   student_id: string
   student: PaymentTargetStudent
   target_term: PaymentTargetTerm | null
   outstanding_balance: string
   has_outstanding: boolean
+  all_time_outstanding: string
+  has_all_time_outstanding: boolean
+  outstanding_terms: OutstandingTermBalance[]
   advance_balance: string
   has_advance: boolean
 }
@@ -126,6 +135,7 @@ export type DebtReminderEligible = {
   full_name: string
   student_code: string
   balance: string
+  terms_summary?: string | null
   guardians: DebtReminderGuardianPlan[]
 }
 
@@ -145,6 +155,7 @@ export type DebtReminderPreview = {
   enabled: boolean
   audience: 'primary' | 'all'
   channels: 'sms' | 'email' | 'both' | null
+  all_time: boolean
   term_id: string
   term_label: string
   requested_count: number
@@ -158,10 +169,14 @@ export type DebtReminderPreview = {
   skipped: DebtReminderSkipped[]
   eligible_truncated: boolean
   skipped_truncated: boolean
+  sample_sms: string
+  sample_email_subject: string
+  sample_email_body: string
 }
 
 export type DebtReminderSendResult = {
   batch_id: string
+  all_time: boolean
   term_id: string
   term_label: string
   queued: boolean
@@ -171,6 +186,31 @@ export type DebtReminderSendResult = {
   skipped_count: number
 }
 
+export type ReceiptAllocation = {
+  term_label: string
+  amount: string
+}
+
+export type ReceiptDetail = {
+  id: string
+  school_name: string
+  school_logo_url: string | null
+  school_phone: string | null
+  school_email: string
+  school_address: string
+  student_name: string
+  student_id: string
+  receipt_number: string
+  amount: string
+  payment_method: string
+  payment_reference: string
+  paid_at: string
+  issued_at: string
+  received_by: string
+  term_label: string
+  allocations: ReceiptAllocation[]
+}
+
 export type RecordPaymentPayload = {
   student_id: string
   amount: string | number
@@ -178,6 +218,12 @@ export type RecordPaymentPayload = {
   paid_at: string
   payment_reference?: string
   payment_notes?: string
+}
+
+export type PaymentAllocation = {
+  term_id: string
+  term_label: string
+  amount: string
 }
 
 export type RecordPaymentResponse = {
@@ -193,6 +239,7 @@ export type RecordPaymentResponse = {
   advance_balance: string
   credit_id: string | null
   paid_at: string
+  allocations: PaymentAllocation[]
 }
 
 export type FeeStructureStatus = 'draft' | 'published' | 'applied' | 'carried_forward'

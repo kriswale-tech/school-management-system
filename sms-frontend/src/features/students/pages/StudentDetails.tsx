@@ -106,7 +106,14 @@ const StudentDetails = () => {
             <div className="flex items-center gap-4 mb-6">
               <AvatarComponent fullName={student.full_name} size={100} />
               <div>
-                <h2 className="text-2xl font-medium mb-1">{student.full_name}</h2>
+                <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <h2 className="text-2xl font-medium">{student.full_name}</h2>
+                  {student.is_new_student ? (
+                    <span className="inline-flex rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-medium text-sky-800">
+                      New student
+                    </span>
+                  ) : null}
+                </div>
                 <span className="text-sm text-gray-500">#{student.student_id}</span>
                 {student.class_assignment ? (
                   <>

@@ -49,6 +49,7 @@ export interface SchoolSettings {
   fees_alert_threshold: string
   results_alert_enabled: boolean
   enrollments_alert_enabled: boolean
+  guardians_alert_enabled: boolean
   transition_popup_enabled: boolean
   guardian_audience: GuardianAudience
   report_parent_notify_mode: ReportParentNotifyMode
@@ -140,7 +141,7 @@ export interface TransitionConfirmPayload {
 }
 
 export interface SchoolAlert {
-  kind: 'fees' | 'results' | 'enrollments'
+  kind: 'fees' | 'results' | 'enrollments' | 'missing_guardians'
   title: string
   summary: string
   count: number

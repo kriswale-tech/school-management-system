@@ -1,4 +1,8 @@
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+import io
+import re
+
+from django.http import FileResponse
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -12,7 +16,12 @@ from assessments.services.report_pdf import (
 )
 from accounts.capabilities import Capability
 from accounts.permissions import HasActiveSchool, HasCapability, IsAdmin
-from fees.services import get_student_fee_history, get_student_fees, list_student_payments
+from fees.services import (
+    build_student_payment_history_xlsx,
+    get_student_fee_history,
+    get_student_fees,
+    list_student_payments,
+)
 from reports.serializers import StudentPerformanceSerializer
 from reports.services import get_student_performance
 from shared.views import SchoolScopedAPIView
@@ -58,7 +67,8 @@ class StudentListView(SchoolScopedAPIView):
         summary='List students',
         description=(
             'Returns paginated students enrolled in the active term for the '
-            'selected school. Supports search, class-level, and stream filtering.'
+            'selected school. Supports search, class-level, stream, and '
+            'missing-guardian filtering.'
         ),
         parameters=[
             OpenApiParameter(
@@ -75,6 +85,11 @@ class StudentListView(SchoolScopedAPIView):
                 name='stream',
                 type=str,
                 description='Filter by class stream UUID.',
+            ),
+            OpenApiParameter(
+                name='missing_guardian',
+                type=bool,
+                description='When true, only students with no linked guardian/parent.',
             ),
             OpenApiParameter(
                 name='term',
@@ -494,7 +509,7 @@ class StudentPaymentListView(SchoolScopedAPIView):
         summary='Student payment history',
         description=(
             'Returns payment ledger rows for a student. '
-            'Filter by academic year or term when provided.'
+            'Filter by academic year, term, or receipt number search when provided.'
         ),
         parameters=[
             OpenApiParameter(
@@ -507,6 +522,11 @@ class StudentPaymentListView(SchoolScopedAPIView):
                 type=str,
                 description='Optional term UUID.',
             ),
+            OpenApiParameter(
+                name='search',
+                type=str,
+                description='Optional receipt number search (case-insensitive contains).',
+            ),
         ],
         responses={200: StudentPaymentSerializer(many=True)},
     )
@@ -517,8 +537,60 @@ class StudentPaymentListView(SchoolScopedAPIView):
             student=student,
             academic_year_id=request.query_params.get('academic_year'),
             term_id=request.query_params.get('term'),
+            search=request.query_params.get('search'),
         )
         return Response(StudentPaymentSerializer(rows, many=True).data)
+
+
+class StudentPaymentHistoryExportView(SchoolScopedAPIView):
+    @extend_schema(
+        tags=['Students'],
+        summary='Export student payment history (Excel)',
+        description=(
+            'Downloads payment history as .xlsx. '
+            'scope=all_time (default), academic_year (requires academic_year), '
+            'or term (requires term).'
+        ),
+        parameters=[
+            OpenApiParameter(
+                name='scope',
+                type=str,
+                description='all_time | academic_year | term',
+            ),
+            OpenApiParameter(
+                name='academic_year',
+                type=str,
+                description='Required when scope=academic_year.',
+            ),
+            OpenApiParameter(
+                name='term',
+                type=str,
+                description='Required when scope=term.',
+            ),
+        ],
+        responses={
+            200: OpenApiResponse(description='Excel payment history (.xlsx).'),
+        },
+    )
+    def get(self, request, student_id):
+        student = get_student(school=self.school, student_id=student_id)
+        payload = build_student_payment_history_xlsx(
+            school=self.school,
+            student=student,
+            scope=request.query_params.get('scope') or 'all_time',
+            academic_year_id=request.query_params.get('academic_year'),
+            term_id=request.query_params.get('term'),
+        )
+        safe_code = re.sub(r'[^A-Za-z0-9_-]+', '-', str(student.student_id or 'student'))
+        filename = f'payment-history-{safe_code}.xlsx'
+        return FileResponse(
+            io.BytesIO(payload),
+            as_attachment=True,
+            filename=filename,
+            content_type=(
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            ),
+        )
 
 
 class StudentFeeHistoryView(SchoolScopedAPIView):

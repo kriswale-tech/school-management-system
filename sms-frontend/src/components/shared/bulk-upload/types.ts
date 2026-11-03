@@ -40,6 +40,9 @@ export type BulkUploadProps = {
   previewResult?: BulkUploadPreviewResult | null
   previewHint?: string
   failureInfo?: BulkUploadFailureInfo | null
+  /** Increment after a successful upload to clear the selected file. */
+  selectionResetKey?: number
+  successMessage?: string | null
   className?: string
 }
 

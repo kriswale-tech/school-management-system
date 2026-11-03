@@ -26,6 +26,7 @@ from students.services import (
     create_class_enrollment,
     generate_student_id,
     get_active_term,
+    normalize_provided_student_id,
 )
 
 IMPORT_COLUMNS = set(IMPORT_HEADERS)
@@ -35,6 +36,7 @@ SUPPORTED_UPLOAD_FORMATS = {'xlsx', 'csv'}
 @dataclass
 class ParsedStudentBulkRow:
     row_number: int
+    student_id: str = ''
     first_name: str = ''
     last_name: str = ''
     other_names: str = ''
@@ -50,6 +52,7 @@ class ParsedStudentBulkRow:
 
     def as_dict(self) -> dict:
         return {
+            'student_id': self.student_id,
             'first_name': self.first_name,
             'last_name': self.last_name,
             'other_names': self.other_names,
@@ -91,7 +94,9 @@ class StudentBulkImportSummary:
     rows_succeeded: int = 0
     rows_failed: int = 0
     students_to_create: int = 0
+    students_to_skip: int = 0
     students_created: int = 0
+    students_skipped: int = 0
     guardians_to_link: int = 0
     guardians_linked: int = 0
 
@@ -147,18 +152,29 @@ def preview_student_bulk_import(school, rows: list[ParsedStudentBulkRow]) -> Stu
     context = build_student_bulk_reference_context(school)
     summary = StudentBulkImportSummary(rows_total=len(rows))
     results: list[StudentBulkRowResult] = []
+    existing_ids = _existing_student_ids(school)
+    seen_ids: set[str] = set()
 
     for row in rows:
-        messages = _validate_row(context, row)
+        messages = _validate_row(
+            context,
+            row,
+            existing_ids=existing_ids,
+            seen_ids=seen_ids,
+        )
+        will_skip = _will_skip_existing_student(row, existing_ids=existing_ids)
         if any(message.startswith('ERROR:') for message in messages):
             status = 'error'
             summary.rows_with_errors += 1
         elif messages:
             status = 'warning'
             summary.rows_with_warnings += 1
-            summary.students_to_create += 1
-            if row.has_guardian_data():
-                summary.guardians_to_link += 1
+            if will_skip:
+                summary.students_to_skip += 1
+            else:
+                summary.students_to_create += 1
+                if row.has_guardian_data():
+                    summary.guardians_to_link += 1
         else:
             status = 'valid'
             summary.rows_valid += 1
@@ -195,25 +211,35 @@ def commit_student_bulk_import(
     summary = StudentBulkImportSummary(rows_total=len(rows), rows_processed=len(rows))
     failed_rows: list[dict] = []
     ward_enrolled_notices: list[dict] = []
+    existing_ids = _existing_student_ids(school)
+    seen_ids: set[str] = set()
 
     for row in rows:
         messages: list[str] = []
         try:
             with transaction.atomic():
-                validated = _validate_row(context, row)
+                validated = _validate_row(
+                    context,
+                    row,
+                    existing_ids=existing_ids,
+                    seen_ids=seen_ids,
+                )
                 error_messages = [m for m in validated if m.startswith('ERROR:')]
                 if error_messages:
                     messages.extend(m.replace('ERROR: ', '') for m in error_messages)
                     raise ValidationError({'detail': messages[-1]})
 
-                _create_student_from_row(
+                created = _create_student_from_row(
                     school=school,
                     term=term,
                     context=context,
                     row=row,
                     summary=summary,
+                    existing_ids=existing_ids,
                     ward_enrolled_notices=ward_enrolled_notices,
                 )
+                if created is not None:
+                    existing_ids.add(created.student_id)
         except ValidationError as exc:
             detail = exc.detail
             if isinstance(detail, dict):
@@ -294,6 +320,7 @@ def load_failure_export(school_id, token: str) -> tuple[Path, str]:
 def _to_parsed_row(raw_row: dict) -> ParsedStudentBulkRow:
     return ParsedStudentBulkRow(
         row_number=int(raw_row.get('row_number') or 0),
+        student_id=normalize_provided_student_id(normalize_cell(raw_row.get('student_id'))),
         first_name=normalize_cell(raw_row.get('first_name')),
         last_name=normalize_cell(raw_row.get('last_name')),
         other_names=normalize_cell(raw_row.get('other_names')),
@@ -309,8 +336,32 @@ def _to_parsed_row(raw_row: dict) -> ParsedStudentBulkRow:
     )
 
 
-def _validate_row(context, row: ParsedStudentBulkRow) -> list[str]:
+def _existing_student_ids(school) -> set[str]:
+    return set(Student.objects.filter(school=school).values_list('student_id', flat=True))
+
+
+def _will_skip_existing_student(row: ParsedStudentBulkRow, *, existing_ids: set[str]) -> bool:
+    return bool(row.student_id) and row.student_id in existing_ids
+
+
+def _validate_row(
+    context,
+    row: ParsedStudentBulkRow,
+    *,
+    existing_ids: set[str],
+    seen_ids: set[str],
+) -> list[str]:
     messages: list[str] = []
+
+    if row.student_id:
+        if row.student_id in seen_ids:
+            messages.append('ERROR: student_id is duplicated in this file.')
+        else:
+            seen_ids.add(row.student_id)
+            if row.student_id in existing_ids:
+                messages.append(
+                    'WARN: student_id already exists — this row will be skipped.',
+                )
 
     if not row.first_name:
         messages.append('ERROR: first_name is required.')
@@ -327,13 +378,17 @@ def _validate_row(context, row: ParsedStudentBulkRow) -> list[str]:
     if not row.date_of_birth:
         messages.append('ERROR: date_of_birth is required.')
     elif dob is None:
-        messages.append('ERROR: date_of_birth must be a valid date (YYYY-MM-DD).')
+        messages.append(
+            'ERROR: date_of_birth must be a valid date (prefer YYYY-MM-DD).',
+        )
 
     admission = _parse_date(row.admission_date)
     if not row.admission_date:
         messages.append('ERROR: admission_date is required.')
     elif admission is None:
-        messages.append('ERROR: admission_date must be a valid date (YYYY-MM-DD).')
+        messages.append(
+            'ERROR: admission_date must be a valid date (prefer YYYY-MM-DD).',
+        )
 
     _, is_new_error = _parse_bool(row.is_new_student, default=False)
     if is_new_error:
@@ -343,7 +398,7 @@ def _validate_row(context, row: ParsedStudentBulkRow) -> list[str]:
     if stream_error:
         messages.append(f'ERROR: {stream_error}')
 
-    if row.has_guardian_data():
+    if row.has_guardian_data() and not _will_skip_existing_student(row, existing_ids=existing_ids):
         if not row.guardian_name:
             messages.append('ERROR: guardian_name is required when guardian fields are provided.')
         if not row.guardian_phone:
@@ -379,8 +434,13 @@ def _create_student_from_row(
     context,
     row: ParsedStudentBulkRow,
     summary,
+    existing_ids: set[str],
     ward_enrolled_notices: list[dict] | None = None,
-):
+) -> Student | None:
+    if _will_skip_existing_student(row, existing_ids=existing_ids):
+        summary.students_skipped += 1
+        return None
+
     stream, stream_error = context.resolve_stream(row.class_name)
     if stream_error or stream is None:
         raise ValidationError({'class_name': stream_error or 'Class not found.'})
@@ -394,9 +454,11 @@ def _create_student_from_row(
     if dob is None or admission is None:
         raise ValidationError({'detail': 'Invalid date values.'})
 
+    student_id = row.student_id or generate_student_id(school=school)
+
     student = Student.objects.create(
         school=school,
-        student_id=generate_student_id(school=school),
+        student_id=student_id,
         first_name=row.first_name.strip(),
         last_name=row.last_name.strip(),
         other_names=(row.other_names or '').strip(),
@@ -434,17 +496,45 @@ def _create_student_from_row(
             'student_id': student.id,
             'class_name': stream.full_name,
         })
+    return student
 
 
 def _parse_date(value: str) -> date | None:
+    """Parse import date strings into a date.
+
+    Accepts ISO ``YYYY-MM-DD`` (preferred), common slash/dash locales, optional
+    trailing times, and Excel serial numbers stringified from numeric cells.
+    Ambiguous day/month values (e.g. ``03/04/2015``) are read as ``DD/MM/YYYY``.
+    """
     if not value:
         return None
 
     cleaned = value.strip()
-    if ' ' in cleaned and cleaned[4:5] == '-':
-        cleaned = cleaned[:10]
+    if not cleaned:
+        return None
 
-    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%m/%d/%Y'):
+    serial_date = _parse_excel_serial_date(cleaned)
+    if serial_date is not None:
+        return serial_date
+
+    # Strip trailing time: "2015-03-12 00:00:00", ISO-T, or "3/12/2015 12:00:00 AM"
+    if 'T' in cleaned and cleaned[4:5] == '-':
+        cleaned = cleaned.split('T', 1)[0]
+    elif cleaned[4:5] == '-' and ' ' in cleaned:
+        cleaned = cleaned[:10]
+    elif ' ' in cleaned:
+        cleaned = cleaned.split(None, 1)[0]
+
+    for fmt in (
+        '%Y-%m-%d',
+        '%Y/%m/%d',
+        '%d/%m/%Y',
+        '%d-%m-%Y',
+        '%m/%d/%Y',
+        '%m-%d-%Y',
+        '%d/%m/%y',
+        '%m/%d/%y',
+    ):
         try:
             return datetime.strptime(cleaned, fmt).date()
         except ValueError:
@@ -454,6 +544,30 @@ def _parse_date(value: str) -> date | None:
         return date.fromisoformat(cleaned[:10])
     except ValueError:
         return None
+
+
+def _parse_excel_serial_date(value: str) -> date | None:
+    """Convert Excel serial date numbers (e.g. ``42005`` / ``42005.0``) when present."""
+    if not value or not value.replace('.', '', 1).isdigit():
+        return None
+    try:
+        serial = float(value)
+    except ValueError:
+        return None
+    # Rough window covering ~1949–2119; avoids treating other numeric cells as dates.
+    if serial < 18000 or serial > 80000:
+        return None
+    try:
+        from openpyxl.utils.datetime import from_excel
+
+        parsed = from_excel(serial)
+    except (ValueError, OverflowError, OSError):
+        return None
+    if isinstance(parsed, datetime):
+        return parsed.date()
+    if isinstance(parsed, date):
+        return parsed
+    return None
 
 
 def _parse_bool(value: str, *, default: bool = False) -> tuple[bool, str | None]:

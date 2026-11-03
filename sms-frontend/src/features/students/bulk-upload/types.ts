@@ -3,6 +3,7 @@ export type BulkImportFileFormat = 'xlsx' | 'csv'
 export type BulkImportRowStatus = 'valid' | 'error' | 'warning'
 
 export interface StudentBulkImportRow {
+  student_id?: string
   first_name: string
   last_name: string
   other_names?: string
@@ -23,6 +24,7 @@ export interface StudentBulkImportPreviewSummary {
   rows_with_errors: number
   rows_with_warnings: number
   students_to_create: number
+  students_to_skip: number
   guardians_to_link: number
 }
 
@@ -45,6 +47,7 @@ export interface StudentBulkImportConfirmSummary {
   rows_succeeded: number
   rows_failed: number
   students_created: number
+  students_skipped: number
   guardians_linked: number
 }
 

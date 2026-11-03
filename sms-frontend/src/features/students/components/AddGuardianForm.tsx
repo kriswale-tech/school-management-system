@@ -318,6 +318,9 @@ const AddGuardianFormContent = ({ studentId, onClose }: AddGuardianFormContentPr
             disabled={isExisting}
             {...register('email')}
           />
+          <p className="text-sm text-slate-500">
+            Optional. Used to send parent messages when email is enabled.
+          </p>
         </div>
 
         <div className="space-y-2">
@@ -339,10 +342,7 @@ const AddGuardianFormContent = ({ studentId, onClose }: AddGuardianFormContentPr
         </div>
 
         <div className="space-y-2">
-          <FormLabel
-            label="Parent messages"
-            helperText="Preferred channels for this parent. School settings still control which events fire."
-          />
+          <FormLabel label="Parent messages" />
           <Controller
             name="notify_channel"
             control={control}
@@ -356,6 +356,10 @@ const AddGuardianFormContent = ({ studentId, onClose }: AddGuardianFormContentPr
               />
             )}
           />
+          <p className="text-sm text-slate-500">
+            Which channels this parent prefers. School settings still decide which events send, and
+            email needs an address on file.
+          </p>
         </div>
 
         <div className="space-y-3">

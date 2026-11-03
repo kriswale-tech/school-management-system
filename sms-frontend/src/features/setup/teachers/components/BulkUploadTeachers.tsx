@@ -28,11 +28,14 @@ const BulkUploadTeachers = ({ onSuccess }: BulkUploadTeachersProps) => {
   const [previewResult, setPreviewResult] = useState<BulkUploadPreviewResult | null>(null)
   const [failures, setFailures] = useState<TeacherBulkImportFailuresInfo | null>(null)
   const [failureInfo, setFailureInfo] = useState<BulkUploadFailureInfo | null>(null)
+  const [selectionResetKey, setSelectionResetKey] = useState(0)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const resetResults = () => {
     setPreviewResult(null)
     setFailures(null)
     setFailureInfo(null)
+    setSuccessMessage(null)
   }
 
   const downloadTemplateMutation = useMutation({
@@ -48,6 +51,7 @@ const BulkUploadTeachers = ({ onSuccess }: BulkUploadTeachersProps) => {
       setPreviewResult(mapPreviewResponseToBulkUploadResult(response))
       setFailures(null)
       setFailureInfo(null)
+      setSuccessMessage(null)
     },
     onError: (error) => {
       toast.error(getApiErrorMessage(error, 'Unable to validate file'))
@@ -65,15 +69,20 @@ const BulkUploadTeachers = ({ onSuccess }: BulkUploadTeachersProps) => {
           label: getFailureDownloadLabel(importFailures.count, importFailures.format),
         })
         toast.error(`${summary.rows_failed} row(s) failed to import`)
+        setSuccessMessage(
+          `Imported ${summary.rows_succeeded} row(s). Download failed rows to review the rest.`,
+        )
       } else {
         setFailures(null)
         setFailureInfo(null)
-        toast.success(
-          `Imported ${summary.rows_succeeded} row(s): ${summary.teachers_created} created, ${summary.teachers_updated} updated`,
-        )
+        const message =
+          `Imported ${summary.rows_succeeded} row(s): ${summary.teachers_created} created, ${summary.teachers_updated} updated`
+        setSuccessMessage(`${message}. Choose another file to continue.`)
+        toast.success(message)
       }
 
       setPreviewResult(null)
+      setSelectionResetKey((value) => value + 1)
       onSuccess?.()
     },
     onError: (error) => {
@@ -110,6 +119,8 @@ const BulkUploadTeachers = ({ onSuccess }: BulkUploadTeachersProps) => {
       previewResult={previewResult}
       previewHint={TEACHER_BULK_UPLOAD_PREVIEW_HINT}
       failureInfo={failureInfo}
+      selectionResetKey={selectionResetKey}
+      successMessage={successMessage}
       validateLoading={previewMutation.isPending}
       uploadLoading={confirmMutation.isPending}
       downloadFailedRowsLoading={downloadFailuresMutation.isPending}

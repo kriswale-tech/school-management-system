@@ -5,7 +5,7 @@ from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from fees.models import Payment, StudentFeeCredit
+from fees.models import Payment, PaymentAllocation, StudentFeeCredit
 
 
 def get_student_advance_balance(*, student) -> Decimal:
@@ -97,7 +97,7 @@ def apply_available_credits_for_student(*, student, term, recorded_by, school=No
         if apply_amount <= 0:
             continue
 
-        payment = Payment.objects.create(
+        payment = Payment(
             student=student,
             term=term,
             amount=apply_amount,
@@ -106,6 +106,12 @@ def apply_available_credits_for_student(*, student, term, recorded_by, school=No
             payment_reference='',
             payment_notes=f'Applied from advance credit {credit.id}',
             recorded_by=recorded_by,
+        )
+        payment.save(skip_default_allocation=True)
+        PaymentAllocation.objects.create(
+            payment=payment,
+            term=term,
+            amount=apply_amount,
         )
         applied_payments.append(payment)
 

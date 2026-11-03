@@ -6,8 +6,13 @@ import uuid
 
 from django.core.exceptions import ValidationError
 
-from fees.services.desk import resolve_fee_desk_term
+from fees.services.desk import FEE_DESK_ALL_TIME, resolve_fee_desk_term
 from fees.services.fees import get_student_term_balance
+from fees.services.payments import (
+    format_outstanding_terms_summary,
+    get_student_all_time_balance,
+    list_student_outstanding_term_balances,
+)
 from notifications.models import GuardianDelivery
 from notifications.services import guardians as guardian_services
 from notifications.services.outbound import enqueue_guardian_outbound
@@ -27,13 +32,81 @@ def _unique_student_ids(student_ids) -> list:
     return ordered
 
 
+def _is_all_time_term(term_id) -> bool:
+    return str(term_id or '').strip().lower() == FEE_DESK_ALL_TIME
+
+
+def _student_balance_context(*, school, student, all_time: bool, term):
+    if all_time:
+        all_time_balance = get_student_all_time_balance(student=student)['balance']
+        outstanding_terms = list_student_outstanding_term_balances(
+            school=school,
+            student=student,
+        )
+        return {
+            'balance': all_time_balance,
+            'outstanding_terms': outstanding_terms,
+            'terms_summary': format_outstanding_terms_summary(outstanding_terms),
+        }
+    balance = get_student_term_balance(student=student, term=term)['balance']
+    return {
+        'balance': balance,
+        'outstanding_terms': [],
+        'terms_summary': '',
+    }
+
+
+def _sample_messages(*, school_name, student_name, balance, all_time, term_label, terms_summary):
+    amount = f'{balance:.2f}'
+    if all_time:
+        summary = terms_summary or 'multiple terms'
+        sms = (
+            f'{guardian_services._sms_prefix(school_name=school_name)}: Reminder — '
+            f'{student_name} owes GHS {amount} across terms ({summary}). '
+            f'Please contact the school to pay.'
+        )
+        email_body = (
+            f'This is a fees reminder from {school_name}.\n\n'
+            f'{student_name} has an outstanding balance of GHS {amount} across all terms.\n\n'
+            f'Terms owed:\n'
+            + (
+                '\n'.join(
+                    f"- {part.strip()}"
+                    for part in summary.split(';')
+                    if part.strip()
+                )
+                if terms_summary
+                else '- See the school for a breakdown.'
+            )
+            + '\n\nPlease contact the school to arrange payment.'
+        )
+    else:
+        sms = guardian_services._debt_reminder_sms_body(
+            student_name=student_name,
+            school_name=school_name,
+            balance=amount,
+            term_label=term_label,
+        )
+        email_body = (
+            f'This is a fees reminder from {school_name}.\n\n'
+            f'{student_name} has an outstanding balance of GHS {amount} for {term_label}.\n\n'
+            f'Please contact the school to arrange payment.'
+        )
+    return {
+        'sample_sms': sms,
+        'sample_email_subject': f'Fee reminder for {student_name}',
+        'sample_email_body': email_body,
+    }
+
+
 def preview_debt_reminders(*, school, term_id, student_ids) -> dict:
     """Validate selection and estimate SMS/email attempts without sending."""
     student_ids = _unique_student_ids(student_ids)
     if not student_ids:
         raise ValidationError({'student_ids': 'Select at least one student.'})
 
-    term = resolve_fee_desk_term(school, term_id)
+    all_time = _is_all_time_term(term_id)
+    term = None if all_time else resolve_fee_desk_term(school, term_id)
     preferences = get_school_settings(school)
     policy = guardian_services._event_policy(
         preferences,
@@ -50,6 +123,15 @@ def preview_debt_reminders(*, school, term_id, student_ids) -> dict:
     skipped = []
     sms_count = 0
     email_count = 0
+    sample = {
+        'sample_sms': '',
+        'sample_email_subject': '',
+        'sample_email_body': '',
+    }
+
+    term_label = 'All time' if all_time else (
+        f'{term.academic_year.academic_year} · {term.get_term_display()}'
+    )
 
     for raw_id in student_ids:
         key = str(raw_id)
@@ -61,12 +143,22 @@ def preview_debt_reminders(*, school, term_id, student_ids) -> dict:
             })
             continue
 
-        balance = get_student_term_balance(student=student, term=term)['balance']
+        context = _student_balance_context(
+            school=school,
+            student=student,
+            all_time=all_time,
+            term=term,
+        )
+        balance = context['balance']
         if balance <= 0:
             skipped.append({
                 'student_id': key,
                 'full_name': guardian_services._student_display_name(student),
-                'reason': 'No outstanding balance for this term.',
+                'reason': (
+                    'No outstanding balance across terms.'
+                    if all_time
+                    else 'No outstanding balance for this term.'
+                ),
             })
             continue
 
@@ -100,11 +192,23 @@ def preview_debt_reminders(*, school, term_id, student_ids) -> dict:
             })
             continue
 
+        full_name = guardian_services._student_display_name(student)
+        if not sample['sample_sms']:
+            sample = _sample_messages(
+                school_name=school.name,
+                student_name=full_name,
+                balance=balance,
+                all_time=all_time,
+                term_label=term_label,
+                terms_summary=context['terms_summary'],
+            )
+
         eligible.append({
             'student_id': key,
-            'full_name': guardian_services._student_display_name(student),
+            'full_name': full_name,
             'student_code': student.student_id,
             'balance': str(balance),
+            'terms_summary': context['terms_summary'] or None,
             'guardians': parent_plans,
         })
 
@@ -112,10 +216,9 @@ def preview_debt_reminders(*, school, term_id, student_ids) -> dict:
         'enabled': enabled,
         'audience': preferences.guardian_audience,
         'channels': policy.school_channels if policy else None,
-        'term_id': term.id,
-        'term_label': (
-            f'{term.academic_year.academic_year} · {term.get_term_display()}'
-        ),
+        'all_time': all_time,
+        'term_id': FEE_DESK_ALL_TIME if all_time else term.id,
+        'term_label': term_label,
         'requested_count': len(student_ids),
         'eligible_count': len(eligible),
         'skipped_count': len(skipped),
@@ -127,6 +230,7 @@ def preview_debt_reminders(*, school, term_id, student_ids) -> dict:
         'skipped': skipped[:25],
         'eligible_truncated': len(eligible) > 25,
         'skipped_truncated': len(skipped) > 25,
+        **sample,
     }
 
 
@@ -149,7 +253,8 @@ def send_debt_reminders(*, school, term_id, student_ids) -> dict:
             'detail': 'No eligible students to remind with the current selection.',
         })
 
-    term = resolve_fee_desk_term(school, term_id)
+    all_time = preview['all_time']
+    term = None if all_time else resolve_fee_desk_term(school, term_id)
     batch_id = uuid.uuid4()
     students = {
         str(student.id): student
@@ -166,14 +271,28 @@ def send_debt_reminders(*, school, term_id, student_ids) -> dict:
         student = students.get(str(student_id))
         if student is None:
             continue
-        balance = get_student_term_balance(student=student, term=term)['balance']
-        if balance <= 0:
+        context = _student_balance_context(
+            school=school,
+            student=student,
+            all_time=all_time,
+            term=term,
+        )
+        if context['balance'] <= 0:
             continue
         planned_sms, planned_email = guardian_services.plan_guardians_debt_reminder(
             student=student,
             term=term,
-            balance=balance,
+            balance=context['balance'],
             batch_id=batch_id,
+            all_time=all_time,
+            terms_owed=[
+                {
+                    'term_label': row['term_label'],
+                    'balance': f"{row['balance']:.2f}",
+                }
+                for row in context['outstanding_terms']
+            ],
+            terms_summary=context['terms_summary'],
         )
         if planned_sms or planned_email:
             students_queued += 1
@@ -184,7 +303,8 @@ def send_debt_reminders(*, school, term_id, student_ids) -> dict:
 
     return {
         'batch_id': str(batch_id),
-        'term_id': term.id,
+        'all_time': all_time,
+        'term_id': FEE_DESK_ALL_TIME if all_time else term.id,
         'term_label': preview['term_label'],
         'queued': True,
         'students_notified': students_queued,

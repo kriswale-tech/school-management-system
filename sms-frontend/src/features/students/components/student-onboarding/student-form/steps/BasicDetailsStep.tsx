@@ -12,6 +12,18 @@ type BasicDetailsStepProps = {
 const BasicDetailsStep = ({ register, control, errors }: BasicDetailsStepProps) => {
   return (
     <div className="space-y-5">
+      <div className="space-y-2">
+        <FormLabel label="Student ID" />
+        <InputField
+          placeholder="Leave blank to auto-generate"
+          error={errors.student_id?.message}
+          {...register('student_id')}
+        />
+        <p className="text-xs text-slate-500">
+          Optional. Use your school&apos;s admission number, or leave blank for an automatic ID.
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <FormLabel label="First Name" required />

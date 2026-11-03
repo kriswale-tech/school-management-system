@@ -245,9 +245,19 @@ class Payment(BaseModel):
         if self.amount is not None and self.amount <= 0:
             raise ValidationError({'amount': 'Payment amount must be greater than zero.'})
 
-    def save(self, *args, **kwargs):
+    def save(self, *args, skip_default_allocation=False, **kwargs):
+        creating = self._state.adding
         self.full_clean()
         super().save(*args, **kwargs)
+        # Legacy / simple creates get a 1:1 allocation. Waterfall recording
+        # passes skip_default_allocation=True and writes allocations explicitly.
+        if creating and not skip_default_allocation:
+            if not self.allocations.exists():
+                PaymentAllocation(
+                    payment=self,
+                    term_id=self.term_id,
+                    amount=self.amount,
+                ).save()
 
 
 class Receipt(BaseModel):
@@ -269,6 +279,53 @@ class Receipt(BaseModel):
 
     def __str__(self):
         return self.receipt_number
+
+
+class PaymentAllocation(BaseModel):
+    """How much of a payment was applied to a specific term's fees."""
+
+    payment = models.ForeignKey(
+        Payment,
+        on_delete=models.CASCADE,
+        related_name='allocations',
+    )
+    term = models.ForeignKey(
+        'schools.Term',
+        on_delete=models.PROTECT,
+        related_name='payment_allocations',
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        ordering = ['term__start_date', 'created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['payment', 'term'],
+                name='unique_payment_allocation_per_term',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(amount__gt=0),
+                name='payment_allocation_amount_positive',
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.amount is not None and self.amount <= 0:
+            raise ValidationError({'amount': 'Allocation amount must be greater than zero.'})
+        if (
+            self.payment_id
+            and self.term_id
+            and self.payment.student.school_id != self.term.school_id
+        ):
+            raise ValidationError({'term': 'Term must belong to the student school.'})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.payment_id} → {self.term_id}: {self.amount}'
 
 
 class StudentFeeCredit(BaseModel):

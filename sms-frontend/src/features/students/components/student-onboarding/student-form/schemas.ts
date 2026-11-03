@@ -6,6 +6,7 @@ const ghanaPhoneSchema = z
   .regex(/^(\+233|0)[0-9]{9}$/, 'Invalid Ghana phone number')
 
 export const basicDetailsSchema = z.object({
+  student_id: z.string(),
   first_name: z.string().min(1, { message: 'First name is required' }),
   last_name: z.string().min(1, { message: 'Last name is required' }),
   other_names: z.string(),
@@ -31,6 +32,8 @@ const relationshipSchema = z.enum(
   { message: 'Relationship is required' },
 )
 
+const notifyChannelSchema = z.enum(['sms', 'email', 'both', 'off'])
+
 export const guardianItemSchema = z.discriminatedUnion('mode', [
   z.object({
     mode: z.literal('new'),
@@ -42,6 +45,7 @@ export const guardianItemSchema = z.discriminatedUnion('mode', [
       .refine((value) => !value || z.string().email().safeParse(value).success, {
         message: 'Invalid email address',
       }),
+    notify_channel: notifyChannelSchema,
     relationship: relationshipSchema,
   }),
   z.object({
@@ -50,6 +54,7 @@ export const guardianItemSchema = z.discriminatedUnion('mode', [
     name: z.string(),
     phone_number: z.string(),
     email: z.string(),
+    notify_channel: notifyChannelSchema,
     relationship: relationshipSchema,
   }),
 ])

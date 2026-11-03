@@ -483,9 +483,7 @@ const ReportsPage = () => {
         <StaffTab data={teachers} />
       ) : null}
 
-      {activeTab === TAB_ACTIVITY ? (
-        <ActivityTab key={resolvedTermId} termId={resolvedTermId} />
-      ) : null}
+      {activeTab === TAB_ACTIVITY ? <ActivityTab /> : null}
     </div>
   )
 }

@@ -220,3 +220,37 @@ class DebtReminderAPITests(APITestCase):
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch(SEND_SMS_PATH, return_value={'status': 'success', 'data': [{'id': 'debt-all'}]})
+    def test_all_time_reminder_includes_term_summary(self, mock_sms):
+        response = self.client.post(
+            self.preview_url,
+            {
+                'term_id': 'all',
+                'student_ids': [str(self.debtor.id)],
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['all_time'])
+        self.assertEqual(response.data['term_id'], 'all')
+        self.assertEqual(response.data['eligible_count'], 1)
+        self.assertIn('across terms', response.data['sample_sms'])
+        self.assertIn('First Term', response.data['sample_sms'])
+        self.assertIn('across all terms', response.data['sample_email_body'])
+
+        send = self.client.post(
+            self.send_url,
+            {
+                'term_id': 'all',
+                'student_ids': [str(self.debtor.id)],
+            },
+            format='json',
+        )
+        self.assertEqual(send.status_code, status.HTTP_200_OK)
+        self.assertTrue(send.data['all_time'])
+        self.assertEqual(send.data['students_notified'], 1)
+        mock_sms.assert_called_once()
+        self.assertIn('across terms', mock_sms.call_args.args[1])
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('across all terms', mail.outbox[0].body)

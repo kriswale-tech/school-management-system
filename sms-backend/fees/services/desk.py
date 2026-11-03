@@ -1,21 +1,96 @@
 from decimal import Decimal
 
-from django.db.models import DecimalField, OuterRef, Subquery, Sum, Value
+from django.db.models import (
+    Case,
+    CharField,
+    DecimalField,
+    F,
+    OuterRef,
+    Prefetch,
+    Subquery,
+    Sum,
+    Value,
+    When,
+)
 from django.db.models.functions import Coalesce
 
-from fees.models import FeeStructure, Payment, StudentFeeCredit
+from fees.models import FeeStructure, Payment, StudentFee, StudentFeeCredit
+from fees.services.ledger import paid_toward_term_subquery
 from schools.models import AcademicYear, Term
-from students.services import list_enrollments_for_term, resolve_term
+from students.models import ClassEnrollment, StudentParent
+from students.services import get_active_term, list_enrollments_for_term, resolve_term
+
+FEE_DESK_ALL_TIME = 'all'
 
 
 def annotate_last_transaction(queryset, *, term):
-    """Latest payment time for the term via subquery (no join inflation)."""
+    """Latest payment time for the term via allocation subquery."""
+    from fees.models import PaymentAllocation
+
     paid_at_sq = (
-        Payment.objects.filter(student_id=OuterRef('student_id'), term=term)
+        PaymentAllocation.objects.filter(
+            payment__student_id=OuterRef('student_id'),
+            term=term,
+        )
+        .order_by('-payment__paid_at')
+        .values('payment__paid_at')[:1]
+    )
+    return queryset.annotate(last_transaction_at=Subquery(paid_at_sq))
+
+
+def annotate_last_transaction_all_time(queryset):
+    """Latest payment time across all terms via subquery."""
+    paid_at_sq = (
+        Payment.objects.filter(student_id=OuterRef('student_id'))
         .order_by('-paid_at')
         .values('paid_at')[:1]
     )
     return queryset.annotate(last_transaction_at=Subquery(paid_at_sq))
+
+
+def annotate_payment_totals_all_time(queryset):
+    """Annotate lifetime billed/paid for each enrollment's student."""
+    decimal_field = DecimalField(max_digits=12, decimal_places=2)
+    billed_sq = (
+        StudentFee.objects.filter(student_id=OuterRef('student_id'))
+        .values('student_id')
+        .annotate(total=Sum('amount'))
+        .values('total')[:1]
+    )
+    paid_sq = (
+        Payment.objects.filter(student_id=OuterRef('student_id'))
+        .values('student_id')
+        .annotate(total=Sum('amount'))
+        .values('total')[:1]
+    )
+    return queryset.annotate(
+        total_billed=Coalesce(
+            Subquery(billed_sq, output_field=decimal_field),
+            Value(Decimal('0.00')),
+            output_field=decimal_field,
+        ),
+        total_paid=Coalesce(
+            Subquery(paid_sq, output_field=decimal_field),
+            Value(Decimal('0.00')),
+            output_field=decimal_field,
+        ),
+    )
+
+
+def annotate_payment_status(queryset):
+    return queryset.annotate(
+        payment_status=Case(
+            When(
+                total_billed__gt=0,
+                total_paid__gte=F('total_billed'),
+                then=Value('fully_paid'),
+            ),
+            When(total_paid__gt=0, then=Value('partially_paid')),
+            When(total_billed__gt=0, then=Value('owing')),
+            default=Value('no_fees'),
+            output_field=CharField(),
+        ),
+    )
 
 
 def annotate_advance_balance(queryset):
@@ -39,8 +114,40 @@ def annotate_advance_balance(queryset):
     )
 
 
-def list_fee_desk_rows(*, school, term):
-    """Enrollments for a term with billed/paid totals, last payment, and advance."""
+def list_fee_desk_rows(*, school, term, all_time: bool = False):
+    """Enrollments for a term with billed/paid totals, last payment, and advance.
+
+    When ``all_time`` is true, money columns sum across every term for each
+    student while the row set remains enrollments for ``term`` (usually active).
+    """
+    if all_time:
+        queryset = (
+            ClassEnrollment.objects.filter(
+                student__school=school,
+                term=term,
+            )
+            .select_related(
+                'student',
+                'class_level',
+                'class_level__level',
+                'stream',
+            )
+            .prefetch_related(
+                Prefetch(
+                    'student__parent_links',
+                    queryset=StudentParent.objects.filter(
+                        is_primary=True,
+                    ).select_related('parent'),
+                    to_attr='primary_parent_links',
+                ),
+            )
+            .order_by('student__last_name', 'student__first_name')
+        )
+        queryset = annotate_payment_totals_all_time(queryset)
+        queryset = annotate_payment_status(queryset)
+        queryset = annotate_last_transaction_all_time(queryset)
+        return annotate_advance_balance(queryset)
+
     queryset = list_enrollments_for_term(school=school, term=term)
     queryset = annotate_last_transaction(queryset, term=term)
     return annotate_advance_balance(queryset)
@@ -160,3 +267,15 @@ def get_fee_filter_options(*, school):
 
 def resolve_fee_desk_term(school, term_id=None):
     return resolve_term(school, term_id)
+
+
+def resolve_fee_desk_scope(school, term_id=None):
+    """Resolve desk term filter.
+
+    Returns ``(term, all_time)``. ``term_id='all'`` uses the active-term
+    enrollment roster with lifetime billed/paid totals.
+    """
+    raw = str(term_id).strip().lower() if term_id not in (None, '') else ''
+    if raw == FEE_DESK_ALL_TIME:
+        return get_active_term(school), True
+    return resolve_term(school, term_id or None), False

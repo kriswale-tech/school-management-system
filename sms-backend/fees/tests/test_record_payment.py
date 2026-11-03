@@ -8,7 +8,7 @@ from rest_framework.test import APITestCase
 
 from academics.models import ClassLevel, Level
 from accounts.tests.factories import create_user, set_client_auth_cookies, user_school
-from fees.models import FeeItem, FeeStructure, Payment, Receipt
+from fees.models import FeeItem, FeeStructure, Payment, PaymentAllocation, Receipt
 from fees.services import apply_fee_structure, publish_fee_structure
 from schools.models import AcademicYear, Term
 from students.tests.factories import create_student, enroll_student, ensure_default_stream
@@ -83,6 +83,12 @@ class RecordPaymentViewTests(APITestCase):
         apply_fee_structure(structure)
 
     def test_payment_target_returns_earliest_outstanding_term(self):
+        enroll_student(
+            student=self.student,
+            term=self.second_term,
+            stream=self.stream,
+            is_new_student=False,
+        )
         self._apply_tuition(term=self.first_term, amount=Decimal('500.00'))
         self._apply_tuition(term=self.second_term, amount=Decimal('400.00'))
         Payment.objects.create(
@@ -99,6 +105,17 @@ class RecordPaymentViewTests(APITestCase):
         self.assertTrue(response.data['has_outstanding'])
         self.assertEqual(response.data['target_term']['term'], 'first_term')
         self.assertEqual(Decimal(response.data['outstanding_balance']), Decimal('400.00'))
+        self.assertTrue(response.data['has_all_time_outstanding'])
+        self.assertEqual(Decimal(response.data['all_time_outstanding']), Decimal('800.00'))
+        self.assertEqual(len(response.data['outstanding_terms']), 2)
+        self.assertEqual(
+            Decimal(response.data['outstanding_terms'][0]['balance']),
+            Decimal('400.00'),
+        )
+        self.assertEqual(
+            Decimal(response.data['outstanding_terms'][1]['balance']),
+            Decimal('400.00'),
+        )
 
     def test_record_payment_creates_payment_and_receipt(self):
         self._apply_tuition(term=self.first_term, amount=Decimal('500.00'))
@@ -137,6 +154,79 @@ class RecordPaymentViewTests(APITestCase):
         self.assertEqual(Decimal(response.data['amount_applied']), Decimal('500.00'))
         self.assertEqual(Decimal(response.data['advance_created']), Decimal('200.00'))
         self.assertEqual(Decimal(response.data['advance_balance']), Decimal('200.00'))
+        self.assertEqual(Payment.objects.filter(student=self.student).count(), 1)
+        payment = Payment.objects.get(student=self.student)
+        self.assertEqual(payment.amount, Decimal('700.00'))
+        self.assertEqual(PaymentAllocation.objects.filter(payment=payment).count(), 1)
+        self.assertEqual(
+            PaymentAllocation.objects.get(payment=payment).amount,
+            Decimal('500.00'),
+        )
+        self.assertEqual(Receipt.objects.filter(payment=payment).count(), 1)
+
+    def test_payment_waterfalls_across_owing_terms(self):
+        enroll_student(
+            student=self.student,
+            term=self.second_term,
+            stream=self.stream,
+            is_new_student=False,
+        )
+        self._apply_tuition(term=self.first_term, amount=Decimal('500.00'))
+        self._apply_tuition(term=self.second_term, amount=Decimal('1500.00'))
+
+        url = reverse('record-payment')
+        response = self.client.post(
+            url,
+            {
+                'student_id': str(self.student.id),
+                'amount': '1800.00',
+                'payment_method': 'cash',
+                'paid_at': timezone.now().isoformat(),
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Decimal(response.data['amount_applied']), Decimal('1800.00'))
+        self.assertEqual(Decimal(response.data['advance_created']), Decimal('0.00'))
+        self.assertEqual(Decimal(response.data['outstanding_after']), Decimal('200.00'))
+        self.assertEqual(len(response.data['allocations']), 2)
+        self.assertEqual(
+            Decimal(response.data['allocations'][0]['amount']),
+            Decimal('500.00'),
+        )
+        self.assertEqual(
+            Decimal(response.data['allocations'][1]['amount']),
+            Decimal('1300.00'),
+        )
+        self.assertEqual(Payment.objects.filter(student=self.student).count(), 1)
+        payment = Payment.objects.get(student=self.student)
+        self.assertEqual(payment.amount, Decimal('1800.00'))
+        self.assertEqual(Receipt.objects.filter(payment=payment).count(), 1)
+        self.assertEqual(
+            PaymentAllocation.objects.get(payment=payment, term=self.first_term).amount,
+            Decimal('500.00'),
+        )
+        self.assertEqual(
+            PaymentAllocation.objects.get(payment=payment, term=self.second_term).amount,
+            Decimal('1300.00'),
+        )
+
+        overpay = self.client.post(
+            url,
+            {
+                'student_id': str(self.student.id),
+                'amount': '500.00',
+                'payment_method': 'cash',
+                'paid_at': timezone.now().isoformat(),
+            },
+            format='json',
+        )
+        self.assertEqual(overpay.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Decimal(overpay.data['amount_applied']), Decimal('200.00'))
+        self.assertEqual(Decimal(overpay.data['advance_created']), Decimal('300.00'))
+        self.assertEqual(Decimal(overpay.data['outstanding_after']), Decimal('0.00'))
+        self.assertEqual(Payment.objects.filter(student=self.student).count(), 2)
+        self.assertEqual(Receipt.objects.filter(payment__student=self.student).count(), 2)
 
     def test_advance_applies_when_next_term_fees_applied(self):
         self._apply_tuition(term=self.first_term, amount=Decimal('500.00'))

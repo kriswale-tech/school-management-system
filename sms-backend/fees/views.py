@@ -1,7 +1,7 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 
 from accounts.capabilities import Capability
@@ -19,17 +19,20 @@ from fees.serializers import (
     FeeItemSettingsSerializer,
     FeeStructureDetailSerializer,
     NextTermFeePrepSerializer,
+    ReceiptDetailSerializer,
     RecordPaymentResponseSerializer,
     RecordPaymentSerializer,
     StudentPaymentTargetSerializer,
     UpdateFeeStructureItemSerializer,
 )
+from fees.services.receipts import build_receipt_context, load_receipt_for_school
 from fees.services.debt_reminders import preview_debt_reminders, send_debt_reminders
 from fees.services.desk import (
     get_fee_desk_stats,
     get_fee_filter_options,
     list_fee_desk_debtor_ids,
     list_fee_desk_rows,
+    resolve_fee_desk_scope,
     resolve_fee_desk_term,
 )
 from fees.services.payments import build_student_payment_target, record_student_payment
@@ -49,8 +52,8 @@ from students.services import get_student
 
 
 def _filtered_fee_desk_queryset(request, school):
-    term = resolve_fee_desk_term(school, request.query_params.get('term'))
-    queryset = list_fee_desk_rows(school=school, term=term)
+    term, all_time = resolve_fee_desk_scope(school, request.query_params.get('term'))
+    queryset = list_fee_desk_rows(school=school, term=term, all_time=all_time)
     filterset = StudentEnrollmentFilter(request.query_params, queryset=queryset)
     if not filterset.is_valid():
         raise ValidationError(filterset.errors)
@@ -94,7 +97,10 @@ class FeeDeskListView(SchoolScopedAPIView):
             OpenApiParameter(
                 name='term',
                 type=str,
-                description='Term UUID. Defaults to the school active term.',
+                description=(
+                    'Term UUID, or "all" for lifetime billed/paid on the active-term '
+                    'enrollment roster. Defaults to the school active term.'
+                ),
             ),
             OpenApiParameter(name='page', type=int, description='Page number.'),
             OpenApiParameter(name='page_size', type=int, description='Page size (max 100).'),
@@ -204,6 +210,20 @@ class StudentPaymentTargetView(SchoolScopedAPIView):
         return Response(StudentPaymentTargetSerializer(data).data)
 
 
+class ReceiptDetailView(SchoolScopedAPIView):
+    @extend_schema(
+        tags=['Fees'],
+        summary='Payment receipt detail',
+        description='Returns receipt content for staff view/print (same fields as the public receipt).',
+        responses={200: ReceiptDetailSerializer},
+    )
+    def get(self, request, receipt_id):
+        receipt = load_receipt_for_school(school=self.school, receipt_id=receipt_id)
+        if receipt is None:
+            raise NotFound({'detail': 'Receipt not found.'})
+        return Response(ReceiptDetailSerializer(build_receipt_context(receipt)).data)
+
+
 class RecordPaymentView(SchoolScopedAPIView):
     @extend_schema(
         tags=['Fees'],
@@ -251,7 +271,8 @@ class DebtReminderPreviewView(SchoolScopedAPIView):
         summary='Preview guardian debt reminders',
         description=(
             'Estimates SMS/email attempts for the selected students without sending. '
-            'Only students with an outstanding balance for the term are eligible.'
+            'Only students with an outstanding balance are eligible. '
+            'Pass term_id=all for lifetime owing with a per-term summary in the message.'
         ),
         request=DebtReminderRequestSerializer,
         responses={200: DebtReminderPreviewSerializer},

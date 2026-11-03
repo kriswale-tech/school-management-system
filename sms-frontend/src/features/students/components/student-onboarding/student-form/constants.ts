@@ -6,6 +6,7 @@ export const STUDENT_FORM_STEPS: FormStepDefinition[] = [
     id: 'basic',
     label: 'Basic Details',
     fields: [
+      'student_id',
       'first_name',
       'last_name',
       'other_names',
@@ -54,16 +55,25 @@ export const GUARDIAN_MODE_OPTIONS: ChoiceItem<'new' | 'existing'>[] = [
   { label: 'Existing parent', value: 'existing' },
 ]
 
+export const NOTIFY_CHANNEL_OPTIONS = [
+  { value: 'both', label: 'SMS and email' },
+  { value: 'sms', label: 'SMS only' },
+  { value: 'email', label: 'Email only' },
+  { value: 'off', label: 'Do not notify' },
+] as const
+
 export const DEFAULT_GUARDIAN: StudentFormValues['guardians'][number] = {
   mode: 'new',
   parent_id: '',
   name: '',
   phone_number: '',
   email: '',
+  notify_channel: 'both',
   relationship: '',
 }
 
 export const DEFAULT_STUDENT_FORM_VALUES: StudentFormValues = {
+  student_id: '',
   first_name: '',
   last_name: '',
   other_names: '',

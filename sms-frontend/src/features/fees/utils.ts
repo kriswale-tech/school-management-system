@@ -33,5 +33,10 @@ export const formatFeeTransactionDate = (value: string | null) => {
 export const formatDebtorsStat = (debtors: number, totalStudents: number) =>
   `${debtors}/${totalStudents}`
 
+export const FEE_DESK_ALL_TIME_TERM = 'all'
+
 export const isFeeDeskDebtor = (remainingBalance: string | number) =>
   Number(remainingBalance) > 0
+
+export const isFeeDeskAllTimeTerm = (term: string | null | undefined) =>
+  String(term ?? '').toLowerCase() === FEE_DESK_ALL_TIME_TERM

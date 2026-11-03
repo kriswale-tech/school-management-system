@@ -3,7 +3,7 @@
 Reference for the fees product: catalog → bill → pay → advance.  
 Deferred items: [fees-backlog.md](./fees-backlog.md).
 
-**Last reviewed:** 2026-10-26
+**Last reviewed:** 2026-11-03
 
 ---
 
@@ -14,7 +14,7 @@ Two layers:
 | Layer | Models | Meaning |
 | --- | --- | --- |
 | **Catalog** | `FeeStructure` + `FeeItem` | What the school charges for a term (name, amount, who it applies to) |
-| **Ledger** | `StudentFee`, `Payment`, `Receipt`, `StudentFeeCredit` | What each student owes / has paid / holds as advance |
+| **Ledger** | `StudentFee`, `Payment`, `PaymentAllocation`, `Receipt`, `StudentFeeCredit` | What each student owes / has paid / holds as advance |
 
 The desk and payment flows read the **ledger**. Changing the catalog does not rewrite existing bills unless you **Apply** (and Apply is blocked once the structure is locked).
 
@@ -74,9 +74,14 @@ Matching uses the student’s `ClassEnrollment` for that term (`class_level`, `i
 
 ## Payments & advances
 
-1. **Record payment** targets the student’s **earliest term with an outstanding balance**.
-2. Amount applied reduces that term’s owing; any **excess** becomes a `StudentFeeCredit` (advance).
-3. When a later term’s fees are **applied** (or a late join is billed onto an applied term), available advances are applied FIFO as `advance_credit` payments.
+1. **Record payment** uses an **all-time waterfall**: cash applies to the earliest owing term first, then cascades to later owing terms in one transaction.
+2. The system creates **one** `Payment` + **one** `Receipt`, plus a `PaymentAllocation` row per term that received money.
+3. Only leftover **after every owing term is cleared** becomes a `StudentFeeCredit` (advance).
+4. When a later term’s fees are **applied** (or a late join is billed onto an applied term), available advances are applied FIFO as `advance_credit` payments.
+
+After a successful record, the Record Fees slider shows a success panel with **Print receipt** (opens print/PDF), **Record another**, and **Cancel**.
+
+Staff can also open receipts from Payment History (`GET /fees/receipts/:id/` → modal / print). Guardians still get the signed public HTML receipt when Parent messages → Payment is enabled.
 
 Advances show on the fees desk, fee detail header, and record-payment summary.  
 Refunding unused advance is **not built yet** (see backlog).
@@ -87,20 +92,20 @@ Refunding unused advance is **not built yet** (see backlog).
 
 | UI | Role |
 | --- | --- |
-| `/fees` | Desk: balances, stats, record payment, open student fee detail (admin + accountant) |
+| `/fees` | Desk: balances, stats, record payment, open student fee detail (admin + accountant). Term filter includes **All time** (`term=all`) for lifetime billed/paid on the active-term roster; debt reminders stay term-scoped. |
 | `/fees/settings` | Catalogs by term: add/edit items, **Publish**, **Copy from previous**, **Apply** (admin); accountant prepares/publishes next term in the lead window |
-| `/fees/:studentId` | Student fee breakdown + payment history |
+| `/fees/:studentId` | Student fee breakdown + payment history; header shows **all-time owing** and advances. One cash payment can cover multiple owing terms (allocations) with a single receipt. |
 | Student detail → Fees | Same breakdown/history; nested tabs `?tab=fees&feesTab=breakdown\|history` |
 | Accountant dashboard | Fees overview + fee-prep banner (see [dashboard.md](./dashboard.md)) |
 | Setup → Fees | First-term catalog during onboarding; completing school setup applies the active term |
 
 ### Main APIs
 
-- Desk: `GET /api/v1/fees/`, `/stats/`, `/filter-options/`
+- Desk: `GET /api/v1/fees/`, `/stats/`, `/filter-options/` (`term=all` for all-time desk)
 - Prep: `GET /api/v1/fees/next-term-prep/` — accountant/admin banner status in the transition lead window
 - Structures: `GET /fees/structures/?term=`, items CRUD, `POST /fees/structures/copy-from-previous/`, `POST /fees/structures/:id/publish/`, `POST /fees/structures/:id/apply/`
-- Payments: `POST /fees/payments/`, `GET /fees/students/:id/payment-target/`
-- Student: `GET /students/:id/fees/`, `GET /students/:id/payments/`
+- Payments: `POST /fees/payments/`, `GET /fees/students/:id/payment-target/`, `GET /fees/receipts/:id/`
+- Student: `GET /students/:id/fees/`, `GET /students/:id/payments/`, `GET /students/:id/payments/export/`
 
 ---
 
@@ -109,8 +114,9 @@ Refunding unused advance is **not built yet** (see backlog).
 1. Ensure academic year/terms exist.  
 2. In **Fees Settings**, select the term → add items (or keep carried-forward copy).  
 3. **Apply** when ready to bill enrolled students (locks amounts).  
-4. Record payments on the desk; overpayments become advances.  
-5. Late joiners on an applied term are billed automatically.
+4. Record payments on the desk (waterfall across owing terms; surplus only then becomes advance).  
+5. Print the receipt from the success panel or Payment History when needed.  
+6. Late joiners on an applied term are billed automatically.
 
 ---
 

@@ -14,6 +14,7 @@ from shared.services.spreadsheets import (
 from students.bulk_reference import build_student_bulk_reference_context
 
 IMPORT_HEADERS = [
+    'student_id',
     'first_name',
     'last_name',
     'other_names',
@@ -36,10 +37,16 @@ REFERENCE_HEADERS = [
 ]
 
 _DROPDOWN_COLUMNS = {
-    'gender': 'D',
-    'is_new_student': 'G',
-    'class_name': 'H',
-    'guardian_relationship': 'L',
+    'gender': 'E',
+    'is_new_student': 'H',
+    'class_name': 'I',
+    'guardian_relationship': 'M',
+}
+
+# Keep date columns as text so Excel does not rewrite YYYY-MM-DD to a locale format.
+_DATE_COLUMNS = {
+    'date_of_birth': 'F',
+    'admission_date': 'G',
 }
 
 
@@ -47,6 +54,7 @@ def build_student_import_template(school) -> bytes:
     context = build_student_bulk_reference_context(school)
     example_class = context.class_names[0] if context.class_names else 'JHS 1'
     example_row = {
+        'student_id': '',
         'first_name': 'Ama',
         'last_name': 'Mensah',
         'other_names': '',
@@ -78,6 +86,9 @@ def _build_student_import_xlsx(school, *, headers: list[str], rows: list[dict]) 
     for row in rows:
         import_sheet.append([row.get(header, '') for header in headers])
 
+    validation_max_row = max(len(rows) + 1, 1000)
+    _apply_date_text_format(import_sheet, max_row=validation_max_row)
+
     reference_sheet = workbook.create_sheet(REFERENCE_SHEET_NAME)
     reference_sheet.append(REFERENCE_HEADERS)
     for reference_row in context.reference_rows:
@@ -104,7 +115,6 @@ def _build_student_import_xlsx(school, *, headers: list[str], rows: list[dict]) 
         ),
     }
 
-    validation_max_row = max(len(rows) + 1, 1000)
     _apply_import_dropdowns(
         import_sheet,
         list_ranges=list_ranges,
@@ -118,6 +128,13 @@ def _build_student_import_xlsx(school, *, headers: list[str], rows: list[dict]) 
     buffer = io.BytesIO()
     workbook.save(buffer)
     return buffer.getvalue()
+
+
+def _apply_date_text_format(import_sheet: Worksheet, *, max_row: int) -> None:
+    """Force date columns to Text so typed YYYY-MM-DD values stay as typed."""
+    for letter in _DATE_COLUMNS.values():
+        for row_index in range(2, max_row + 1):
+            import_sheet[f'{letter}{row_index}'].number_format = '@'
 
 
 def _apply_import_dropdowns(

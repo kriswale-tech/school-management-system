@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Icon } from '@iconify/react'
 import { useQuery } from '@tanstack/react-query'
 import ActionBar from '@/components/shared/ActionBar'
 import { AvatarComponent, Button } from '@/components/ui'
+import ActionButton from '@/components/ui/ActionButton'
 import DotComponent from '@/components/ui/DotComponent'
 import RecordPaymentSlider from '@/features/fees/components/RecordPaymentSlider'
 import { getStudentPaymentTarget } from '@/features/fees/services'
@@ -18,6 +19,7 @@ import { getApiErrorMessage } from '@/utils'
 
 const FeeDetailPage = () => {
   const { studentId } = useParams<{ studentId: string }>()
+  const navigate = useNavigate()
   const [recordOpen, setRecordOpen] = useState(false)
 
   const {
@@ -54,7 +56,14 @@ const FeeDetailPage = () => {
               <div className="flex items-center gap-4">
                 <AvatarComponent fullName={student.full_name} size={100} />
                 <div>
-                  <h2 className="text-2xl font-medium mb-1">{student.full_name}</h2>
+                  <div className="mb-1 flex items-center gap-2">
+                    <h2 className="text-2xl font-medium">{student.full_name}</h2>
+                    <ActionButton
+                      icon="hugeicons:view"
+                      label={`View ${student.full_name}`}
+                      onClick={() => navigate(`/students/${student.id}`)}
+                    />
+                  </div>
                   <span className="text-sm text-gray-500">#{student.student_id}</span>
                   {student.class_assignment ? (
                     <>
@@ -72,6 +81,14 @@ const FeeDetailPage = () => {
                   >
                     {student.is_active ? 'Active' : 'Inactive'}
                   </span>
+                  {paymentTarget?.has_all_time_outstanding ? (
+                    <>
+                      <DotComponent />
+                      <span className="text-sm font-medium text-amber-700">
+                        All-time owing: {formatFeeAmount(paymentTarget.all_time_outstanding)}
+                      </span>
+                    </>
+                  ) : null}
                   {paymentTarget?.has_advance ? (
                     <>
                       <DotComponent />

@@ -54,6 +54,7 @@ const AlertsSection = () => {
               fees_alert_threshold: draft.fees_alert_threshold,
               results_alert_enabled: draft.results_alert_enabled,
               enrollments_alert_enabled: draft.enrollments_alert_enabled,
+              guardians_alert_enabled: draft.guardians_alert_enabled,
               transition_popup_enabled: draft.transition_popup_enabled,
             })
           }}
@@ -97,6 +98,14 @@ const AlertsSection = () => {
             }
           >
             New enrollments for admins and staff
+          </CheckboxField>
+          <CheckboxField
+            checked={draft.guardians_alert_enabled}
+            onChange={(event) =>
+              setDraftOverride({ ...draft, guardians_alert_enabled: event.target.checked })
+            }
+          >
+            Missing guardians for admins and staff
           </CheckboxField>
           <CheckboxField
             checked={draft.transition_popup_enabled}

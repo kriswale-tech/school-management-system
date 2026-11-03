@@ -15,11 +15,11 @@ const ManageClasses = lazy(() => import('@/features/classes/manage-classes/Manag
 const TABS = [
   { label: 'School profile', slug: 'school-profile' },
   { label: 'Academic year', slug: 'academic-year' },
+  { label: 'Classes', slug: 'classes' },
+  { label: 'Assessments', slug: 'assessments' },
+  { label: 'Fees', slug: 'fees' },
   { label: 'Alerts', slug: 'alerts' },
   { label: 'Parent messages', slug: 'parent-messages' },
-  { label: 'Fees', slug: 'fees' },
-  { label: 'Assessments', slug: 'assessments' },
-  { label: 'Classes', slug: 'classes' },
 ] as const
 
 type SettingsTabSlug = (typeof TABS)[number]['slug']

@@ -26,11 +26,9 @@ def get_teacher_dashboard(*, school, membership) -> dict:
     subjects = _subject_rows(subject_rows)
     show_academic = _show_academic(overview=overview, subjects=subjects)
     classes = _class_rows(overview['results'])
-    activities = []
-    if term is not None:
-        activities = list(
-            list_activities_for_teacher(school=school, user=user, term=term)[:10]
-        )
+    activities = list(
+        list_activities_for_teacher(school=school, user=user)[:10]
+    )
     subjects_to_publish = sum(1 for row in subjects if row['is_open'])
     subjects_published = sum(
         1 for row in subjects if row['students_count'] > 0 and not row['is_open']

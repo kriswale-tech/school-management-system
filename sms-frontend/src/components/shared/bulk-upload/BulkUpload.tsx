@@ -31,10 +31,21 @@ const BulkUpload = ({
   previewResult = null,
   previewHint,
   failureInfo = null,
+  selectionResetKey = 0,
+  successMessage = null,
   className,
 }: BulkUploadProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [error, setError] = useState('')
+  const [seenResetKey, setSeenResetKey] = useState(selectionResetKey)
+
+  if (selectionResetKey !== seenResetKey) {
+    setSeenResetKey(selectionResetKey)
+    if (selectionResetKey !== 0) {
+      setSelectedFile(null)
+      setError('')
+    }
+  }
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file)
@@ -64,6 +75,12 @@ const BulkUpload = ({
       <h3 className="text-base font-medium text-slate-900">{title}</h3>
 
       <TemplateSection hint={templateHint} onDownloadTemplate={onDownloadTemplate} />
+
+      {successMessage ? (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+          {successMessage}
+        </div>
+      ) : null}
 
       <DropZone
         acceptedExtensions={acceptedExtensions}

@@ -132,7 +132,9 @@ class SchoolSettingsAPITests(APITestCase):
         response = self.client.get(self.alerts_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         kinds = {item['kind'] for item in response.data}
-        self.assertEqual(kinds, {'fees', 'enrollments'})
+        self.assertEqual(kinds, {'fees', 'enrollments', 'missing_guardians'})
+        missing = next(item for item in response.data if item['kind'] == 'missing_guardians')
+        self.assertEqual(missing['href'], '/students?missing_guardian=true')
 
         accountant = create_user(
             phone_number='+233200000031',
@@ -154,12 +156,19 @@ class SchoolSettingsAPITests(APITestCase):
         )
         self._as(staff)
         response = self.client.get(self.alerts_url)
-        self.assertEqual([item['kind'] for item in response.data], ['enrollments'])
+        self.assertEqual(
+            {item['kind'] for item in response.data},
+            {'enrollments', 'missing_guardians'},
+        )
 
         self._as(self.admin)
         saved = self.client.patch(
             self.settings_url,
-            {'fees_alert_enabled': False, 'enrollments_alert_enabled': False},
+            {
+                'fees_alert_enabled': False,
+                'enrollments_alert_enabled': False,
+                'guardians_alert_enabled': False,
+            },
             format='json',
         )
         self.assertEqual(saved.status_code, status.HTTP_200_OK)

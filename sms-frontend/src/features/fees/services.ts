@@ -13,6 +13,7 @@ import type {
   FeeStructureItem,
   FeeStructureItemPayload,
   NextTermFeePrep,
+  ReceiptDetail,
   RecordPaymentPayload,
   RecordPaymentResponse,
   StudentPaymentTarget,
@@ -62,6 +63,11 @@ export const recordPayment = async (
   payload: RecordPaymentPayload,
 ): Promise<RecordPaymentResponse> => {
   const response = await api.post<RecordPaymentResponse>(`${baseUrl}payments/`, payload)
+  return response.data
+}
+
+export const getReceiptDetail = async (receiptId: string): Promise<ReceiptDetail> => {
+  const response = await api.get<ReceiptDetail>(`${baseUrl}receipts/${receiptId}/`)
   return response.data
 }
 

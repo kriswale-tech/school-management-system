@@ -7,8 +7,9 @@ from rest_framework.test import APITestCase
 
 from academics.models import ClassLevel, Level
 from accounts.tests.factories import create_user, set_client_auth_cookies, user_school
-from fees.models import FeeItem, FeeStructure, Payment
+from fees.models import FeeItem, FeeStructure, Payment, Receipt
 from fees.services import apply_fee_structure, publish_fee_structure
+from django.utils import timezone
 from schools.models import AcademicYear, Term
 from students.tests.factories import create_student, enroll_student, ensure_default_stream
 
@@ -163,12 +164,18 @@ class StudentFeesViewTests(APITestCase):
 
     def test_payment_list_returns_ledger_rows(self):
         self._apply_tuition(term=self.first_term, amount=Decimal('500.00'))
-        Payment.objects.create(
+        payment = Payment.objects.create(
             student=self.student,
             term=self.first_term,
             amount=Decimal('150.00'),
             payment_method=Payment.PaymentMethod.MOBILE_MONEY,
             recorded_by=self.user,
+        )
+        Receipt.objects.create(
+            payment=payment,
+            receipt_number='RCPT-TEST-0001',
+            issued_by=self.user,
+            issued_at=timezone.now(),
         )
 
         url = reverse('student-payment-list', kwargs={'student_id': self.student.id})
@@ -178,4 +185,55 @@ class StudentFeesViewTests(APITestCase):
         self.assertEqual(response.data[0]['payment_method'], 'mobile_money')
         self.assertEqual(Decimal(response.data[0]['amount']), Decimal('150.00'))
         self.assertEqual(response.data[0]['term_name'], 'First Term')
-        self.assertIsNone(response.data[0]['receipt'])
+        self.assertEqual(response.data[0]['receipt']['receipt_number'], 'RCPT-TEST-0001')
+        self.assertTrue(response.data[0]['received_by'])
+
+        searched = self.client.get(url, {'search': 'RCPT-TEST-0001'})
+        self.assertEqual(searched.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(searched.data), 1)
+
+        missed = self.client.get(url, {'search': 'NO-MATCH'})
+        self.assertEqual(missed.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(missed.data), 0)
+
+        detail = self.client.get(
+            reverse('fee-receipt-detail', kwargs={'receipt_id': payment.receipt.id}),
+        )
+        self.assertEqual(detail.status_code, status.HTTP_200_OK)
+        self.assertEqual(detail.data['receipt_number'], 'RCPT-TEST-0001')
+        self.assertEqual(detail.data['amount'], '150.00')
+        self.assertTrue(detail.data['received_by'])
+
+    def test_payment_history_export_xlsx(self):
+        self._apply_tuition(term=self.first_term, amount=Decimal('500.00'))
+        Payment.objects.create(
+            student=self.student,
+            term=self.first_term,
+            amount=Decimal('150.00'),
+            payment_method=Payment.PaymentMethod.CASH,
+            recorded_by=self.user,
+            payment_reference='REF-1',
+        )
+
+        url = reverse(
+            'student-payment-history-export',
+            kwargs={'student_id': self.student.id},
+        )
+        response = self.client.get(url, {'scope': 'all_time'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        self.assertIn('payment-history-TA-0001.xlsx', response['Content-Disposition'])
+        payload = b''.join(response.streaming_content)
+        self.assertGreater(len(payload), 0)
+
+        missing_year = self.client.get(url, {'scope': 'academic_year'})
+        self.assertEqual(missing_year.status_code, status.HTTP_400_BAD_REQUEST)
+
+        by_term = self.client.get(
+            url,
+            {'scope': 'term', 'term': str(self.first_term.id)},
+        )
+        self.assertEqual(by_term.status_code, status.HTTP_200_OK)

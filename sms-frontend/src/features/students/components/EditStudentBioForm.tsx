@@ -16,6 +16,7 @@ import {
 } from '../utils'
 
 const schema = z.object({
+  student_id: z.string().min(1, 'Student ID is required'),
   first_name: z.string().min(1, 'First name is required'),
   last_name: z.string().min(1, 'Last name is required'),
   other_names: z.string().optional(),
@@ -34,6 +35,7 @@ type EditStudentBioFormProps = {
 }
 
 const mapStudentToFormValues = (student: StudentDetail): EditStudentBioFormValues => ({
+  student_id: student.student_id,
   first_name: student.first_name,
   last_name: student.last_name,
   other_names: student.other_names ?? '',
@@ -86,6 +88,15 @@ const EditStudentBioForm = ({ open, student, onClose }: EditStudentBioFormProps)
   return (
     <Modal open={open} title="Edit Student Bio" onClose={onClose} scrollable className="max-w-2xl">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <div className="space-y-2">
+          <FormLabel label="Student ID" required />
+          <InputField
+            placeholder="Enter student ID"
+            error={errors.student_id?.message}
+            {...register('student_id')}
+          />
+        </div>
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <FormLabel label="First Name" required />

@@ -82,9 +82,13 @@ class AdminDashboardViewTests(APITestCase):
         self.assertEqual(len(response.data['top_debtors']), 1)
         self.assertEqual(response.data['top_debtors'][0]['full_name'], 'Ama Mensah')
         self.assertFalse(response.data['show_academic_widgets'])
-        self.assertTrue(
-            any(item['code'] == 'debtors' for item in response.data['needs_attention']),
+        codes = {item['code'] for item in response.data['needs_attention']}
+        self.assertIn('debtors', codes)
+        self.assertIn('missing_guardians', codes)
+        missing = next(
+            item for item in response.data['needs_attention'] if item['code'] == 'missing_guardians'
         )
+        self.assertEqual(missing['href'], '/students?missing_guardian=true')
 
     def test_teacher_cannot_access_admin_dashboard(self):
         teacher = create_user(

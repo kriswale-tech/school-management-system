@@ -175,10 +175,14 @@ def _record_skip(*, school, parent, student, event_type, scope_id) -> None:
     )
 
 
-def _ward_enrolled_sms_body(*, school_name: str, student_name: str, class_name: str) -> str:
+def _sms_prefix(*, school_name: str) -> str:
     sender = getattr(settings, 'ARKESEL_SMS_SENDER', None) or 'SCHOOLASST'
+    return f'{sender} [{school_name}]'
+
+
+def _ward_enrolled_sms_body(*, school_name: str, student_name: str, class_name: str) -> str:
     return (
-        f'{sender}: {student_name} has been enrolled at {school_name}'
+        f'{_sms_prefix(school_name=school_name)}: {student_name} has been enrolled'
         f'{f" ({class_name})" if class_name else ""}. '
         f'You are listed as a guardian.'
     )
@@ -288,15 +292,15 @@ def schedule_ward_enrolled_notice(*, student_id, class_name: str = '') -> None:
 
 def _payment_receipt_sms_body(
     *,
+    school_name: str,
     student_name: str,
     amount,
     receipt_number: str,
     receipt_url: str,
 ) -> str:
-    sender = getattr(settings, 'ARKESEL_SMS_SENDER', None) or 'SCHOOLASST'
     return (
-        f'{sender}: Payment of GHS {amount} received for {student_name}. '
-        f'Receipt {receipt_number}: {receipt_url}'
+        f'{_sms_prefix(school_name=school_name)}: Payment of GHS {amount} received for '
+        f'{student_name}. Receipt {receipt_number}: {receipt_url}'
     )
 
 
@@ -351,6 +355,7 @@ def notify_guardians_payment_receipt(
                     student=student,
                     event_type=GuardianDelivery.EventType.PAYMENT_RECEIPT,
                     body=_payment_receipt_sms_body(
+                        school_name=school_name,
                         student_name=student_name,
                         amount=amount,
                         receipt_number=receipt_number,
@@ -435,10 +440,25 @@ def _debt_reminder_sms_body(
     balance,
     term_label: str,
 ) -> str:
-    sender = getattr(settings, 'ARKESEL_SMS_SENDER', None) or 'SCHOOLASST'
     return (
-        f'{sender}: Reminder — {student_name} has an outstanding balance of '
-        f'GHS {balance} for {term_label} at {school_name}. Please contact the school to pay.'
+        f'{_sms_prefix(school_name=school_name)}: Reminder — {student_name} has an '
+        f'outstanding balance of GHS {balance} for {term_label}. '
+        f'Please contact the school to pay.'
+    )
+
+
+def _debt_reminder_all_time_sms_body(
+    *,
+    student_name: str,
+    school_name: str,
+    balance,
+    terms_summary: str,
+) -> str:
+    summary = terms_summary or 'multiple terms'
+    return (
+        f'{_sms_prefix(school_name=school_name)}: Reminder — {student_name} owes '
+        f'GHS {balance} across terms ({summary}). '
+        f'Please contact the school to pay.'
     )
 
 
@@ -448,6 +468,9 @@ def plan_guardians_debt_reminder(
     term,
     balance,
     batch_id,
+    all_time: bool = False,
+    terms_owed: list[dict] | None = None,
+    terms_summary: str = '',
 ) -> tuple[list[dict], list[dict]]:
     """Build SMS/email items for one student without sending."""
     school = student.school
@@ -458,10 +481,14 @@ def plan_guardians_debt_reminder(
 
     student_name = _student_display_name(student)
     school_name = school.name
-    term_label = f'{term.academic_year.academic_year} · {term.get_term_display()}'
+    if all_time:
+        term_label = 'all terms'
+    else:
+        term_label = f'{term.academic_year.academic_year} · {term.get_term_display()}'
     amount = balance if isinstance(balance, Decimal) else Decimal(str(balance))
     amount_display = f'{amount:.2f}'
     scope = f'{batch_id}:{student.id}'
+    terms_owed = terms_owed or []
     sms_items = []
     email_items = []
 
@@ -486,18 +513,28 @@ def plan_guardians_debt_reminder(
             continue
 
         if CHANNEL_SMS in channels:
+            body = (
+                _debt_reminder_all_time_sms_body(
+                    student_name=student_name,
+                    school_name=school_name,
+                    balance=amount_display,
+                    terms_summary=terms_summary,
+                )
+                if all_time
+                else _debt_reminder_sms_body(
+                    student_name=student_name,
+                    school_name=school_name,
+                    balance=amount_display,
+                    term_label=term_label,
+                )
+            )
             sms_items.append(
                 _sms_item(
                     school=school,
                     parent=parent,
                     student=student,
                     event_type=GuardianDelivery.EventType.DEBT_REMINDER,
-                    body=_debt_reminder_sms_body(
-                        student_name=student_name,
-                        school_name=school_name,
-                        balance=amount_display,
-                        term_label=term_label,
-                    ),
+                    body=body,
                     idempotency_key=_idempotency_key(
                         event_type=GuardianDelivery.EventType.DEBT_REMINDER,
                         scope_id=scope,
@@ -509,6 +546,11 @@ def plan_guardians_debt_reminder(
 
         if CHANNEL_EMAIL in channels:
             greeting_name = (parent.name or '').strip()
+            preheader = (
+                f'{student_name} owes GHS {amount_display} across terms'
+                if all_time
+                else f'{student_name} has an outstanding balance of GHS {amount_display}'
+            )
             email_items.append(
                 _email_item(
                     school=school,
@@ -522,10 +564,10 @@ def plan_guardians_debt_reminder(
                         'student_name': student_name,
                         'balance': amount_display,
                         'term_label': term_label,
+                        'all_time': all_time,
+                        'terms_owed': terms_owed,
                         'app_logo_url': default_app_logo_url(),
-                        'preheader': (
-                            f'{student_name} has an outstanding balance of GHS {amount_display}'
-                        ),
+                        'preheader': preheader,
                     },
                     template_base='notifications/email/guardian_debt_reminder',
                     idempotency_key=_idempotency_key(
@@ -546,6 +588,9 @@ def notify_guardians_debt_reminder(
     term,
     balance,
     batch_id,
+    all_time: bool = False,
+    terms_owed: list[dict] | None = None,
+    terms_summary: str = '',
 ) -> dict:
     """Plan + enqueue debt reminder for one student."""
     sms_items, email_items = plan_guardians_debt_reminder(
@@ -553,6 +598,9 @@ def notify_guardians_debt_reminder(
         term=term,
         balance=balance,
         batch_id=batch_id,
+        all_time=all_time,
+        terms_owed=terms_owed,
+        terms_summary=terms_summary,
     )
     return enqueue_guardian_outbound(sms_items=sms_items, email_items=email_items)
 
@@ -564,10 +612,9 @@ def _report_ready_sms_body(
     term_label: str,
     report_url: str,
 ) -> str:
-    sender = getattr(settings, 'ARKESEL_SMS_SENDER', None) or 'SCHOOLASST'
     return (
-        f'{sender}: {student_name}\'s report for {term_label} at {school_name} '
-        f'is ready. Download: {report_url}'
+        f'{_sms_prefix(school_name=school_name)}: {student_name}\'s report for '
+        f'{term_label} is ready. Download: {report_url}'
     )
 
 
@@ -691,10 +738,9 @@ def _next_term_fees_sms_body(
     total_display: str,
     schedule_url: str,
 ) -> str:
-    sender = getattr(settings, 'ARKESEL_SMS_SENDER', None) or 'SCHOOLASST'
     return (
-        f'{sender}: Fees for {student_name} at {school_name} ({term_label}) '
-        f'total GHS {total_display}. Details: {schedule_url}'
+        f'{_sms_prefix(school_name=school_name)}: Fees for {student_name} '
+        f'({term_label}) total GHS {total_display}. Details: {schedule_url}'
     )
 
 

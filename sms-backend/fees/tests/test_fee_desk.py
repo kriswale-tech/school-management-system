@@ -202,3 +202,52 @@ class FeeDeskViewTests(APITestCase):
         self.assertEqual(paid_stats.data['total_students'], 1)
         self.assertEqual(paid_stats.data['debtors_count'], 0)
         self.assertEqual(Decimal(paid_stats.data['outstanding']), Decimal('0.00'))
+
+    def test_all_time_sums_balances_across_terms(self):
+        self._apply_tuition(amount=Decimal('500.00'))
+        second_structure = FeeStructure.objects.create(
+            school=self.school,
+            term=self.second_term,
+            created_by=self.user,
+        )
+        FeeItem.objects.create(
+            fee_structure=second_structure,
+            name='Tuition Fee',
+            amount=Decimal('400.00'),
+            applies_to_type=FeeItem.AppliesToType.SCHOOL,
+            student_type=FeeItem.StudentType.ALL_STUDENTS,
+        )
+        publish_fee_structure(second_structure)
+        # Keep first term active for the all-time roster, but bill second term too.
+        enroll_student(
+            student=self.student_a,
+            term=self.second_term,
+            stream=self.stream,
+            is_new_student=False,
+        )
+        apply_fee_structure(second_structure)
+
+        Payment.objects.create(
+            student=self.student_a,
+            term=self.first_term,
+            amount=Decimal('200.00'),
+            payment_method=Payment.PaymentMethod.CASH,
+            recorded_by=self.user,
+        )
+
+        response = self.client.get(reverse('fee-desk-list'), {'term': 'all'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ama = next(row for row in response.data['results'] if row['student_id'] == 'TA-0001')
+        # First term 500 + second term 400 billed, 200 paid → 700 remaining.
+        self.assertEqual(Decimal(ama['amount_paid']), Decimal('200.00'))
+        self.assertEqual(Decimal(ama['remaining_balance']), Decimal('700.00'))
+
+        debtors = self.client.get(
+            reverse('fee-desk-list'),
+            {'term': 'all', 'debtors': 'true'},
+        )
+        self.assertEqual(debtors.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(debtors.data['count'], 1)
+        self.assertTrue(
+            any(row['student_id'] == 'TA-0001' for row in debtors.data['results']),
+        )

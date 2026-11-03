@@ -18,7 +18,7 @@ const RecentActivitiesCard = ({ activities, isLoading = false }: RecentActivitie
         {isLoading ? (
           <p className="text-sm text-slate-500 py-6 text-center">Loading activities…</p>
         ) : activities.length === 0 ? (
-          <p className="text-sm text-slate-500 py-6 text-center">No recent activity this term.</p>
+          <p className="text-sm text-slate-500 py-6 text-center">No recent activity yet.</p>
         ) : (
           <ul className="divide-y divide-slate-100">
             {activities.map((activity) => {

@@ -13,7 +13,7 @@ from accounts.models import SchoolMembership
 from assessments.services.admin_overview import list_admin_assessment_overview
 from fees.services.desk import get_fee_desk_stats, list_fee_desk_rows
 from schools.models import Term
-from students.services import get_student_stats
+from students.services import count_students_missing_guardian, get_student_stats
 
 
 TOP_DEBTORS_LIMIT = 5
@@ -51,6 +51,7 @@ def get_admin_dashboard(*, school) -> dict:
         )
     )
 
+    missing_guardians = count_students_missing_guardian(school=school, term=term)
     needs_attention = _build_needs_attention(
         ready_for_you=ready,
         unassigned_classes=class_stats['unassigned_classes'],
@@ -59,6 +60,7 @@ def get_admin_dashboard(*, school) -> dict:
         corrections_inbox=inbox_count,
         empty_classes=class_stats['empty_classes'],
         needs_correction=needs_correction,
+        missing_guardians_count=missing_guardians,
     )
 
     return {
@@ -174,6 +176,7 @@ def _build_needs_attention(
     corrections_inbox,
     empty_classes,
     needs_correction,
+    missing_guardians_count=0,
 ) -> list[dict]:
     items = []
 
@@ -211,6 +214,19 @@ def _build_needs_attention(
             'label': label,
             'count': needs_correction,
             'href': '/assessments',
+        })
+
+    if missing_guardians_count:
+        label = (
+            f'{missing_guardians_count} student'
+            f'{"s" if missing_guardians_count != 1 else ""} '
+            f'{"have" if missing_guardians_count != 1 else "has"} no guardian'
+        )
+        items.append({
+            'code': 'missing_guardians',
+            'label': label,
+            'count': missing_guardians_count,
+            'href': '/students?missing_guardian=true',
         })
 
     if unassigned_classes:

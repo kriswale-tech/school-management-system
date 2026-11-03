@@ -11,12 +11,14 @@ import {
 import { getStudents } from '@/features/students/services'
 import type { Student } from '@/features/students/types'
 import {
+  STUDENT_FEE_HISTORY_QUERY_KEY,
   STUDENT_FEES_QUERY_KEY,
   STUDENT_PAYMENTS_QUERY_KEY,
 } from '@/features/students/utils'
 import dayjs from '@/lib/dayjs'
 import { getApiErrorMessage } from '@/utils'
-import { getStudentPaymentTarget, recordPayment } from '../services'
+import { getReceiptDetail, getStudentPaymentTarget, recordPayment } from '../services'
+import type { RecordPaymentResponse } from '../types'
 import {
   FEE_DESK_QUERY_KEY,
   FEE_DESK_STATS_QUERY_KEY,
@@ -24,6 +26,7 @@ import {
   STUDENT_PAYMENT_TARGET_QUERY_KEY,
   formatFeeAmount,
 } from '../utils'
+import { openReceiptPrintWindow } from '../utils/receiptPrint'
 import StudentPaymentSummary from './StudentPaymentSummary'
 
 const STUDENT_SEARCH_DEBOUNCE_MS = 300
@@ -31,7 +34,6 @@ const STUDENT_PAGE_SIZE = 20
 
 type RecordPaymentFormProps = {
   preselectedStudentId?: string
-  onSuccess?: () => void
   onCancel?: () => void
 }
 
@@ -43,7 +45,6 @@ const getStudentClassLabel = (student: Student) =>
 
 const RecordPaymentForm = ({
   preselectedStudentId,
-  onSuccess,
   onCancel,
 }: RecordPaymentFormProps) => {
   const queryClient = useQueryClient()
@@ -54,6 +55,8 @@ const RecordPaymentForm = ({
   const [amountDraft, setAmountDraft] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('')
   const [paidAt, setPaidAt] = useState(dayjs().format('YYYY-MM-DD'))
+  const [successResult, setSuccessResult] = useState<RecordPaymentResponse | null>(null)
+  const [isPrinting, setIsPrinting] = useState(false)
 
   const isPreselected = Boolean(preselectedStudentId)
 
@@ -96,7 +99,7 @@ const RecordPaymentForm = ({
   })
 
   const suggestedAmount = paymentTarget?.has_outstanding
-    ? paymentTarget.outstanding_balance
+    ? paymentTarget.all_time_outstanding
     : ''
   const amount = amountEdited ? amountDraft : suggestedAmount
 
@@ -106,20 +109,36 @@ const RecordPaymentForm = ({
     setAmountDraft('')
   }
 
+  const resetForAnotherPayment = () => {
+    setSuccessResult(null)
+    setAmountEdited(false)
+    setAmountDraft('')
+    setPaymentMethod('')
+    setPaidAt(dayjs().format('YYYY-MM-DD'))
+    if (!isPreselected) {
+      setStudentId('')
+      setSearchValue('')
+      setDebouncedSearch('')
+    }
+  }
+
   const { mutate: submitPayment, isPending } = useMutation({
     mutationFn: recordPayment,
-    onSuccess: (response) => {
+    onSuccess: async (response) => {
       const advanceNote =
         Number(response.advance_created) > 0
           ? ` · Advance ${formatFeeAmount(response.advance_created)} held`
           : ''
       toast.success(`Payment recorded · Receipt ${response.receipt_number}${advanceNote}`)
-      void queryClient.invalidateQueries({ queryKey: [FEE_DESK_QUERY_KEY] })
-      void queryClient.invalidateQueries({ queryKey: [FEE_DESK_STATS_QUERY_KEY] })
-      void queryClient.invalidateQueries({ queryKey: [STUDENT_FEES_QUERY_KEY] })
-      void queryClient.invalidateQueries({ queryKey: [STUDENT_PAYMENTS_QUERY_KEY] })
-      void queryClient.invalidateQueries({ queryKey: [STUDENT_PAYMENT_TARGET_QUERY_KEY] })
-      onSuccess?.()
+      setSuccessResult(response)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [FEE_DESK_QUERY_KEY] }),
+        queryClient.invalidateQueries({ queryKey: [FEE_DESK_STATS_QUERY_KEY] }),
+        queryClient.invalidateQueries({ queryKey: [STUDENT_FEES_QUERY_KEY] }),
+        queryClient.invalidateQueries({ queryKey: [STUDENT_FEE_HISTORY_QUERY_KEY] }),
+        queryClient.invalidateQueries({ queryKey: [STUDENT_PAYMENTS_QUERY_KEY] }),
+        queryClient.invalidateQueries({ queryKey: [STUDENT_PAYMENT_TARGET_QUERY_KEY] }),
+      ])
     },
     onError: (error) => {
       toast.error(getApiErrorMessage(error, 'Unable to record payment.'))
@@ -144,6 +163,74 @@ const RecordPaymentForm = ({
       payment_method: paymentMethod as (typeof PAYMENT_METHOD_OPTIONS)[number]['value'],
       paid_at: dayjs(`${paidAt}T12:00:00`).toISOString(),
     })
+  }
+
+  const handlePrintReceipt = async () => {
+    if (!successResult || isPrinting) return
+    setIsPrinting(true)
+    try {
+      const receipt = await getReceiptDetail(successResult.receipt_id)
+      openReceiptPrintWindow(receipt)
+    } catch (error) {
+      toast.error(
+        error instanceof Error && error.message.includes('Pop-up')
+          ? error.message
+          : getApiErrorMessage(error, 'Unable to open receipt for printing.'),
+      )
+    } finally {
+      setIsPrinting(false)
+    }
+  }
+
+  if (successResult) {
+    const advanceCreated = Number(successResult.advance_created) > 0
+    return (
+      <div className="space-y-5">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-4 space-y-2">
+          <p className="text-sm font-medium text-emerald-900">Payment recorded</p>
+          <p className="text-sm text-emerald-800">
+            Receipt {successResult.receipt_number} ·{' '}
+            {formatFeeAmount(successResult.amount)}
+          </p>
+          {successResult.allocations.length > 1 ? (
+            <ul className="text-sm text-emerald-800 space-y-1 pt-1">
+              {successResult.allocations.map((row) => (
+                <li key={row.term_id}>
+                  {row.term_label}: {formatFeeAmount(row.amount)}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-emerald-800">{successResult.term_label}</p>
+          )}
+          {advanceCreated ? (
+            <p className="text-sm text-emerald-800">
+              Advance held: {formatFeeAmount(successResult.advance_created)}
+            </p>
+          ) : null}
+          <p className="text-sm text-emerald-800">
+            Outstanding after: {formatFeeAmount(successResult.outstanding_after)}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-slate-200 pt-4">
+          <Button
+            type="button"
+            className="w-full"
+            loading={isPrinting}
+            onClick={handlePrintReceipt}
+          >
+            Print receipt
+          </Button>
+          <Button type="button" variant="outline" className="w-full" onClick={resetForAnotherPayment}>
+            Record another
+          </Button>
+          <Button type="button" variant="ghost" className="w-full" onClick={onCancel}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -183,8 +270,7 @@ const RecordPaymentForm = ({
             className="bg-white"
           />
           <p className="text-sm text-slate-500">
-            Automatically assigned to the semester with the outstanding balance and cannot be
-            edited.
+            Starts at the earliest owing term. Larger amounts cascade to later terms.
           </p>
         </div>
 
@@ -209,10 +295,10 @@ const RecordPaymentForm = ({
             />
           </div>
           <p className="text-sm text-slate-500">
-            Pre-filled with the student&apos;s outstanding balance. You can adjust this if
-            recording a partial or excess payment.
+            Pre-filled with all-time owing. Only surplus after clearing every owing term becomes
+            advance.
             {paymentTarget?.has_outstanding
-              ? ` Current outstanding: ${formatFeeAmount(paymentTarget.outstanding_balance)}.`
+              ? ` All-time owing: ${formatFeeAmount(paymentTarget.all_time_outstanding)}.`
               : ''}
           </p>
         </div>

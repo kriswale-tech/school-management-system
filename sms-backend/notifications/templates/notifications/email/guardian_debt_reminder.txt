@@ -2,6 +2,11 @@
 
 {% endif %}This is a fees reminder from {{ school_name }}.
 
-{{ student_name }} has an outstanding balance of GHS {{ balance }} for {{ term_label }}.
-
+{% if all_time %}{{ student_name }} has an outstanding balance of GHS {{ balance }} across all terms.
+{% if terms_owed %}
+Terms owed:
+{% for row in terms_owed %}- {{ row.term_label }}: GHS {{ row.balance }}
+{% endfor %}{% endif %}
+{% else %}{{ student_name }} has an outstanding balance of GHS {{ balance }} for {{ term_label }}.
+{% endif %}
 Please contact the school to arrange payment.

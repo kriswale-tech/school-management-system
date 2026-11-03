@@ -73,8 +73,7 @@ const EVENT_ROWS: {
     enabledKey: 'guardian_report_ready_enabled',
     channelsKey: 'guardian_report_ready_channels',
     label: 'Report ready',
-    helper:
-      'Signed report download links from Assessment details (select students with generated reports). Auto mode sends when a PDF is generated.',
+    helper: 'Send guardians a signed link when their ward’s report is ready to download.',
     wired: true,
   },
   {
@@ -111,7 +110,7 @@ const ParentMessagesSection = () => {
   return (
     <SettingsSection
       title="Parent messages"
-      description="SMS and email to guardian contacts (not staff inbox). Effective channel is school allow ∩ parent preference ∩ available phone/email."
+      description="Choose which events notify guardians by SMS or email. Messages only go out on channels the school allows, the parent prefers, and for which a phone number or email is on file."
     >
       {isLoading || !draft ? (
         <LoadingSpinner className="mx-auto" />
@@ -138,37 +137,22 @@ const ParentMessagesSection = () => {
             })
           }}
         >
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <FormLabel label="Default audience" className="font-normal text-base" />
-              <SelectField
-                options={AUDIENCE_OPTIONS}
-                value={draft.guardian_audience}
-                onChange={(value) =>
-                  setDraftOverride({
-                    ...draft,
-                    guardian_audience: value as GuardianAudience,
-                  })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <FormLabel
-                label="Report notify mode"
-                className="font-normal text-base"
-                helperText="Staff triggered from Assessment details, or automatic when a report PDF is generated."
-              />
-              <SelectField
-                options={REPORT_MODE_OPTIONS}
-                value={draft.report_parent_notify_mode}
-                onChange={(value) =>
-                  setDraftOverride({
-                    ...draft,
-                    report_parent_notify_mode: value as ReportParentNotifyMode,
-                  })
-                }
-              />
-            </div>
+          <div className="max-w-xs space-y-2">
+            <FormLabel label="Default audience" className="font-normal text-base" />
+            <SelectField
+              options={AUDIENCE_OPTIONS}
+              value={draft.guardian_audience}
+              onChange={(value) =>
+                setDraftOverride({
+                  ...draft,
+                  guardian_audience: value as GuardianAudience,
+                })
+              }
+            />
+            <p className="text-sm text-slate-500">
+              Who receives parent messages by default — primary guardian only, or every linked
+              guardian.
+            </p>
           </div>
 
           <div className="space-y-4">
@@ -222,12 +206,12 @@ const ParentMessagesSection = () => {
                     >
                       Send automatically on a schedule
                     </CheckboxField>
+                    <p className="text-sm text-slate-500">
+                      Default is end of each month. Automatic reminders run around 8:00 AM Accra
+                      time.
+                    </p>
                     <div className="max-w-xs space-y-2">
-                      <FormLabel
-                        label="Automatic frequency"
-                        className="font-normal text-base"
-                        helperText="System default is end of each month. Runs around 08:00 UTC."
-                      />
+                      <FormLabel label="Automatic frequency" className="font-normal text-base" />
                       <SelectField
                         options={DEBT_FREQUENCY_OPTIONS}
                         value={draft.guardian_debt_reminder_frequency}
@@ -241,6 +225,29 @@ const ParentMessagesSection = () => {
                           !draft.guardian_debt_reminder_enabled ||
                           !draft.guardian_debt_reminder_auto_enabled
                         }
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
+                {row.enabledKey === 'guardian_report_ready_enabled' ? (
+                  <div className="space-y-3 border-t border-slate-200 pt-3">
+                    <FormLabel label="When to send" className="font-normal text-base" />
+                    <p className="text-sm text-slate-500">
+                      Staff can send from Assessment details, or messages go out automatically when
+                      the report PDF is generated.
+                    </p>
+                    <div className="max-w-xs space-y-2">
+                      <SelectField
+                        options={REPORT_MODE_OPTIONS}
+                        value={draft.report_parent_notify_mode}
+                        onChange={(value) =>
+                          setDraftOverride({
+                            ...draft,
+                            report_parent_notify_mode: value as ReportParentNotifyMode,
+                          })
+                        }
+                        disabled={!draft.guardian_report_ready_enabled}
                       />
                     </div>
                   </div>

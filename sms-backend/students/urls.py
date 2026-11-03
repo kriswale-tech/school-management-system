@@ -19,6 +19,7 @@ from students.views import (
     StudentListView,
     StudentMarkLeftView,
     StudentOnboardView,
+    StudentPaymentHistoryExportView,
     StudentPaymentListView,
     StudentPerformanceView,
     StudentReactivateView,
@@ -84,6 +85,11 @@ urlpatterns = [
         '<uuid:student_id>/payments/',
         StudentPaymentListView.as_view(),
         name='student-payment-list',
+    ),
+    path(
+        '<uuid:student_id>/payments/export/',
+        StudentPaymentHistoryExportView.as_view(),
+        name='student-payment-history-export',
     ),
     path(
         '<uuid:student_id>/guardians/',

@@ -15,6 +15,7 @@ import type {
   StudentGuardian,
   StudentOnboardPayload,
   StudentPayment,
+  StudentPaymentHistoryExportParams,
   StudentAssessmentsQueryParams,
   StudentPerformance,
   StudentQueryParams,
@@ -131,6 +132,27 @@ export const getStudentPayments = async (
   const url = getQueryUrl(`/students/${studentId}/payments/`, params)
   const response = await api.get<StudentPayment[]>(url)
   return response.data
+}
+
+export const downloadStudentPaymentHistory = async (
+  studentId: string,
+  params: StudentPaymentHistoryExportParams,
+): Promise<void> => {
+  const url = getQueryUrl(`/students/${studentId}/payments/export/`, {
+    scope: params.scope,
+    academic_year: params.academic_year,
+    term: params.term,
+  })
+  const response = await api.get<Blob>(url, { responseType: 'blob' })
+  const contentDisposition = response.headers['content-disposition'] as string | undefined
+  const match = contentDisposition?.match(/filename="?([^";]+)"?/)
+  const filename = match?.[1] ?? `payment-history-${studentId}.xlsx`
+  const objectUrl = URL.createObjectURL(response.data)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(objectUrl)
 }
 
 export const getStudentAssessments = async (

@@ -37,12 +37,33 @@
                     <h1 style="margin:0 0 12px 0; font-size:22px; font-weight:700; letter-spacing:-0.02em; color:#0f172a;">
                       Fees reminder
                     </h1>
+                    {% if all_time %}
+                    <p style="margin:0 0 12px 0; font-size:15px; line-height:1.65; color:#475569;">
+                      <strong style="color:#0f172a;">{{ student_name }}</strong> has an outstanding balance of
+                      <strong style="color:#0f172a;">GHS {{ balance }}</strong> across all terms at
+                      <strong style="color:#0f172a;">{{ school_name }}</strong>.
+                    </p>
+                    {% if terms_owed %}
+                    <p style="margin:0 0 8px 0; font-size:15px; line-height:1.65; color:#475569;">
+                      Terms owed:
+                    </p>
+                    <ul style="margin:0 0 12px 0; padding-left:20px; font-size:15px; line-height:1.65; color:#475569;">
+                      {% for row in terms_owed %}
+                      <li style="margin:0 0 4px 0;">
+                        <strong style="color:#0f172a;">{{ row.term_label }}</strong>:
+                        GHS {{ row.balance }}
+                      </li>
+                      {% endfor %}
+                    </ul>
+                    {% endif %}
+                    {% else %}
                     <p style="margin:0 0 12px 0; font-size:15px; line-height:1.65; color:#475569;">
                       <strong style="color:#0f172a;">{{ student_name }}</strong> has an outstanding balance of
                       <strong style="color:#0f172a;">GHS {{ balance }}</strong> for
                       <strong style="color:#0f172a;">{{ term_label }}</strong> at
                       <strong style="color:#0f172a;">{{ school_name }}</strong>.
                     </p>
+                    {% endif %}
                     <p style="margin:0; font-size:15px; line-height:1.65; color:#475569;">
                       Please contact the school to arrange payment.
                     </p>

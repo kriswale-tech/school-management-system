@@ -8,7 +8,7 @@ from activities.services import list_activities_for_staff
 from assessments.services.admin_overview import list_admin_assessment_overview
 from dashboard.services.admin_dashboard import _build_needs_attention
 from schools.models import Term
-from students.services import get_student_stats
+from students.services import count_students_missing_guardian, get_student_stats
 
 
 def get_staff_dashboard(*, school) -> dict:
@@ -46,6 +46,7 @@ def get_staff_dashboard(*, school) -> dict:
         )
     )
 
+    missing_guardians = count_students_missing_guardian(school=school, term=term)
     needs_attention = _build_needs_attention(
         ready_for_you=ready,
         unassigned_classes=class_stats['unassigned_classes'],
@@ -54,10 +55,11 @@ def get_staff_dashboard(*, school) -> dict:
         corrections_inbox=inbox_count,
         empty_classes=class_stats['empty_classes'],
         needs_correction=needs_correction,
+        missing_guardians_count=missing_guardians,
     )
 
     activities = list(
-        list_activities_for_staff(school=school, term=term)[:10],
+        list_activities_for_staff(school=school)[:10],
     )
 
     return {

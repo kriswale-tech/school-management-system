@@ -17,9 +17,11 @@ import type { Parent } from '@/features/students/types'
 import {
   DEFAULT_GUARDIAN,
   GUARDIAN_MODE_OPTIONS,
+  NOTIFY_CHANNEL_OPTIONS,
   RELATIONSHIP_OPTIONS,
 } from '../constants'
 import type { GuardianMode, StudentFormValues } from '../types'
+import type { GuardianNotifyChannel } from '@/features/students/types'
 
 type GuardianInfoStepProps = {
   register: UseFormRegister<StudentFormValues>
@@ -108,6 +110,7 @@ const GuardianCard = ({
     setValue(`guardians.${index}.name`, '', { shouldDirty: true })
     setValue(`guardians.${index}.phone_number`, '', { shouldDirty: true })
     setValue(`guardians.${index}.email`, '', { shouldDirty: true })
+    setValue(`guardians.${index}.notify_channel`, 'both', { shouldDirty: true })
     setSelectedParent(null)
     setSearchValue('')
     setDebouncedSearch('')
@@ -227,6 +230,9 @@ const GuardianCard = ({
           disabled={isExisting}
           {...register(`guardians.${index}.email`)}
         />
+        <p className="text-sm text-slate-500">
+          Optional. Used to send parent messages when email is enabled.
+        </p>
       </div>
 
       <div className="space-y-2">
@@ -245,6 +251,27 @@ const GuardianCard = ({
             />
           )}
         />
+      </div>
+
+      <div className="space-y-2">
+        <FormLabel label="Parent messages" />
+        <Controller
+          name={`guardians.${index}.notify_channel`}
+          control={control}
+          render={({ field: notifyField }) => (
+            <SelectField
+              options={[...NOTIFY_CHANNEL_OPTIONS]}
+              value={notifyField.value}
+              onChange={(value) => notifyField.onChange(value as GuardianNotifyChannel)}
+              onBlur={notifyField.onBlur}
+              error={guardianErrors?.notify_channel?.message}
+            />
+          )}
+        />
+        <p className="text-sm text-slate-500">
+          Which channels this parent prefers. School settings still decide which events send, and
+          email needs an address on file.
+        </p>
       </div>
     </div>
   )

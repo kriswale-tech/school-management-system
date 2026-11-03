@@ -1,14 +1,14 @@
 from decimal import Decimal
 
-from django.db.models import DecimalField, Exists, F, OuterRef, Subquery, Sum, Value
-from django.db.models.functions import Coalesce
+from django.db.models import Exists, F, OuterRef, Sum
 
 from accounts.models import User
 from accounts.services.access_scope import resolve_access_scope
 from assessments.models import StudentResult
-from fees.models import Payment, StudentFee
+from fees.models import StudentFee
 from schools.models import Term
 from students.models import ClassEnrollment
+from students.services import count_students_missing_guardian
 
 
 def _money(value) -> str:
@@ -20,23 +20,14 @@ def _plural(count: int, singular: str, plural: str) -> str:
 
 
 def count_outstanding_students(*, school, term, threshold) -> int:
-    decimal_field = DecimalField(max_digits=12, decimal_places=2)
-    paid_sq = (
-        Payment.objects.filter(student_id=OuterRef('student_id'), term=term)
-        .values('student_id')
-        .annotate(total=Sum('amount'))
-        .values('total')[:1]
-    )
+    from fees.services.ledger import paid_toward_term_subquery
+
     return (
         StudentFee.objects.filter(term=term, student__school=school)
         .values('student_id')
         .annotate(
             billed=Sum('amount'),
-            paid=Coalesce(
-                Subquery(paid_sq, output_field=decimal_field),
-                Value(Decimal('0.00')),
-                output_field=decimal_field,
-            ),
+            paid=paid_toward_term_subquery(term=term),
         )
         .annotate(balance=F('billed') - F('paid'))
         .filter(balance__gte=threshold)
@@ -135,6 +126,23 @@ def list_school_alerts(*, school, membership) -> list[dict]:
                 ),
                 'count': count,
                 'href': '/students',
+            })
+
+    if preferences.guardians_alert_enabled and role in (
+        User.RoleChoices.ADMIN,
+        User.RoleChoices.STAFF,
+    ):
+        count = count_students_missing_guardian(school=school, term=term)
+        if count:
+            alerts.append({
+                'kind': 'missing_guardians',
+                'title': 'Missing guardians',
+                'summary': (
+                    f'{count} {_plural(count, "student has", "students have")} '
+                    'no linked guardian this term.'
+                ),
+                'count': count,
+                'href': '/students?missing_guardian=true',
             })
 
     return alerts

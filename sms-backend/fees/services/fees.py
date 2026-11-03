@@ -322,15 +322,20 @@ def ensure_enrollment_fees(enrollment):
 
 
 def get_student_term_balance(*, student, term):
+    from fees.models import PaymentAllocation
+    from fees.services.ledger import sum_paid_toward_term
+
     fees = list(
         StudentFee.objects.filter(student=student, term=term).order_by('name'),
     )
-    payments = list(
-        Payment.objects.filter(student=student, term=term).order_by('-paid_at'),
+    allocations = list(
+        PaymentAllocation.objects.filter(payment__student=student, term=term)
+        .select_related('payment')
+        .order_by('-payment__paid_at'),
     )
 
     total_billed = sum((fee.amount for fee in fees), Decimal('0.00'))
-    total_paid = sum((payment.amount for payment in payments), Decimal('0.00'))
+    total_paid = sum_paid_toward_term(student=student, term=term)
     balance = total_billed - total_paid
 
     if balance <= 0 and total_billed > 0:
@@ -360,13 +365,14 @@ def get_student_term_balance(*, student, term):
         ],
         'payments': [
             {
-                'id': payment.id,
-                'amount': payment.amount,
-                'payment_method': payment.payment_method,
-                'paid_at': payment.paid_at,
-                'payment_reference': payment.payment_reference,
+                'id': allocation.payment_id,
+                'allocation_id': allocation.id,
+                'amount': allocation.amount,
+                'payment_method': allocation.payment.payment_method,
+                'paid_at': allocation.payment.paid_at,
+                'payment_reference': allocation.payment.payment_reference,
             }
-            for payment in payments
+            for allocation in allocations
         ],
     }
 
@@ -492,25 +498,69 @@ def get_student_fees(*, school, student, academic_year_id=None, term_id=None):
     return get_student_current_year_fees(school=school, student=student)
 
 
-def list_student_payments(*, school, student, academic_year_id=None, term_id=None):
-    """Payment ledger rows for a student, optionally filtered by year or term."""
+PAYMENT_HISTORY_EXPORT_HEADERS = [
+    'Paid at',
+    'Amount (GHS)',
+    'Method',
+    'Applied to',
+    'Reference',
+    'Receipt number',
+    'Received by',
+]
+
+
+def _term_label_for_payment_term(term) -> str:
+    return f'{term.academic_year.academic_year} · {term.get_term_display()}'
+
+
+def _payment_received_by_name(payment) -> str:
+    user = payment.recorded_by
+    if user is None:
+        return ''
+    return (user.get_full_name() or '').strip() or getattr(user, 'phone_number', '') or ''
+
+
+def list_student_payments(
+    *,
+    school,
+    student,
+    academic_year_id=None,
+    term_id=None,
+    search=None,
+):
+    """Payment ledger rows for a student, optionally filtered by year or term.
+
+    Term/year filters match payments that allocated money to that scope.
+    ``search`` matches receipt number (case-insensitive contains).
+    """
     from rest_framework.exceptions import ValidationError
     from fees.models import Receipt
     from schools.models import AcademicYear
 
     queryset = (
-        Payment.objects.filter(student=student, term__school=school)
-        .select_related('term', 'term__academic_year', 'receipt')
+        Payment.objects.filter(student=student, student__school=school)
+        .select_related(
+            'term',
+            'term__academic_year',
+            'receipt',
+            'recorded_by',
+        )
+        .prefetch_related('allocations__term__academic_year')
         .order_by('-paid_at')
+        .distinct()
     )
 
     if term_id:
-        queryset = queryset.filter(term_id=term_id)
+        queryset = queryset.filter(allocations__term_id=term_id)
     elif academic_year_id:
         academic_year = AcademicYear.objects.filter(school=school, id=academic_year_id).first()
         if academic_year is None:
             raise ValidationError({'academic_year': 'Academic year not found in this school.'})
-        queryset = queryset.filter(term__academic_year=academic_year)
+        queryset = queryset.filter(allocations__term__academic_year=academic_year)
+
+    needle = str(search or '').strip()
+    if needle:
+        queryset = queryset.filter(receipt__receipt_number__icontains=needle)
 
     rows = []
     for payment in queryset:
@@ -518,6 +568,17 @@ def list_student_payments(*, school, student, academic_year_id=None, term_id=Non
             receipt = payment.receipt
         except Receipt.DoesNotExist:
             receipt = None
+        allocation_rows = [
+            {
+                'term_id': allocation.term_id,
+                'term_label': _term_label_for_payment_term(allocation.term),
+                'amount': allocation.amount,
+            }
+            for allocation in sorted(
+                payment.allocations.all(),
+                key=lambda row: (row.term.start_date, row.created_at),
+            )
+        ]
         rows.append({
             'id': payment.id,
             'term_id': payment.term_id,
@@ -530,6 +591,8 @@ def list_student_payments(*, school, student, academic_year_id=None, term_id=Non
             'payment_method_display': payment.get_payment_method_display(),
             'paid_at': payment.paid_at,
             'payment_reference': payment.payment_reference,
+            'received_by': _payment_received_by_name(payment),
+            'allocations': allocation_rows,
             'receipt': (
                 {
                     'id': receipt.id,
@@ -540,6 +603,81 @@ def list_student_payments(*, school, student, academic_year_id=None, term_id=Non
             ),
         })
     return rows
+
+
+def resolve_payment_history_export_filters(*, scope, academic_year_id=None, term_id=None):
+    """Validate export scope and return (academic_year_id, term_id)."""
+    from rest_framework.exceptions import ValidationError
+
+    normalized = str(scope or 'all_time').strip().lower()
+    if normalized == 'all_time':
+        return None, None
+    if normalized == 'academic_year':
+        if not academic_year_id:
+            raise ValidationError({'academic_year': 'Select an academic year.'})
+        return academic_year_id, None
+    if normalized == 'term':
+        if not term_id:
+            raise ValidationError({'term': 'Select a term.'})
+        return None, term_id
+    raise ValidationError({
+        'scope': 'Scope must be all_time, academic_year, or term.',
+    })
+
+
+def build_student_payment_history_xlsx(
+    *,
+    school,
+    student,
+    scope='all_time',
+    academic_year_id=None,
+    term_id=None,
+) -> bytes:
+    """Build an Excel ledger for a student's payments."""
+    from shared.services.spreadsheets import build_xlsx_bytes
+
+    year_id, export_term_id = resolve_payment_history_export_filters(
+        scope=scope,
+        academic_year_id=academic_year_id,
+        term_id=term_id,
+    )
+    payments = list_student_payments(
+        school=school,
+        student=student,
+        academic_year_id=year_id,
+        term_id=export_term_id,
+    )
+    rows = []
+    for payment in payments:
+        paid_at = payment['paid_at']
+        paid_at_display = (
+            paid_at.strftime('%Y-%m-%d %H:%M')
+            if hasattr(paid_at, 'strftime')
+            else str(paid_at or '')
+        )
+        receipt = payment.get('receipt') or {}
+        applied_to = '; '.join(
+            f"{row['term_label']}: GHS {row['amount']:.2f}"
+            for row in payment.get('allocations') or []
+        ) or (
+            f"{payment['academic_year']} · {payment['term_name']}: "
+            f"GHS {payment['amount']:.2f}"
+        )
+        rows.append({
+            'Paid at': paid_at_display,
+            'Amount (GHS)': f"{payment['amount']:.2f}",
+            'Method': payment['payment_method_display'],
+            'Applied to': applied_to,
+            'Reference': payment.get('payment_reference') or '',
+            'Receipt number': receipt.get('receipt_number') or '',
+            'Received by': payment.get('received_by') or '',
+        })
+
+    return build_xlsx_bytes(
+        sheet_name='Payments',
+        headers=PAYMENT_HISTORY_EXPORT_HEADERS,
+        rows=rows,
+    )
 
 
 def get_student_fee_history(*, school, student, academic_year_id=None):

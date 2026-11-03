@@ -97,7 +97,7 @@ The year list is the school’s own years, not a generated dropdown. Past years 
 
 **Open transition** places pupils on the next term, marks leavers graduated, copies teachers, applies the next fee list, and makes that term current. It is also in the navbar from 7 days before the current term ends. Detail: [term-transition.md](./term-transition.md) (BECE / final-year exam special-casing is deferred).
 
-The navbar bell reads the same alert rules: outstanding fees, unreleased results, and new enrollments, limited to what that role should see. Alerts also hold the switch for the dashboard popup that reminds an admin to open the next term.
+The navbar bell reads the same alert rules: outstanding fees, unreleased results, new enrollments, and missing guardians, limited to what that role should see. Alerts also hold the switch for the dashboard popup that reminds an admin to open the next term.
 
 ---
 
@@ -207,9 +207,9 @@ Every role opens **`/profile`** from the header. You can update photo, name, ema
 
 ### Students
 
-- List and search students  
+- List and search students — “Needs guardian” tag + Guardian filter (`?missing_guardian=true`) for students with no linked parent  
 - Onboard a student (bio, class, guardians) — can SMS/email guardians when enabled (Settings → Parent messages; [guardian-communications.md](./guardian-communications.md))  
-- Bulk import  
+- Bulk import — optional `student_id` (blank auto-generates; existing IDs skipped). Dates as `YYYY-MM-DD`. Guardians optional. Detail: [`student-bulk-import.md`](../sms-backend/docs/student-bulk-import.md)  
 - Student detail (bio, guardians, fee balance/history, reports & assessment)  
 
 ### Classes

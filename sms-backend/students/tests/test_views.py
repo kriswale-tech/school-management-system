@@ -130,6 +130,34 @@ class StudentViewTests(APITestCase):
         self.assertIsNone(kofi['stream']['name'])
         self.assertTrue(kofi['stream']['is_default'])
         self.assertIsNone(kofi['primary_parent'])
+        self.assertFalse(ama['missing_guardian'])
+        self.assertTrue(kofi['missing_guardian'])
+
+    def test_list_filter_missing_guardian(self):
+        response = self.client.get(self.list_url, {'missing_guardian': 'true'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['student_id'], 'STU-002')
+        self.assertTrue(response.data['results'][0]['missing_guardian'])
+
+        response = self.client.get(self.list_url, {'missing_guardian': 'false'})
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['student_id'], 'STU-001')
+        self.assertFalse(response.data['results'][0]['missing_guardian'])
+
+    def test_list_filter_is_new_student(self):
+        response = self.client.get(self.list_url, {'is_new_student': 'true'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['student_id'], 'STU-001')
+        self.assertTrue(response.data['results'][0]['is_new_student'])
+
+        response = self.client.get(self.list_url, {'is_new_student': 'false'})
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['student_id'], 'STU-002')
+        self.assertFalse(response.data['results'][0]['is_new_student'])
 
     def test_list_search_by_student_id_and_name(self):
         response = self.client.get(self.list_url, {'search': 'STU-002'})

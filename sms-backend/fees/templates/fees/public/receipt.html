@@ -30,12 +30,30 @@
     .inner {
       padding: 28px 32px;
     }
+    .header {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+    }
+    .logo {
+      display: block;
+      width: auto;
+      max-width: 140px;
+      max-height: 56px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+    .header-text {
+      min-width: 0;
+    }
     h1 {
       margin: 0 0 4px;
       font-size: 22px;
+      font-weight: 600;
       letter-spacing: -0.02em;
     }
     .muted {
+      margin: 0;
       color: #64748b;
       font-size: 14px;
       line-height: 1.5;
@@ -77,7 +95,12 @@
     @media print {
       body { background: #fff; padding: 0; }
       .actions { display: none; }
-      .sheet { border: 0; border-radius: 0; }
+      .sheet {
+        border: 0;
+        border-radius: 0;
+        max-width: none;
+      }
+      .accent { display: none; }
     }
   </style>
 </head>
@@ -85,13 +108,20 @@
   <div class="sheet">
     <div class="accent"></div>
     <div class="inner">
-      <h1>{{ school_name }}</h1>
-      <p class="muted">
-        {% if school_address %}{{ school_address }}<br>{% endif %}
-        {% if school_phone %}{{ school_phone }}{% endif %}
-        {% if school_phone and school_email %} · {% endif %}
-        {% if school_email %}{{ school_email }}{% endif %}
-      </p>
+      <div class="header">
+        {% if school_logo_url %}
+        <img class="logo" src="{{ school_logo_url }}" alt="{{ school_name }} logo" />
+        {% endif %}
+        <div class="header-text">
+          <h1>{{ school_name }}</h1>
+          <p class="muted">
+            {% if school_address %}{{ school_address }}<br>{% endif %}
+            {% if school_phone %}{{ school_phone }}{% endif %}
+            {% if school_phone and school_email %} · {% endif %}
+            {% if school_email %}{{ school_email }}{% endif %}
+          </p>
+        </div>
+      </div>
 
       <p class="amount">GHS {{ amount }}</p>
       <p class="muted" style="margin-top:-12px; margin-bottom:24px;">Payment received</p>
@@ -103,6 +133,14 @@
         <dd>{{ student_name }} ({{ student_id }})</dd>
         <dt>Term</dt>
         <dd>{{ term_label }}</dd>
+        {% if allocations and allocations|length > 1 %}
+        <dt>Applied to</dt>
+        <dd>
+          {% for row in allocations %}
+            {{ row.term_label }}: GHS {{ row.amount }}{% if not forloop.last %}<br>{% endif %}
+          {% endfor %}
+        </dd>
+        {% endif %}
         <dt>Method</dt>
         <dd>{{ payment_method }}</dd>
         {% if payment_reference %}

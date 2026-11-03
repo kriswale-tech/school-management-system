@@ -7,6 +7,8 @@ export type StudentQueryParams = {
   class_level?: string
   stream?: string
   term?: string
+  missing_guardian?: boolean
+  is_new_student?: boolean
 }
 
 export interface StudentClassLevel {
@@ -44,7 +46,8 @@ export interface Student {
   stream: StudentStream
   is_new_student: boolean
   payment_status: string
-  primary_parent: PrimaryParent
+  missing_guardian: boolean
+  primary_parent: PrimaryParent | null
 }
 
 export interface StudentStats {
@@ -86,19 +89,24 @@ export type ParentQueryParams = {
   search?: string
 }
 
+export type GuardianNotifyChannel = 'sms' | 'email' | 'both' | 'off'
+
 export type GuardianInput =
   | {
       parent_id: string
       relationship: GuardianRelationship
+      notify_channel?: GuardianNotifyChannel
     }
   | {
       name: string
       phone_number: string
       email: string
       relationship: GuardianRelationship
+      notify_channel?: GuardianNotifyChannel
     }
 
 export type StudentOnboardPayload = {
+  student_id?: string
   first_name: string
   last_name: string
   other_names: string
@@ -116,8 +124,6 @@ export type StudentClassAssignment = {
   display_name: string
   is_default: boolean
 }
-
-export type GuardianNotifyChannel = 'sms' | 'email' | 'both' | 'off'
 
 export type StudentGuardian = {
   id: string
@@ -165,6 +171,7 @@ export type MarkStudentLeftPayload = {
 }
 
 export type StudentBioUpdatePayload = {
+  student_id?: string
   first_name?: string
   last_name?: string
   other_names?: string
@@ -244,6 +251,12 @@ export type StudentPaymentReceipt = {
   receipt_number: string
 }
 
+export type StudentPaymentAllocation = {
+  term_id: string
+  term_label: string
+  amount: string
+}
+
 export type StudentPayment = {
   id: string
   term_id: string
@@ -256,10 +269,21 @@ export type StudentPayment = {
   payment_method_display: string
   paid_at: string
   payment_reference: string
+  received_by: string
+  allocations: StudentPaymentAllocation[]
   receipt: StudentPaymentReceipt | null
 }
 
 export type StudentFeesQueryParams = {
+  academic_year?: string
+  term?: string
+  search?: string
+}
+
+export type PaymentHistoryExportScope = 'all_time' | 'academic_year' | 'term'
+
+export type StudentPaymentHistoryExportParams = {
+  scope: PaymentHistoryExportScope
   academic_year?: string
   term?: string
 }

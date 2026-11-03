@@ -82,7 +82,10 @@ def _serialize_confirm_result(result):
     description=(
         'Returns an Excel template for bulk student import. The workbook includes '
         'Import and Reference sheets plus dropdowns for gender, class, and guardian '
-        'relationship values configured for the current school.'
+        'relationship values configured for the current school. Optional student_id '
+        'uses the school ID when provided (blank auto-generates). Date columns '
+        '(date_of_birth, admission_date) are formatted as Text so YYYY-MM-DD values '
+        'are not rewritten by Excel locale formatting.'
     ),
     responses={
         200: OpenApiResponse(description='Excel template file (.xlsx).'),
@@ -106,7 +109,9 @@ class StudentBulkImportTemplateView(SchoolScopedAPIView):
         'Uploads a student import file for preview or commit. Accepts .xlsx and .csv '
         'files up to the configured size limit. Use dry_run=true to validate without '
         'saving; dry_run=false commits valid rows and returns a temporary failure '
-        'export when some rows fail. Guardian columns are optional.'
+        'export when some rows fail. Guardian columns and student_id are optional. '
+        'Existing student_id values are skipped (not updated). Dates prefer '
+        'YYYY-MM-DD; Excel date cells and common locale strings are also accepted.'
     ),
     parameters=[
         OpenApiParameter(

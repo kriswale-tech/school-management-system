@@ -14,6 +14,8 @@ BACKFILL_NOTE_PREFIX = 'Backfilled from historical overpayment'
 
 
 def _term_cash_totals(*, student, term):
+    from fees.models import PaymentAllocation
+
     billed = (
         StudentFee.objects.filter(student=student, term=term).aggregate(
             total=Coalesce(Sum('amount'), Decimal('0.00')),
@@ -21,8 +23,8 @@ def _term_cash_totals(*, student, term):
         or Decimal('0.00')
     )
     paid = (
-        Payment.objects.filter(student=student, term=term)
-        .exclude(payment_method=Payment.PaymentMethod.ADVANCE_CREDIT)
+        PaymentAllocation.objects.filter(payment__student=student, term=term)
+        .exclude(payment__payment_method=Payment.PaymentMethod.ADVANCE_CREDIT)
         .aggregate(
             total=Coalesce(Sum('amount'), Decimal('0.00')),
         )['total']

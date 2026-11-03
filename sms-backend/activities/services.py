@@ -81,15 +81,21 @@ def list_activities_for_staff(*, school, term=None):
     return list_activities(school=school, term=term).exclude(verb__in=FEE_VERBS)
 
 
-def list_activities_for_teacher(*, school, user, term):
-    """Events for the classes this teacher manages and the subjects they teach."""
+def list_activities_for_teacher(*, school, user, term=None):
+    """Events for the classes this teacher manages and the subjects they teach.
+
+    Assignment scope uses the given term when provided, otherwise the active
+    term. Activity rows are only term-filtered when ``term`` is explicitly set.
+    """
+    from schools.models import Term
     from teachers.models import ClassTeacher, TeachingAssignment
 
-    if term is None:
+    scope_term = term or Term.objects.filter(school=school, is_active=True).first()
+    if scope_term is None:
         return Activity.objects.none()
 
     class_rows = list(
-        ClassTeacher.objects.filter(teacher=user, term=term).only(
+        ClassTeacher.objects.filter(teacher=user, term=scope_term).only(
             'stream_id',
             'class_level_id',
         )
@@ -98,7 +104,7 @@ def list_activities_for_teacher(*, school, user, term):
     whole_class_level_ids = [row.class_level_id for row in class_rows if not row.stream_id]
 
     teaching_rows = list(
-        TeachingAssignment.objects.filter(teacher=user, term=term).only('id', 'stream_id')
+        TeachingAssignment.objects.filter(teacher=user, term=scope_term).only('id', 'stream_id')
     )
     teaching_ids = [row.id for row in teaching_rows]
     class_stream_set = set(class_stream_ids)

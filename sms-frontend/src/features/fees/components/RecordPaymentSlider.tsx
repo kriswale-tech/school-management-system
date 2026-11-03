@@ -17,7 +17,6 @@ const RecordPaymentSlider = ({
       <RecordPaymentForm
         key={`${open}-${preselectedStudentId ?? 'none'}`}
         preselectedStudentId={preselectedStudentId}
-        onSuccess={onClose}
         onCancel={onClose}
       />
     </SideSlider>

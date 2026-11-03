@@ -10,13 +10,16 @@ from fees.services.credits import (
     get_student_advance_balance,
 )
 from fees.services.desk import (
+    FEE_DESK_ALL_TIME,
     get_fee_desk_stats,
     get_fee_filter_options,
     list_fee_desk_rows,
+    resolve_fee_desk_scope,
     resolve_fee_desk_term,
 )
 from fees.services.fees import (
     apply_fee_structure,
+    build_student_payment_history_xlsx,
     build_student_term_fees,
     carry_forward_fee_structure,
     copy_fee_items_from_previous,
@@ -33,7 +36,10 @@ from fees.services.fees import (
 )
 from fees.services.payments import (
     build_student_payment_target,
+    format_outstanding_terms_summary,
     get_earliest_outstanding_term,
+    get_student_all_time_balance,
+    list_student_outstanding_term_balances,
     record_student_payment,
 )
 from fees.services.prep import next_term_fee_prep_status
@@ -54,6 +60,7 @@ __all__ = [
     'apply_structure',
     'backfill_advances',
     'backfill_advances_for_school',
+    'build_student_payment_history_xlsx',
     'build_student_payment_target',
     'build_student_term_fees',
     'carry_forward_fee_structure',
@@ -63,6 +70,8 @@ __all__ = [
     'create_fee_item',
     'delete_fee_item',
     'ensure_enrollment_fees',
+    'FEE_DESK_ALL_TIME',
+    'format_outstanding_terms_summary',
     'get_earliest_outstanding_term',
     'get_fee_desk_stats',
     'get_fee_filter_options',
@@ -70,17 +79,20 @@ __all__ = [
     'get_or_create_fee_structure',
     'get_student_advance_balance',
     'get_student_academic_year_fees',
+    'get_student_all_time_balance',
     'get_student_current_year_fees',
     'get_student_fee_history',
     'get_student_fees',
     'get_student_term_balance',
     'list_fee_desk_rows',
+    'list_student_outstanding_term_balances',
     'list_student_payments',
     'next_term_fee_prep_status',
     'publish_fee_structure',
     'publish_structure',
     'reconcile_duplicate_backfill_credits_for_school',
     'record_student_payment',
+    'resolve_fee_desk_scope',
     'resolve_fee_desk_term',
     'update_fee_item',
     'validate_fee_structure_ready',

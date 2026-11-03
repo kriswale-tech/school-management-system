@@ -24,11 +24,13 @@ import {
 } from '../services'
 import type { FeeDeskQueryParams, FeeDeskRow } from '../types'
 import {
+  FEE_DESK_ALL_TIME_TERM,
   FEE_DESK_FILTERS_QUERY_KEY,
   FEE_DESK_QUERY_KEY,
   FEE_DESK_STATS_QUERY_KEY,
   formatDebtorsStat,
   formatFeeAmount,
+  isFeeDeskAllTimeTerm,
   isFeeDeskDebtor,
 } from '../utils'
 
@@ -75,7 +77,7 @@ const Fees = () => {
   })
 
   const term: FilterSelection =
-    termSelection !== undefined ? termSelection : (filterOptions?.active_term_id ?? '')
+    termSelection !== undefined ? termSelection : FEE_DESK_ALL_TIME_TERM
 
   const filtersReady = Boolean(filterOptions)
 
@@ -122,11 +124,15 @@ const Fees = () => {
     label: item.name,
   }))
 
-  const termOptions = (filterOptions?.terms ?? []).map((item) => ({
-    value: item.id,
-    label: item.label,
-  }))
+  const termOptions = [
+    { value: FEE_DESK_ALL_TIME_TERM, label: 'All time' },
+    ...(filterOptions?.terms ?? []).map((item) => ({
+      value: item.id,
+      label: item.label,
+    })),
+  ]
 
+  const isAllTime = isFeeDeskAllTimeTerm(typeof term === 'string' ? term : '')
   const selectedCount = selectedIds.size
   const selectedIdList = useMemo(() => Array.from(selectedIds), [selectedIds])
   const pageDebtorIds = useMemo(
@@ -297,9 +303,9 @@ const Fees = () => {
 
       {canRecordPayment && selectedCount === 0 ? (
         <p className="text-sm text-slate-500">
-          Select debtors in the table to send parent fee reminders. Use the header checkbox to
-          select all matching debtors across pages
-          {debtors !== true ? ' (tip: filter Status → Debtors only)' : ''}.
+          {isAllTime
+            ? 'All time shows lifetime billed and paid for students enrolled in the active term. Select debtors to remind parents about total fees owed (with a per-term summary).'
+            : `Select debtors in the table to send parent fee reminders. Use the header checkbox to select all matching debtors across pages${debtors !== true ? ' (tip: filter Status → Debtors only)' : ''}.`}
         </p>
       ) : null}
 

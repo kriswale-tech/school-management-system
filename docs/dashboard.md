@@ -37,7 +37,7 @@ The page uses `public/images/dashboard-banner.png` full-bleed against the main v
 
 ### Below the banner
 
-- **Needs Attention** — the action queue. Examples: reports ready for release, reopen requests, classes with no class teacher, empty classes, subjects with no teacher, subject groups with no students. Each row deep-links with the query the destination already understands (`/assessments?status=ready_for_you`, `/assessments?inbox=1`, `/classes?tab=classes&attention=unassigned`, `/fees?debtors=true`, and so on).
+- **Needs Attention** — the action queue. Examples: reports ready for release, reopen requests, students with no guardian, classes with no class teacher, empty classes, subjects with no teacher, subject groups with no students. Each row deep-links with the query the destination already understands (`/assessments?status=ready_for_you`, `/assessments?inbox=1`, `/students?missing_guardian=true`, `/classes?tab=classes&attention=unassigned`, `/fees?debtors=true`, and so on).
 - **Academic Progress** — one bar per class, shown with Academic Overview. Slate is ready for the admin, green is released. The percent is those two groups over enrolled students. Pending and needs-correction do not move the bar.
 - **Setup Health** — after Academic Progress, and only while something is under 100%. Class teachers, subject teachers, classes with students, and (when the school has groups) groups with students and students placed in groups. An empty total counts as complete so it does not keep the card open.
 - **Top Debtors** — up to five students. View all opens `/fees?debtors=true`. A row opens that student’s fees.
@@ -140,8 +140,8 @@ Not recorded: logins, page views, and individual score edits. Events from before
 
 ### Reading the feed
 
-- Anyone with `reports.view`: `GET /api/v1/activities/` — newest first, paginated, active term unless `?term=` is set. Scoped by role (admin: all; accountant: fees; staff: non-fees; teacher: assigned classes/subjects). The admin dashboard requests `page_size=10`. Insights → **Activity** uses the same API with the selected reports term.
-- Teachers: the teacher dashboard payload still embeds up to 10 matching rows; the full paginated list is on Insights → Activity.
+- Anyone with `reports.view`: `GET /api/v1/activities/` — newest first, paginated, **across terms by default**. Pass optional `?term=` to narrow to activities tagged with that term. Scoped by role (admin: all; accountant: fees; staff: non-fees; teacher: assigned classes/subjects). The admin/accountant dashboards request `page_size=10`. Insights → **Activity** uses the same time-ordered feed (not the Reports term picker).
+- Teachers: the teacher dashboard embeds up to 10 matching rows (assignment scope from the active term); the full paginated list is on Insights → Activity.
 
 A row stores `href`. Clicking it in the UI follows that link.
 

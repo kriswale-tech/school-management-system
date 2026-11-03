@@ -27,6 +27,26 @@ def build_receipt_public_url(receipt_id) -> str:
     return f'{public_base_url()}/api/v1/public/receipts/{token}/'
 
 
+def _receipt_queryset():
+    return Receipt.objects.select_related(
+        'payment',
+        'payment__student',
+        'payment__student__school',
+        'payment__term',
+        'payment__term__academic_year',
+        'payment__recorded_by',
+        'issued_by',
+    ).prefetch_related('payment__allocations__term__academic_year')
+
+
+def load_receipt_for_school(*, school, receipt_id) -> Receipt | None:
+    return (
+        _receipt_queryset()
+        .filter(id=receipt_id, payment__student__school=school)
+        .first()
+    )
+
+
 def load_receipt_from_token(token: str) -> Receipt:
     try:
         payload = signing.loads(
@@ -43,46 +63,71 @@ def load_receipt_from_token(token: str) -> Receipt:
     if not receipt_id:
         raise ValueError('This receipt link is invalid.')
 
-    receipt = (
-        Receipt.objects.select_related(
-            'payment',
-            'payment__student',
-            'payment__student__school',
-            'payment__term',
-            'payment__term__academic_year',
-            'issued_by',
-        )
-        .filter(id=receipt_id)
-        .first()
-    )
+    receipt = _receipt_queryset().filter(id=receipt_id).first()
     if receipt is None:
         raise ValueError('Receipt not found.')
     return receipt
+
+
+def _user_display_name(user) -> str:
+    if user is None:
+        return ''
+    return (user.get_full_name() or '').strip() or getattr(user, 'phone_number', '') or ''
 
 
 def build_receipt_context(receipt: Receipt) -> dict:
     payment = receipt.payment
     student = payment.student
     school = student.school
-    term = payment.term
     student_name = ' '.join(
         part
         for part in (student.first_name, student.other_names, student.last_name)
         if part
     ).strip()
-    term_label = f'{term.academic_year.academic_year} · {term.get_term_display()}'
+    allocations = sorted(
+        payment.allocations.all(),
+        key=lambda row: (row.term.start_date, row.created_at),
+    )
+    allocation_rows = [
+        {
+            'term_label': (
+                f'{row.term.academic_year.academic_year} · {row.term.get_term_display()}'
+            ),
+            'amount': f'{row.amount:.2f}',
+        }
+        for row in allocations
+    ]
+    if len(allocation_rows) == 1:
+        term_label = allocation_rows[0]['term_label']
+    elif allocation_rows:
+        term_label = 'Multiple terms'
+    else:
+        term = payment.term
+        term_label = f'{term.academic_year.academic_year} · {term.get_term_display()}'
+
+    received_by = _user_display_name(payment.recorded_by) or _user_display_name(
+        receipt.issued_by,
+    )
+    try:
+        school_logo_url = school.logo.url if school.logo else None
+    except (ValueError, AttributeError):
+        school_logo_url = None
     return {
+        'id': receipt.id,
         'school_name': school.name,
+        'school_logo_url': school_logo_url,
         'school_phone': school.phone_number,
         'school_email': school.email or '',
         'school_address': school.address or '',
         'student_name': student_name,
         'student_id': student.student_id,
         'receipt_number': receipt.receipt_number,
-        'amount': payment.amount,
+        'amount': f'{payment.amount:.2f}',
         'payment_method': payment.get_payment_method_display(),
         'payment_reference': payment.payment_reference or '',
         'paid_at': payment.paid_at,
         'issued_at': receipt.issued_at,
+        'received_by': received_by,
         'term_label': term_label,
+        'allocations': allocation_rows,
     }

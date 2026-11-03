@@ -20,6 +20,7 @@ import type { StudentFormStepId, StudentFormValues } from './types'
 type ValidatedStudentForm = z.infer<typeof studentFormSchema>
 
 const toOnboardPayload = (values: ValidatedStudentForm): StudentOnboardPayload => ({
+  ...(values.student_id.trim() ? { student_id: values.student_id.trim() } : {}),
   first_name: values.first_name,
   last_name: values.last_name,
   other_names: values.other_names,
@@ -33,6 +34,7 @@ const toOnboardPayload = (values: ValidatedStudentForm): StudentOnboardPayload =
       return {
         parent_id: guardian.parent_id,
         relationship: guardian.relationship,
+        notify_channel: guardian.notify_channel,
       }
     }
     return {
@@ -40,6 +42,7 @@ const toOnboardPayload = (values: ValidatedStudentForm): StudentOnboardPayload =
       phone_number: guardian.phone_number,
       email: guardian.email,
       relationship: guardian.relationship,
+      notify_channel: guardian.notify_channel,
     }
   }),
 })

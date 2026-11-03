@@ -167,6 +167,10 @@ class SchoolSettings(BaseModel):
     )
     results_alert_enabled = models.BooleanField(default=True)
     enrollments_alert_enabled = models.BooleanField(default=True)
+    guardians_alert_enabled = models.BooleanField(
+        default=True,
+        help_text='Alert admins and staff when enrolled students have no linked guardian.',
+    )
     transition_popup_enabled = models.BooleanField(
         default=True,
         help_text='Show a popup on the dashboard while opening the next term still needs action.',

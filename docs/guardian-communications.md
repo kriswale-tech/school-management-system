@@ -134,7 +134,7 @@ Body: `{ "term_id": "<uuid?>", "student_ids": ["…"] }`. Requires `assessments.
 
 - Token: Django `signing.dumps` (`fees.services.receipts`), max age `RECEIPT_LINK_MAX_AGE_SECONDS` (default 30 days)
 - URL: `{PUBLIC_BASE_URL}/api/v1/public/receipts/<token>/` (no auth)
-- Page: printable HTML (`fees/templates/fees/public/receipt.html`) with Print / save as PDF
+- Page: printable HTML (`fees/templates/fees/public/receipt.html`) with school logo beside name/contact, card border + top accent on screen, Print / save as PDF (print omits border/accent)
 - Env: `PUBLIC_BASE_URL` (default `http://localhost:9000`), see `.env.example`
 
 ### Public report link

@@ -66,7 +66,19 @@ const StudentsTable = ({
                   <div className="flex items-center gap-3">
                     <AvatarComponent fullName={fullName} size={40} />
                     <div className="space-y-1">
-                      <p>{fullName}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p>{fullName}</p>
+                        {student.is_new_student ? (
+                          <span className="inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-800">
+                            New student
+                          </span>
+                        ) : null}
+                        {student.missing_guardian ? (
+                          <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                            Needs guardian
+                          </span>
+                        ) : null}
+                      </div>
                       <p className="text-xs font-normal text-slate-500">{student.student_id}</p>
                     </div>
                   </div>

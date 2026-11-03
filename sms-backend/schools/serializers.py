@@ -38,6 +38,7 @@ class SchoolSettingsSerializer(serializers.ModelSerializer):
             'fees_alert_threshold',
             'results_alert_enabled',
             'enrollments_alert_enabled',
+            'guardians_alert_enabled',
             'transition_popup_enabled',
             'report_show_logo',
             'report_show_address',
