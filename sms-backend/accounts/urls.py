@@ -1,5 +1,9 @@
 from django.urls import path
 
+from accounts.invite_views import (
+    SchoolAdminInviteAcceptView,
+    SchoolAdminInvitePreviewView,
+)
 from accounts.views import (
     AdminSignUpView,
     AdminVerifyOtpView,
@@ -33,6 +37,16 @@ urlpatterns = [
     path('login/resend-otp/', ResendLoginOtpView.as_view(), name='login-resend-otp'),
     path('refresh/', RefreshTokenView.as_view(), name='refresh-token'),
     path('logout/', LogoutView.as_view(), name='logout'),
+    path(
+        'invites/<str:token>/',
+        SchoolAdminInvitePreviewView.as_view(),
+        name='school-admin-invite-preview',
+    ),
+    path(
+        'invites/<str:token>/accept/',
+        SchoolAdminInviteAcceptView.as_view(),
+        name='school-admin-invite-accept',
+    ),
     path('users/', UserListCreateView.as_view(), name='user-list'),
     path('users/<uuid:pk>/', UserDetailView.as_view(), name='user-detail'),
     # Staff directory (separate from /users/ so existing user-management stays unchanged)

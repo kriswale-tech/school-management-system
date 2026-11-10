@@ -50,6 +50,12 @@ School-Management-System/
 | `notifications` | Staff in-app inbox (Tier‑1 + Celery email) and guardian outbound log (`GuardianDelivery`) via `services/guardians.py` |
 | `reports` | School-wide and teacher-scoped analytics |
 | `shared` | `BaseModel`, helpers, shared exceptions/services |
+| `platform_admin` | Platform (SCHOOLASST staff) auth realm — email/password + MFA, roles, settings, audit, school invites. Serves `/api/v1/platform/...` |
+| `billing` | SaaS billing: plans, school subscriptions, periods, invoices, payments, top-ups, promotions, capacity gates, dunning. **`billing.Payment` ≠ `fees.Payment`** |
+| `communications` | School SMS/email credit wallets (`CreditAccount` + append-only `CreditLedgerEntry`), add-on SKUs, segment calculator, send gates |
+| `messaging` | School-facing messaging surface: overview, guardian delivery history, message templates |
+
+> The platform side has its own separate app (`platform-admin/`, React/Vite) and its own auth realm. For the full design — plans, capacity, proration, credit ledger discipline, and provider economics — see [platform-admin-billing-architecture-v4.md](./platform-admin-billing-architecture-v4.md).
 
 ## Frontend feature modules
 

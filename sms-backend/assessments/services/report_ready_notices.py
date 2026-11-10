@@ -226,7 +226,12 @@ def send_report_ready_notices(*, school, stream_id, term_id, student_ids) -> dic
 
 
 def maybe_auto_notify_report_ready(*, report: Report) -> None:
-    """If settings say auto + enabled, enqueue notify after a report PDF is generated."""
+    """If settings say auto + enabled, enqueue notify after a report PDF is generated.
+
+    Idempotency is scoped to ``report.id`` + ``generation_id`` so parents get one
+    auto notice per PDF generation. Regenerating (new generation_id) allows another
+    auto send; skipping an existing file does not bump generation_id.
+    """
     preferences = get_school_settings(report.school)
     if preferences.report_parent_notify_mode != SchoolSettings.ReportParentNotifyMode.AUTO:
         return
@@ -234,8 +239,9 @@ def maybe_auto_notify_report_ready(*, report: Report) -> None:
         return
     if not _report_file_exists(report):
         return
+    generation = report.generation_id or report.generated_at or 'none'
     guardian_services.notify_guardians_report_ready(
         student=report.student,
         report=report,
-        batch_id=f'auto-{report.id}',
+        batch_id=f'auto-{report.id}-{generation}',
     )

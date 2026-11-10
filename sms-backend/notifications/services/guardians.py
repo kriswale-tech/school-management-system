@@ -11,11 +11,9 @@ import logging
 from dataclasses import dataclass
 from decimal import Decimal
 
-from django.conf import settings
-from django.template.loader import render_to_string
-
 from notifications.models import GuardianDelivery
 from notifications.services.email_context import default_app_logo_url
+from notifications.services.message_templates import compose_email, compose_sms
 from notifications.services.outbound import (
     enqueue_guardian_outbound,
     record_delivery_result,
@@ -135,13 +133,14 @@ def _email_item(
     parent,
     student,
     event_type,
-    subject,
     context,
-    template_base,
     idempotency_key,
 ) -> dict:
-    text_body = render_to_string(f'{template_base}.txt', context)
-    html_body = render_to_string(f'{template_base}.html', context)
+    subject, text_body, html_body = compose_email(
+        school=school,
+        event_type=event_type,
+        context=context,
+    )
     return {
         'school_id': str(school.id),
         'parent_id': str(parent.id),
@@ -172,19 +171,6 @@ def _record_skip(*, school, parent, student, event_type, scope_id) -> None:
             channel='none',
         ),
         skip_reason='No matching channel or contact details',
-    )
-
-
-def _sms_prefix(*, school_name: str) -> str:
-    sender = getattr(settings, 'ARKESEL_SMS_SENDER', None) or 'SCHOOLASST'
-    return f'{sender} [{school_name}]'
-
-
-def _ward_enrolled_sms_body(*, school_name: str, student_name: str, class_name: str) -> str:
-    return (
-        f'{_sms_prefix(school_name=school_name)}: {student_name} has been enrolled'
-        f'{f" ({class_name})" if class_name else ""}. '
-        f'You are listed as a guardian.'
     )
 
 
@@ -228,10 +214,14 @@ def notify_guardians_ward_enrolled(*, student: Student, class_name: str = '') ->
                     parent=parent,
                     student=student,
                     event_type=GuardianDelivery.EventType.WARD_ENROLLED,
-                    body=_ward_enrolled_sms_body(
-                        school_name=school_name,
-                        student_name=student_name,
-                        class_name=class_name,
+                    body=compose_sms(
+                        school=school,
+                        event_type=GuardianDelivery.EventType.WARD_ENROLLED,
+                        context={
+                            'school_name': school_name,
+                            'student_name': student_name,
+                            'class_part': f' ({class_name})' if class_name else '',
+                        },
                     ),
                     idempotency_key=_idempotency_key(
                         event_type=GuardianDelivery.EventType.WARD_ENROLLED,
@@ -250,16 +240,15 @@ def notify_guardians_ward_enrolled(*, student: Student, class_name: str = '') ->
                     parent=parent,
                     student=student,
                     event_type=GuardianDelivery.EventType.WARD_ENROLLED,
-                    subject=f'{student_name} enrolled at {school_name}',
                     context={
                         'greeting': f'Hi {greeting_name},' if greeting_name else '',
                         'school_name': school_name,
                         'student_name': student_name,
                         'class_name': class_name,
+                        'class_part': f' ({class_name})' if class_name else '',
                         'app_logo_url': default_app_logo_url(),
                         'preheader': f'{student_name} has been enrolled at {school_name}',
                     },
-                    template_base='notifications/email/guardian_ward_enrolled',
                     idempotency_key=_idempotency_key(
                         event_type=GuardianDelivery.EventType.WARD_ENROLLED,
                         scope_id=student.id,
@@ -288,20 +277,6 @@ def schedule_ward_enrolled_notice(*, student_id, class_name: str = '') -> None:
     from django.db import transaction
 
     transaction.on_commit(_run)
-
-
-def _payment_receipt_sms_body(
-    *,
-    school_name: str,
-    student_name: str,
-    amount,
-    receipt_number: str,
-    receipt_url: str,
-) -> str:
-    return (
-        f'{_sms_prefix(school_name=school_name)}: Payment of GHS {amount} received for '
-        f'{student_name}. Receipt {receipt_number}: {receipt_url}'
-    )
 
 
 def notify_guardians_payment_receipt(
@@ -354,12 +329,16 @@ def notify_guardians_payment_receipt(
                     parent=parent,
                     student=student,
                     event_type=GuardianDelivery.EventType.PAYMENT_RECEIPT,
-                    body=_payment_receipt_sms_body(
-                        school_name=school_name,
-                        student_name=student_name,
-                        amount=amount,
-                        receipt_number=receipt_number,
-                        receipt_url=receipt_url,
+                    body=compose_sms(
+                        school=school,
+                        event_type=GuardianDelivery.EventType.PAYMENT_RECEIPT,
+                        context={
+                            'school_name': school_name,
+                            'student_name': student_name,
+                            'amount': amount,
+                            'receipt_number': receipt_number,
+                            'receipt_url': receipt_url,
+                        },
                     ),
                     idempotency_key=_idempotency_key(
                         event_type=GuardianDelivery.EventType.PAYMENT_RECEIPT,
@@ -378,7 +357,6 @@ def notify_guardians_payment_receipt(
                     parent=parent,
                     student=student,
                     event_type=GuardianDelivery.EventType.PAYMENT_RECEIPT,
-                    subject=f'Receipt {receipt_number} — {student_name}',
                     context={
                         'greeting': f'Hi {greeting_name},' if greeting_name else '',
                         'school_name': school_name,
@@ -389,7 +367,6 @@ def notify_guardians_payment_receipt(
                         'app_logo_url': default_app_logo_url(),
                         'preheader': f'Payment of GHS {amount} received for {student_name}',
                     },
-                    template_base='notifications/email/guardian_payment_receipt',
                     idempotency_key=_idempotency_key(
                         event_type=GuardianDelivery.EventType.PAYMENT_RECEIPT,
                         scope_id=payment_id,
@@ -431,35 +408,6 @@ def schedule_payment_receipt_notice(
     from django.db import transaction
 
     transaction.on_commit(_run)
-
-
-def _debt_reminder_sms_body(
-    *,
-    student_name: str,
-    school_name: str,
-    balance,
-    term_label: str,
-) -> str:
-    return (
-        f'{_sms_prefix(school_name=school_name)}: Reminder — {student_name} has an '
-        f'outstanding balance of GHS {balance} for {term_label}. '
-        f'Please contact the school to pay.'
-    )
-
-
-def _debt_reminder_all_time_sms_body(
-    *,
-    student_name: str,
-    school_name: str,
-    balance,
-    terms_summary: str,
-) -> str:
-    summary = terms_summary or 'multiple terms'
-    return (
-        f'{_sms_prefix(school_name=school_name)}: Reminder — {student_name} owes '
-        f'GHS {balance} across terms ({summary}). '
-        f'Please contact the school to pay.'
-    )
 
 
 def plan_guardians_debt_reminder(
@@ -513,28 +461,24 @@ def plan_guardians_debt_reminder(
             continue
 
         if CHANNEL_SMS in channels:
-            body = (
-                _debt_reminder_all_time_sms_body(
-                    student_name=student_name,
-                    school_name=school_name,
-                    balance=amount_display,
-                    terms_summary=terms_summary,
-                )
-                if all_time
-                else _debt_reminder_sms_body(
-                    student_name=student_name,
-                    school_name=school_name,
-                    balance=amount_display,
-                    term_label=term_label,
-                )
-            )
             sms_items.append(
                 _sms_item(
                     school=school,
                     parent=parent,
                     student=student,
                     event_type=GuardianDelivery.EventType.DEBT_REMINDER,
-                    body=body,
+                    body=compose_sms(
+                        school=school,
+                        event_type=GuardianDelivery.EventType.DEBT_REMINDER,
+                        all_time=all_time,
+                        context={
+                            'school_name': school_name,
+                            'student_name': student_name,
+                            'balance': amount_display,
+                            'term_label': term_label,
+                            'terms_summary': terms_summary or 'multiple terms',
+                        },
+                    ),
                     idempotency_key=_idempotency_key(
                         event_type=GuardianDelivery.EventType.DEBT_REMINDER,
                         scope_id=scope,
@@ -557,7 +501,6 @@ def plan_guardians_debt_reminder(
                     parent=parent,
                     student=student,
                     event_type=GuardianDelivery.EventType.DEBT_REMINDER,
-                    subject=f'Fee reminder for {student_name}',
                     context={
                         'greeting': f'Hi {greeting_name},' if greeting_name else '',
                         'school_name': school_name,
@@ -566,10 +509,10 @@ def plan_guardians_debt_reminder(
                         'term_label': term_label,
                         'all_time': all_time,
                         'terms_owed': terms_owed,
+                        'terms_summary': terms_summary or 'multiple terms',
                         'app_logo_url': default_app_logo_url(),
                         'preheader': preheader,
                     },
-                    template_base='notifications/email/guardian_debt_reminder',
                     idempotency_key=_idempotency_key(
                         event_type=GuardianDelivery.EventType.DEBT_REMINDER,
                         scope_id=scope,
@@ -603,19 +546,6 @@ def notify_guardians_debt_reminder(
         terms_summary=terms_summary,
     )
     return enqueue_guardian_outbound(sms_items=sms_items, email_items=email_items)
-
-
-def _report_ready_sms_body(
-    *,
-    student_name: str,
-    school_name: str,
-    term_label: str,
-    report_url: str,
-) -> str:
-    return (
-        f'{_sms_prefix(school_name=school_name)}: {student_name}\'s report for '
-        f'{term_label} is ready. Download: {report_url}'
-    )
 
 
 def plan_guardians_report_ready(
@@ -669,11 +599,15 @@ def plan_guardians_report_ready(
                     parent=parent,
                     student=student,
                     event_type=GuardianDelivery.EventType.REPORT_READY,
-                    body=_report_ready_sms_body(
-                        student_name=student_name,
-                        school_name=school_name,
-                        term_label=term_label,
-                        report_url=report_url,
+                    body=compose_sms(
+                        school=school,
+                        event_type=GuardianDelivery.EventType.REPORT_READY,
+                        context={
+                            'school_name': school_name,
+                            'student_name': student_name,
+                            'term_label': term_label,
+                            'report_url': report_url,
+                        },
                     ),
                     idempotency_key=_idempotency_key(
                         event_type=GuardianDelivery.EventType.REPORT_READY,
@@ -692,7 +626,6 @@ def plan_guardians_report_ready(
                     parent=parent,
                     student=student,
                     event_type=GuardianDelivery.EventType.REPORT_READY,
-                    subject=f'{student_name}\'s report is ready',
                     context={
                         'greeting': f'Hi {greeting_name},' if greeting_name else '',
                         'school_name': school_name,
@@ -702,7 +635,6 @@ def plan_guardians_report_ready(
                         'app_logo_url': default_app_logo_url(),
                         'preheader': f'{student_name}\'s report is ready',
                     },
-                    template_base='notifications/email/guardian_report_ready',
                     idempotency_key=_idempotency_key(
                         event_type=GuardianDelivery.EventType.REPORT_READY,
                         scope_id=scope,
@@ -728,20 +660,6 @@ def notify_guardians_report_ready(
         batch_id=batch_id,
     )
     return enqueue_guardian_outbound(sms_items=sms_items, email_items=email_items)
-
-
-def _next_term_fees_sms_body(
-    *,
-    student_name: str,
-    school_name: str,
-    term_label: str,
-    total_display: str,
-    schedule_url: str,
-) -> str:
-    return (
-        f'{_sms_prefix(school_name=school_name)}: Fees for {student_name} '
-        f'({term_label}) total GHS {total_display}. Details: {schedule_url}'
-    )
 
 
 def plan_guardians_next_term_fees(
@@ -815,12 +733,16 @@ def plan_guardians_next_term_fees(
                     parent=parent,
                     student=student,
                     event_type=GuardianDelivery.EventType.NEXT_TERM_FEES,
-                    body=_next_term_fees_sms_body(
-                        student_name=student_name,
-                        school_name=school_name,
-                        term_label=term_label,
-                        total_display=total_display,
-                        schedule_url=schedule_url,
+                    body=compose_sms(
+                        school=school,
+                        event_type=GuardianDelivery.EventType.NEXT_TERM_FEES,
+                        context={
+                            'school_name': school_name,
+                            'student_name': student_name,
+                            'term_label': term_label,
+                            'total_display': total_display,
+                            'schedule_url': schedule_url,
+                        },
                     ),
                     idempotency_key=_idempotency_key(
                         event_type=GuardianDelivery.EventType.NEXT_TERM_FEES,
@@ -839,13 +761,13 @@ def plan_guardians_next_term_fees(
                     parent=parent,
                     student=student,
                     event_type=GuardianDelivery.EventType.NEXT_TERM_FEES,
-                    subject=f'Fee schedule for {student_name} — {term_label}',
                     context={
                         'greeting': f'Hi {greeting_name},' if greeting_name else '',
                         'school_name': school_name,
                         'student_name': student_name,
                         'term_label': term_label,
                         'total': total_display,
+                        'total_display': total_display,
                         'items': item_rows,
                         'schedule_url': schedule_url,
                         'app_logo_url': default_app_logo_url(),
@@ -853,7 +775,6 @@ def plan_guardians_next_term_fees(
                             f'Fees for {student_name} total GHS {total_display}'
                         ),
                     },
-                    template_base='notifications/email/guardian_next_term_fees',
                     idempotency_key=_idempotency_key(
                         event_type=GuardianDelivery.EventType.NEXT_TERM_FEES,
                         scope_id=scope,

@@ -12,10 +12,18 @@ class HasActiveSchool(BasePermission):
     message = NO_ACTIVE_SCHOOL_MESSAGE
 
     def has_permission(self, request, view):
-        return (
-            request.user.is_authenticated
-            and getattr(request, 'membership', None) is not None
-        )
+        if not request.user.is_authenticated:
+            return False
+        membership = getattr(request, 'membership', None)
+        if membership is None:
+            return False
+        school = getattr(membership, 'school', None)
+        if school is not None and not getattr(school, 'is_accessible', True):
+            self.message = (
+                'This school is suspended or archived and cannot be used right now.'
+            )
+            return False
+        return True
 
 
 class HasCapability(BasePermission):

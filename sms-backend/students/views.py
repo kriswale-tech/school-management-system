@@ -390,11 +390,17 @@ class StudentAssessmentReportGenerateView(SchoolScopedAPIView):
         responses={200: StoredStudentReportSerializer},
     )
     def post(self, request, student_id):
+        force = str(request.query_params.get('force') or '').lower() in {
+            '1',
+            'true',
+            'yes',
+        }
         payload = generate_student_profile_report(
             school=self.school,
             membership=self.membership,
             student_id=student_id,
             term_id=request.query_params.get('term') or None,
+            force=force,
         )
         return Response(StoredStudentReportSerializer(payload).data)
 

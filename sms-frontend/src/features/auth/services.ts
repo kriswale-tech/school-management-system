@@ -8,9 +8,49 @@ import type {
   VerifyOTPData,
 } from './types'
 
+export type PublicConfig = {
+  public_school_registration_enabled: boolean
+}
+
+export type SchoolAdminInvitePreview = {
+  school_name: string
+  phone_number: string
+  email: string
+  first_name: string
+  last_name: string
+  status: string
+  expires_at: string
+  school_status: string
+}
+
+export type SchoolAdminInviteAcceptResult = {
+  message: string
+  school_id: string
+  school_name: string
+  phone_number: string
+  created_user: boolean
+}
+
+export const getPublicConfig = async () => {
+  const response = await api.get<PublicConfig>('/platform/public-config/')
+  return response.data
+}
+
 // signup endpoing
 export const signup = async (data: SignupData) => {
   const response = await api.post<{ message: string }>('/accounts/signup/', data)
+  return response.data
+}
+
+export const getSchoolAdminInvite = async (token: string) => {
+  const response = await api.get<SchoolAdminInvitePreview>(`/accounts/invites/${token}/`)
+  return response.data
+}
+
+export const acceptSchoolAdminInvite = async (token: string) => {
+  const response = await api.post<SchoolAdminInviteAcceptResult>(
+    `/accounts/invites/${token}/accept/`,
+  )
   return response.data
 }
 

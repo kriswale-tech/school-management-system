@@ -29,6 +29,8 @@ from assessments.views import (
     AdminAssessmentOverviewView,
     AdminAssessmentReleaseView,
     AdminCorrectionReviewView,
+    AdminBulkReportGenerateJobView,
+    AdminBulkReportGenerateView,
     AdminReportReadyPreviewView,
     AdminReportReadySendView,
     AdminStudentCorrectionView,
@@ -168,6 +170,16 @@ urlpatterns = [
         'assessments/admin/classes/<uuid:stream_id>/report-ready/send/',
         AdminReportReadySendView.as_view(),
         name='academics-assessments-admin-report-ready-send',
+    ),
+    path(
+        'assessments/admin/classes/<uuid:stream_id>/reports/generate/',
+        AdminBulkReportGenerateView.as_view(),
+        name='academics-assessments-admin-reports-generate',
+    ),
+    path(
+        'assessments/admin/classes/<uuid:stream_id>/reports/generate/<uuid:job_id>/',
+        AdminBulkReportGenerateJobView.as_view(),
+        name='academics-assessments-admin-reports-generate-job',
     ),
     path(
         'assessments/admin/classes/<uuid:stream_id>/students/<uuid:student_id>/report/',

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
@@ -145,31 +147,14 @@ def get_stored_student_report(*, school, stream_id, student_id, term_id=None) ->
         raise NotFound('Report has not been generated yet.')
     return serialize_stored_report(report)
 
-@transaction.atomic
-def generate_student_report(
-    *,
-    school,
-    membership,
-    stream_id,
-    student_id,
-    term_id=None,
-) -> dict:
-    payload = get_student_report_preview(
-        school=school,
-        stream_id=stream_id,
-        student_id=student_id,
-        term_id=term_id,
-    )
-    term = Term.objects.select_related('academic_year').get(id=payload['term_id'])
-    pdf_bytes = render_report_pdf(payload)
-
+def _load_report_for_generate(*, school, student_id, stream_id, term_id) -> Report:
     report, _created = Report.objects.select_for_update().get_or_create(
         school=school,
         student_id=student_id,
         stream_id=stream_id,
-        term_id=term.id,
+        term_id=term_id,
     )
-    report = (
+    return (
         Report.objects.select_related(
             'school',
             'student',
@@ -179,6 +164,41 @@ def generate_student_report(
             'term__academic_year',
         ).get(pk=report.pk)
     )
+
+
+@transaction.atomic
+def generate_student_report(
+    *,
+    school,
+    membership,
+    stream_id,
+    student_id,
+    term_id=None,
+    force: bool = False,
+) -> dict:
+    """Create or replace a student report PDF.
+
+    When ``force`` is False and an R2 object already exists, returns the stored
+    report without rewriting the file or bumping ``generation_id`` (no re-notify).
+    """
+    payload = get_student_report_preview(
+        school=school,
+        stream_id=stream_id,
+        student_id=student_id,
+        term_id=term_id,
+    )
+    term = Term.objects.select_related('academic_year').get(id=payload['term_id'])
+    report = _load_report_for_generate(
+        school=school,
+        student_id=student_id,
+        stream_id=stream_id,
+        term_id=term.id,
+    )
+
+    if not force and _report_file_exists(report):
+        return serialize_stored_report(report)
+
+    pdf_bytes = render_report_pdf(payload)
 
     filename = student_report_filename(
         first_name=report.student.first_name,
@@ -191,6 +211,7 @@ def generate_student_report(
             report.file.name = ''
     report.file.save(filename, ContentFile(pdf_bytes), save=False)
     report.generated_at = timezone.now()
+    report.generation_id = uuid.uuid4()
     report.generated_by = getattr(membership, 'user', None)
     report.save()
 
@@ -245,7 +266,14 @@ def get_student_profile_report(*, school, student_id, term_id=None) -> dict:
     )
 
 
-def generate_student_profile_report(*, school, membership, student_id, term_id=None) -> dict:
+def generate_student_profile_report(
+    *,
+    school,
+    membership,
+    student_id,
+    term_id=None,
+    force: bool = False,
+) -> dict:
     student, stream, term = resolve_student_report_target(
         school=school,
         student_id=student_id,
@@ -257,4 +285,5 @@ def generate_student_profile_report(*, school, membership, student_id, term_id=N
         stream_id=stream.id,
         student_id=student.id,
         term_id=term.id,
+        force=force,
     )

@@ -36,6 +36,7 @@ import type {
   ClassTeacherAssessmentDetail,
   ClassTeacherAssessmentOverview,
   CorrectionRequest,
+  ReportGenerateJob,
   ReportReadyPreview,
   ReportReadySendResult,
   SaveMarksPayload,
@@ -399,11 +400,40 @@ export const generateStudentReport = async (
   streamId: string,
   studentId: string,
   termId?: string,
+  options?: { force?: boolean },
 ): Promise<StoredStudentReport> => {
   const response = await api.post<StoredStudentReport>(
     `/academics/assessments/admin/classes/${streamId}/students/${studentId}/report/generate/`,
     {},
+    {
+      params: {
+        ...(termId ? { term_id: termId } : {}),
+        ...(options?.force ? { force: true } : {}),
+      },
+    },
+  )
+  return response.data
+}
+
+export const queueBulkReportGenerate = async (
+  streamId: string,
+  payload: { student_ids: string[]; term_id?: string; force?: boolean },
+  termId?: string,
+): Promise<ReportGenerateJob> => {
+  const response = await api.post<ReportGenerateJob>(
+    `/academics/assessments/admin/classes/${streamId}/reports/generate/`,
+    payload,
     { params: termId ? { term_id: termId } : undefined },
+  )
+  return response.data
+}
+
+export const getBulkReportGenerateJob = async (
+  streamId: string,
+  jobId: string,
+): Promise<ReportGenerateJob> => {
+  const response = await api.get<ReportGenerateJob>(
+    `/academics/assessments/admin/classes/${streamId}/reports/generate/${jobId}/`,
   )
   return response.data
 }

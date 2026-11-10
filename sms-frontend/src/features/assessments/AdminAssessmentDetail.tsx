@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
@@ -11,12 +11,15 @@ import { useCan } from '@/features/auth/hooks'
 import {
   adminCorrectStudent,
   getAdminAssessmentDetail,
+  getBulkReportGenerateJob,
+  queueBulkReportGenerate,
   releaseAdminAssessmentStudents,
   reviewAdminCorrection,
 } from '@/features/classes/services'
 import type {
   AdminAssessmentDetailStudent,
   AdminAssessmentStudentStatus,
+  ReportGenerateJob,
 } from '@/features/classes/assessment/types'
 import { getApiErrorMessage, mergeClasses } from '@/utils'
 import BulkReleaseModal from './components/BulkReleaseModal'
@@ -76,13 +79,39 @@ const AdminAssessmentDetail = () => {
   const [bulkOpen, setBulkOpen] = useState(false)
   const [correctionOpen, setCorrectionOpen] = useState(false)
   const [notifyOpen, setNotifyOpen] = useState(false)
-  const [notifyIds, setNotifyIds] = useState<Set<string>>(() => new Set())
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [generateJobId, setGenerateJobId] = useState<string | null>(null)
+  const toastedJobId = useRef<string | null>(null)
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: DETAIL_QUERY_KEY(streamId ?? '', termId ?? ''),
     queryFn: () => getAdminAssessmentDetail(streamId!, termId),
     enabled: Boolean(streamId),
   })
+
+  const { data: generateJob } = useQuery({
+    queryKey: ['assessments', 'admin', 'report-generate-job', streamId, generateJobId],
+    queryFn: () => getBulkReportGenerateJob(streamId!, generateJobId!),
+    enabled: Boolean(streamId && generateJobId),
+    refetchInterval: (query) => {
+      const job = query.state.data as ReportGenerateJob | undefined
+      if (!job || job.done) return false
+      return 3000
+    },
+  })
+
+  useEffect(() => {
+    if (!generateJob?.done || !generateJobId) return
+    if (toastedJobId.current === generateJobId) return
+    toastedJobId.current = generateJobId
+    toast.success(
+      `Reports finished: ${generateJob.generated} generated, ${generateJob.skipped} already had a file, ${generateJob.failed} failed.`,
+    )
+    queryClient.invalidateQueries({
+      queryKey: DETAIL_QUERY_KEY(streamId ?? '', termId ?? ''),
+    })
+    setGenerateJobId(null)
+  }, [generateJob, generateJobId, queryClient, streamId, termId])
 
   const filteredStudents = useMemo(() => {
     const students = data?.students ?? []
@@ -164,19 +193,39 @@ const AdminAssessmentDetail = () => {
     data?.students.filter((student) => student.status === 'ready_for_you').map((student) => student.id) ??
     []
 
-  const canNotifyParents = canRelease
+  const canManageReports = canRelease
+  const isReleased = (student: AdminAssessmentDetailStudent) => student.status === 'released'
   const isNotifyEligible = (student: AdminAssessmentDetailStudent) =>
-    student.status === 'released' && Boolean(student.has_report)
+    isReleased(student) && Boolean(student.has_report)
+  const needsReport = (student: AdminAssessmentDetailStudent) =>
+    isReleased(student) && !student.has_report
 
-  const notifySelectableIds = (data?.students ?? [])
-    .filter((student) => student.status === 'released' && Boolean(student.has_report))
-    .map((student) => student.id)
+  const releasedIds = useMemo(
+    () => (data?.students ?? []).filter(isReleased).map((student) => student.id),
+    [data?.students],
+  )
 
-  const notifySelectedCount = notifyIds.size
-  const notifySelectedList = useMemo(() => Array.from(notifyIds), [notifyIds])
+  const selectedCount = selectedIds.size
+  const selectedList = useMemo(() => Array.from(selectedIds), [selectedIds])
+  const selectedForGenerate = useMemo(
+    () =>
+      selectedList.filter((id) => {
+        const student = data?.students.find((row) => row.id === id)
+        return student ? needsReport(student) : false
+      }),
+    [selectedList, data?.students],
+  )
+  const selectedForNotify = useMemo(
+    () =>
+      selectedList.filter((id) => {
+        const student = data?.students.find((row) => row.id === id)
+        return student ? isNotifyEligible(student) : false
+      }),
+    [selectedList, data?.students],
+  )
 
-  const toggleNotifyRow = (studentId: string) => {
-    setNotifyIds((prev) => {
+  const toggleSelectedRow = (studentId: string) => {
+    setSelectedIds((prev) => {
       const next = new Set(prev)
       if (next.has(studentId)) next.delete(studentId)
       else next.add(studentId)
@@ -184,7 +233,31 @@ const AdminAssessmentDetail = () => {
     })
   }
 
-  const clearNotifySelection = () => setNotifyIds(new Set())
+  const clearSelection = () => setSelectedIds(new Set())
+
+  const selectAllReleased = () => setSelectedIds(new Set(releasedIds))
+
+  const { mutate: startBulkGenerate, isPending: isQueueingGenerate } = useMutation({
+    mutationFn: (studentIds: string[]) =>
+      queueBulkReportGenerate(
+        streamId!,
+        {
+          student_ids: studentIds,
+          term_id: termId,
+          force: false,
+        },
+        termId,
+      ),
+    onSuccess: (job) => {
+      toast.success(
+        `Generating reports in the background (${job.total} student${job.total === 1 ? '' : 's'}).`,
+      )
+      setGenerateJobId(job.id)
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Unable to start report generation')),
+  })
+
+  const generateJobRunning = Boolean(generateJobId) && !generateJob?.done
 
   const pillTabs: Array<{ key: StatusFilter; label: string; count: number }> = [
     { key: 'all', label: 'All', count: data?.students_count ?? 0 },
@@ -201,7 +274,7 @@ const AdminAssessmentDetail = () => {
   const canReleaseSelected = selectedStudent?.status === 'ready_for_you' && canRelease
   const canGenerateReport = selectedStudent?.status === 'released'
   const canNotifySelected =
-    Boolean(canNotifyParents && selectedStudent && isNotifyEligible(selectedStudent))
+    Boolean(canManageReports && selectedStudent && isNotifyEligible(selectedStudent))
   const canCorrectSelected =
     canRelease &&
     selectedStudent &&
@@ -224,37 +297,25 @@ const AdminAssessmentDetail = () => {
           {getApiErrorMessage(error, 'Unable to load assessment details.')}
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12 min-h-[70vh]">
-          <aside className="xl:col-span-4 bg-white p-4 custom-shadow-md flex flex-col gap-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <h2 className="text-lg font-medium text-slate-900">{data.display_name}</h2>
-                <p className="text-sm text-slate-500 mt-0.5">
-                  {data.class_teacher_name ?? 'No class teacher'}
+        <div className="space-y-4">
+          <div className="bg-white p-4 custom-shadow-md space-y-4">
+            <div className="min-w-0">
+              <h2 className="text-lg font-medium text-slate-900">{data.display_name}</h2>
+              <p className="text-sm text-slate-500 mt-0.5">
+                {data.class_teacher_name ?? 'No class teacher'}
+                <span className="mx-1.5 text-slate-300">·</span>
+                {data.term_label}
+              </p>
+              {data.with_class_teacher_count > 0 ? (
+                <p className="text-xs text-slate-400 mt-1">
+                  {data.with_class_teacher_count} still with the class teacher — not shown
                 </p>
-                <p className="text-sm text-slate-500 mt-0.5">{data.term_label}</p>
-                {data.with_class_teacher_count > 0 ? (
-                  <p className="text-xs text-slate-400 mt-1">
-                    {data.with_class_teacher_count} still with the class teacher — not shown
-                  </p>
-                ) : null}
-                {(data.pending_reopen_requests_count ?? 0) > 0 ? (
-                  <p className="text-xs text-orange-700 mt-1">
-                    {data.pending_reopen_requests_count} reopen request
-                    {data.pending_reopen_requests_count === 1 ? '' : 's'} awaiting review
-                  </p>
-                ) : null}
-              </div>
-              {canRelease ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="max-w-fit shrink-0 py-2 text-sm"
-                  disabled={readyIds.length === 0}
-                  onClick={() => setBulkOpen(true)}
-                >
-                  Release all ready
-                </Button>
+              ) : null}
+              {(data.pending_reopen_requests_count ?? 0) > 0 ? (
+                <p className="text-xs text-orange-700 mt-1">
+                  {data.pending_reopen_requests_count} reopen request
+                  {data.pending_reopen_requests_count === 1 ? '' : 's'} awaiting review
+                </p>
               ) : null}
             </div>
 
@@ -280,34 +341,88 @@ const AdminAssessmentDetail = () => {
                 )
               })}
             </div>
+          </div>
 
-            {canNotifyParents && notifySelectedCount > 0 ? (
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-12 min-h-[70vh]">
+          <aside className="xl:col-span-4 bg-white p-4 custom-shadow-md flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              {canManageReports && releasedIds.length > 0 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="max-w-fit py-1.5 text-sm"
+                  onClick={selectAllReleased}
+                >
+                  Select all released ({releasedIds.length})
+                </Button>
+              ) : (
+                <span className="text-xs text-slate-500">Student list</span>
+              )}
+              {canRelease && readyIds.length > 0 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="max-w-fit py-1.5 text-sm"
+                  onClick={() => setBulkOpen(true)}
+                >
+                  Release all ready ({readyIds.length})
+                </Button>
+              ) : null}
+            </div>
+
+            {canManageReports && generateJobRunning ? (
+              <div className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+                Generating reports…
+                {generateJob ? (
+                  <span className="ml-1">
+                    {generateJob.generated + generateJob.skipped + generateJob.failed}/
+                    {generateJob.total}
+                    {generateJob.failed > 0 ? ` (${generateJob.failed} failed so far)` : ''}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+
+            {canManageReports && selectedCount > 0 ? (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
                 <p className="text-sm text-slate-700">
-                  <span className="font-medium text-slate-900">{notifySelectedCount}</span> selected
+                  <span className="font-medium text-slate-900">{selectedCount}</span> selected
                   <button
                     type="button"
                     className="ml-2 text-sm text-sky-700 hover:underline"
-                    onClick={clearNotifySelection}
+                    onClick={clearSelection}
                   >
                     Clear
                   </button>
                 </p>
-                <Button
-                  type="button"
-                  className="max-w-fit py-1.5 text-sm"
-                  onClick={() => setNotifyOpen(true)}
-                >
-                  <Icon icon="hugeicons:mail-01" className="size-4" />
-                  Notify parents
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="max-w-fit py-1.5 text-sm"
+                    loading={isQueueingGenerate}
+                    loadingText="Queuing…"
+                    disabled={
+                      selectedForGenerate.length === 0 || generateJobRunning || isQueueingGenerate
+                    }
+                    onClick={() => startBulkGenerate(selectedForGenerate)}
+                  >
+                    <Icon icon="hugeicons:file-02" className="size-4" />
+                    Generate reports
+                    {selectedForGenerate.length > 0 ? ` (${selectedForGenerate.length})` : ''}
+                  </Button>
+                  <Button
+                    type="button"
+                    className="max-w-fit py-1.5 text-sm"
+                    disabled={selectedForNotify.length === 0}
+                    onClick={() => setNotifyOpen(true)}
+                  >
+                    <Icon icon="hugeicons:mail-01" className="size-4" />
+                    Send to guardians
+                    {selectedForNotify.length > 0 ? ` (${selectedForNotify.length})` : ''}
+                  </Button>
+                </div>
               </div>
-            ) : null}
-
-            {canNotifyParents && notifySelectedCount === 0 && notifySelectableIds.length > 0 ? (
-              <p className="text-xs text-slate-500">
-                Select released students with a generated report to notify parents.
-              </p>
             ) : null}
 
             <ul className="space-y-2 overflow-y-auto">
@@ -318,7 +433,7 @@ const AdminAssessmentDetail = () => {
               ) : (
                 filteredStudents.map((student) => {
                   const selected = student.id === resolvedStudentId
-                  const notifyEligible = isNotifyEligible(student)
+                  const released = isReleased(student)
                   return (
                     <li key={student.id}>
                       <div
@@ -329,16 +444,16 @@ const AdminAssessmentDetail = () => {
                             : 'border-slate-200 bg-white hover:border-slate-300',
                         )}
                       >
-                        {canNotifyParents && notifyEligible ? (
+                        {canManageReports && released ? (
                           <input
                             type="checkbox"
                             className="mt-1 size-4 shrink-0 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
-                            checked={notifyIds.has(student.id)}
-                            onChange={() => toggleNotifyRow(student.id)}
+                            checked={selectedIds.has(student.id)}
+                            onChange={() => toggleSelectedRow(student.id)}
                             onClick={(event) => event.stopPropagation()}
-                            aria-label={`Select ${student.full_name} for parent notice`}
+                            aria-label={`Select ${student.full_name}`}
                           />
-                        ) : canNotifyParents ? (
+                        ) : canManageReports ? (
                           <span className="mt-1 size-4 shrink-0" aria-hidden />
                         ) : null}
                         <button
@@ -358,8 +473,8 @@ const AdminAssessmentDetail = () => {
                                 {statusLabel(student.status)}
                               </span>
                               {student.has_report ? (
-                                <span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700">
-                                  Report ready
+                                <span className="inline-flex rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-800">
+                                  Report generated
                                 </span>
                               ) : null}
                               {student.active_correction?.kind === 'reopen_request' &&
@@ -643,11 +758,11 @@ const AdminAssessmentDetail = () => {
                           variant="outline"
                           className="max-w-fit py-2 text-sm"
                           onClick={() => {
-                            setNotifyIds(new Set([selectedStudent.id]))
+                            setSelectedIds(new Set([selectedStudent.id]))
                             setNotifyOpen(true)
                           }}
                         >
-                          Notify parents
+                          Send to guardians
                         </Button>
                       ) : null}
                       {canCorrectSelected ? (
@@ -669,6 +784,7 @@ const AdminAssessmentDetail = () => {
               </>
             )}
           </section>
+          </div>
         </div>
       )}
 
@@ -699,14 +815,14 @@ const AdminAssessmentDetail = () => {
         onConfirm={(payload) => correctStudent(payload)}
       />
 
-      {canNotifyParents && streamId ? (
+      {canManageReports && streamId ? (
         <ReportReadyModal
           open={notifyOpen}
           streamId={streamId}
           termId={termId}
-          studentIds={notifySelectedList}
+          studentIds={selectedForNotify}
           onClose={() => setNotifyOpen(false)}
-          onSent={clearNotifySelection}
+          onSent={clearSelection}
         />
       ) : null}
     </div>

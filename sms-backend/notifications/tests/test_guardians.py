@@ -3,7 +3,9 @@ from unittest.mock import patch
 from django.core import mail
 from django.test import TestCase, override_settings
 
+from academics.models import ClassLevel, Level
 from accounts.tests.factories import create_user, user_school
+from communications.tests.helpers import seed_test_credits
 from notifications.models import GuardianDelivery
 from notifications.services.guardians import (
     notify_guardians_ward_enrolled,
@@ -14,7 +16,6 @@ from schools.services.settings import get_school_settings
 from schools.tests.factories import create_active_term
 from students.models import Parent, StudentParent
 from students.tests.factories import create_student, ensure_default_stream
-from academics.models import ClassLevel, Level
 
 
 SEND_SMS_PATH = 'shared.services.arkesel_sms.send_sms_to_recipients'
@@ -96,6 +97,7 @@ class WardEnrolledNotifyTests(TestCase):
             is_primary=False,
         )
         get_school_settings(self.school)
+        seed_test_credits(self.school)
 
     @patch(SEND_SMS_PATH, return_value={'status': 'success', 'data': [{'id': 'sms-1'}]})
     @override_settings(DEBUG=True)
@@ -112,7 +114,10 @@ class WardEnrolledNotifyTests(TestCase):
         self.assertEqual(
             GuardianDelivery.objects.filter(
                 event_type=GuardianDelivery.EventType.WARD_ENROLLED,
-                status=GuardianDelivery.Status.SENT,
+                status__in=(
+                    GuardianDelivery.Status.SUBMITTED,
+                    GuardianDelivery.Status.SENT,
+                ),
             ).count(),
             2,
         )

@@ -261,7 +261,7 @@ Page-level line/button tabs keep the active section in the query string (`replac
 
 | Surface | Param | Values |
 | --- | --- | --- |
-| Settings | path `/settings/:tab` | `school-profile`, `academic-year`, `alerts`, `fees`, `assessments`, `classes` |
+| Settings | path `/settings/:tab` | `school-profile`, `academic-year`, `classes`, `assessments`, `fees`, `alerts`, `parent-messages` |
 | Reports | `?tab=` | `overview`, `finance`, `academic`, `enrollment`, `teachers`, `activity`, `my-classes`, `my-subjects` |
 | Classes list | `?tab=` (+ optional `attention`) | `classes`, `subjects` |
 | Teacher classes workspace | `?tab=` | `managed`, `subject` |

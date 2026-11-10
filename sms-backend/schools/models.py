@@ -7,6 +7,22 @@ from shared.models import BaseModel
 
 # Create your models here.
 class School(BaseModel):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        ACTIVE = 'active', 'Active'
+        SUSPENDED = 'suspended', 'Suspended'
+        ARCHIVED = 'archived', 'Archived'
+
+    class Category(models.TextChoices):
+        CRECHE = 'creche', 'Creche'
+        NURSERY = 'nursery', 'Nursery'
+        KINDERGARTEN = 'kindergarten', 'Kindergarten'
+        PRIMARY = 'primary', 'Primary'
+        JHS = 'jhs', 'Junior High School'
+        SHS = 'shs', 'Senior High School'
+        MIXED = 'mixed', 'Mixed levels'
+        OTHER = 'other', 'Other'
+
     name = models.CharField(max_length=255)
     address = models.CharField(max_length=255, null=True, blank=True)
     gps_address = models.CharField(max_length=15, null=True, blank=True)
@@ -22,6 +38,21 @@ class School(BaseModel):
         default='',
         help_text='Used for new student IDs. Blank keeps a prefix from the school name.',
     )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+        db_index=True,
+    )
+    region = models.CharField(max_length=100, blank=True, default='')
+    category = models.CharField(
+        max_length=32,
+        choices=Category.choices,
+        blank=True,
+        default='',
+    )
+    activated_at = models.DateTimeField(null=True, blank=True)
+    suspended_at = models.DateTimeField(null=True, blank=True)
 
     setup_completed = models.BooleanField(default=False)
     setup_completed_at = models.DateTimeField(null=True, blank=True)
@@ -32,6 +63,11 @@ class School(BaseModel):
         blank=True,
         related_name='schools',
     )
+
+    @property
+    def is_accessible(self) -> bool:
+        """Members may use the school app when pending (setup) or active."""
+        return self.status in {self.Status.PENDING, self.Status.ACTIVE}
 
 
 class SchoolSetup(models.Model):

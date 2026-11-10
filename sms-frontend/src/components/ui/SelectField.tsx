@@ -151,13 +151,13 @@ const SelectField = forwardRef<HTMLButtonElement, SelectFieldProps>(function Sel
                     disabled={option.disabled}
                     onClick={() => handleSelect(option)}
                     className={mergeClasses(
-                      'flex w-full items-center justify-between px-3 py-2.5 text-left text-base text-slate-700 transition',
+                      'flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left text-base text-slate-700 transition',
                       'hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none',
                       isSelected && 'bg-slate-100 font-medium text-slate-900',
                       option.disabled && 'cursor-not-allowed text-slate-400 hover:bg-white',
                     )}
                   >
-                    <span className="truncate">{option.label}</span>
+                    <span className="min-w-0 whitespace-normal break-words">{option.label}</span>
                     {isSelected ? (
                       <Icon icon="mdi:check" className="size-4 shrink-0 text-slate-700" aria-hidden />
                     ) : null}

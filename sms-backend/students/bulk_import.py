@@ -204,6 +204,7 @@ def commit_student_bulk_import(
     *,
     upload_format: str,
 ) -> StudentBulkImportResult:
+    from billing.services.capacity import ensure_can_add_students
     from students.bulk_reference import build_student_bulk_reference_context
 
     context = build_student_bulk_reference_context(school)
@@ -228,6 +229,10 @@ def commit_student_bulk_import(
                 if error_messages:
                     messages.extend(m.replace('ERROR: ', '') for m in error_messages)
                     raise ValidationError({'detail': messages[-1]})
+
+                will_skip = _will_skip_existing_student(row, existing_ids=existing_ids)
+                if not will_skip:
+                    ensure_can_add_students(school, additional=1)
 
                 created = _create_student_from_row(
                     school=school,

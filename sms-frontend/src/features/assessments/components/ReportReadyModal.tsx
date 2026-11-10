@@ -49,7 +49,7 @@ const ReportReadyModal = ({
       ),
     onSuccess: (data) => setPreview(data),
     onError: (error) => {
-      toast.error(getApiErrorMessage(error, 'Unable to preview parent notices'))
+      toast.error(getApiErrorMessage(error, 'Unable to preview guardian messages'))
       onClose()
     },
   })
@@ -63,13 +63,13 @@ const ReportReadyModal = ({
       ),
     onSuccess: (result) => {
       toast.success(
-        `Queued parent notices for ${result.students_notified} student${result.students_notified === 1 ? '' : 's'} (${result.sms_sent} SMS, ${result.email_sent} email)`,
+        `Queued guardian messages for ${result.students_notified} student${result.students_notified === 1 ? '' : 's'} (${result.sms_sent} SMS, ${result.email_sent} email)`,
       )
       onSent()
       onClose()
     },
     onError: (error) => {
-      toast.error(getApiErrorMessage(error, 'Unable to notify parents'))
+      toast.error(getApiErrorMessage(error, 'Unable to send to guardians'))
     },
   })
 
@@ -81,7 +81,7 @@ const ReportReadyModal = ({
   const displayPreview = open ? preview : null
 
   return (
-    <Modal open={open} title="Notify parents — report ready" onClose={onClose} scrollable className="max-w-lg">
+    <Modal open={open} title="Send to guardians — report ready" onClose={onClose} scrollable className="max-w-lg">
       {isPreviewing || !displayPreview ? (
         <LoadingSpinner className="mx-auto my-8" />
       ) : (
@@ -161,7 +161,7 @@ const ReportReadyModal = ({
               disabled={!displayPreview.enabled || displayPreview.eligible_count === 0}
               onClick={() => send()}
             >
-              Notify parents
+              Send to guardians
             </Button>
           </div>
         </div>

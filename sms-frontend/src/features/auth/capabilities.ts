@@ -6,6 +6,8 @@ export const Capability = {
   NAV_CLASSES: 'nav.classes',
   NAV_ASSESSMENTS: 'nav.assessments',
   NAV_FEES: 'nav.fees',
+  NAV_BILLING: 'nav.billing',
+  NAV_MESSAGING: 'nav.messaging',
   NAV_STAFF: 'nav.staff',
   NAV_REPORTS: 'nav.reports',
 
@@ -24,6 +26,12 @@ export const Capability = {
   FEES_VIEW: 'fees.view',
   FEES_RECORD_PAYMENT: 'fees.record_payment',
   FEES_MANAGE_SETTINGS: 'fees.manage_settings',
+
+  BILLING_VIEW: 'billing.view',
+  BILLING_MANAGE: 'billing.manage',
+
+  MESSAGING_VIEW: 'messaging.view',
+  MESSAGING_MANAGE: 'messaging.manage',
 
   STAFF_VIEW: 'staff.view',
   STAFF_MANAGE: 'staff.manage',

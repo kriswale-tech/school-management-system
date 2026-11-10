@@ -63,7 +63,19 @@ services:
       - "3003:5173"
     stdin_open: true
     tty: true
-    
+
+  platform-admin:
+    container_name: sms_platform_admin
+    build:
+      context: ./platform-admin
+      dockerfile: Dockerfile
+    volumes:
+      - ./platform-admin:/app
+      - platform_admin_node_modules:/app/node_modules
+    ports:
+      - "3004:5174"
+    stdin_open: true
+    tty: true
 
   db:
     container_name: sms_db
@@ -98,3 +110,4 @@ services:
 volumes:
   sms_db_data:
   node_modules:
+  platform_admin_node_modules:

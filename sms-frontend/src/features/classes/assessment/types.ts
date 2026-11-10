@@ -391,6 +391,23 @@ export type StoredStudentReport = {
   status: 'ready'
 }
 
+export type ReportGenerateJob = {
+  id: string
+  status: 'pending' | 'running' | 'completed' | 'failed' | string
+  force: boolean
+  stream_id: string
+  term_id: string
+  total: number
+  generated: number
+  skipped: number
+  failed: number
+  error_message: string
+  failures: Array<{ student_id: string; full_name?: string; reason: string }>
+  created_at: string | null
+  finished_at: string | null
+  done: boolean
+}
+
 export type ClassTeacherAssessmentDetail = {
   id: string
   term_id: string

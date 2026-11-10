@@ -9,6 +9,7 @@ from rest_framework.test import APITestCase
 
 from academics.models import ClassLevel, Level
 from accounts.tests.factories import create_user, set_client_auth_cookies, user_school
+from communications.tests.helpers import seed_test_credits
 from fees.models import FeeItem, FeeStructure, StudentFee
 from fees.services import apply_fee_structure, publish_fee_structure
 from fees.services.fee_schedule_links import (
@@ -109,6 +110,7 @@ class NextTermFeeNoticeTests(APITestCase):
         settings_row.guardian_next_term_fees_enabled = True
         settings_row.guardian_next_term_fees_channels = SchoolSettings.GuardianChannel.BOTH
         settings_row.save()
+        seed_test_credits(self.school)
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
     @patch(SEND_SMS_PATH, return_value={'status': 'success', 'data': [{'id': 'nt-1'}]})
@@ -122,11 +124,15 @@ class NextTermFeeNoticeTests(APITestCase):
         message = mock_sms.call_args.args[1]
         self.assertIn('550.00', message)
         self.assertIn('/api/v1/public/fee-schedules/', message)
+        submitted = (
+            GuardianDelivery.Status.SUBMITTED,
+            GuardianDelivery.Status.SENT,
+        )
         self.assertEqual(
             GuardianDelivery.objects.filter(
                 event_type=GuardianDelivery.EventType.NEXT_TERM_FEES,
                 channel=GuardianDelivery.Channel.SMS,
-                status=GuardianDelivery.Status.SENT,
+                status__in=submitted,
             ).count(),
             1,
         )
@@ -134,7 +140,7 @@ class NextTermFeeNoticeTests(APITestCase):
             GuardianDelivery.objects.filter(
                 event_type=GuardianDelivery.EventType.NEXT_TERM_FEES,
                 channel=GuardianDelivery.Channel.EMAIL,
-                status=GuardianDelivery.Status.SENT,
+                status__in=submitted,
             ).count(),
             1,
         )

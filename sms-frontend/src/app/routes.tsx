@@ -7,6 +7,8 @@ import { studentsRoutes } from '@/features/students/routes'
 import { classesRoutes } from '@/features/classes/routes'
 import { assessmentsRoutes } from '@/features/assessments/routes'
 import { feesRoutes } from '@/features/fees/routes'
+import { billingRoutes } from '@/features/billing/routes'
+import { messagingRoutes } from '@/features/messaging/routes'
 import { staffRoutes } from '@/features/staff/routes'
 import { reportsRoutes } from '@/features/reports/routes'
 import { profileRoutes } from '@/features/profile/routes'
@@ -22,6 +24,8 @@ const AppRoutes = () => {
           {classesRoutes}
           {assessmentsRoutes}
           {feesRoutes}
+          {billingRoutes}
+          {messagingRoutes}
           {staffRoutes}
           {reportsRoutes}
           {settingsRoutes}

@@ -92,9 +92,22 @@ def _send_login_otp_sms(phone_number: str, otp: str) -> dict | None:
         f'It expires in {settings.OTP_EXPIRY_MINUTES} minutes.'
     )
     try:
-        return send_sms(phone_number, message)
+        result = send_sms(phone_number, message)
+        try:
+            from notifications.services.platform_outbound import record_otp_sms
+
+            record_otp_sms(phone_number=phone_number, body=message, provider_payload=result, ok=True)
+        except Exception:
+            logger.exception('Failed to record platform OTP SMS delivery')
+        return result
     except Exception:
         logger.exception('Failed to send login OTP SMS to %s', phone_number)
+        try:
+            from notifications.services.platform_outbound import record_otp_sms
+
+            record_otp_sms(phone_number=phone_number, body=message, ok=False)
+        except Exception:
+            logger.exception('Failed to record failed platform OTP SMS delivery')
         return None
 
 
@@ -122,8 +135,20 @@ def _send_login_otp_email(user: User, otp: str) -> None:
         )
         message.attach_alternative(html_body, 'text/html')
         message.send(fail_silently=False)
+        try:
+            from notifications.services.platform_outbound import record_otp_email
+
+            record_otp_email(email=email, ok=True)
+        except Exception:
+            logger.exception('Failed to record platform OTP email delivery')
     except Exception:
         logger.exception('Failed to send login OTP email to %s', email)
+        try:
+            from notifications.services.platform_outbound import record_otp_email
+
+            record_otp_email(email=email, ok=False, error_message='send_failed')
+        except Exception:
+            logger.exception('Failed to record failed platform OTP email delivery')
 
 
 def _deliver_login_otp(user: User, otp: str) -> None:

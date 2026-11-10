@@ -11,9 +11,10 @@ type StudentReportViewerProps = {
   enabled: boolean
   queryKey: readonly unknown[]
   getReport: () => Promise<StoredStudentReport>
-  generateReport: () => Promise<StoredStudentReport>
+  generateReport: (options?: { force?: boolean }) => Promise<StoredStudentReport>
   variant?: 'page' | 'embed'
   autoLoad?: boolean
+  onNotifyParents?: () => void
 }
 
 const StudentReportViewer = ({
@@ -23,13 +24,13 @@ const StudentReportViewer = ({
   generateReport,
   variant = 'embed',
   autoLoad,
+  onNotifyParents,
 }: StudentReportViewerProps) => {
   const queryClient = useQueryClient()
   const queryKeyValue = queryKey.join(':')
   const shouldAutoLoad = autoLoad ?? variant === 'page'
   const autoGenerateStarted = useRef(false)
   const [requested, setRequested] = useState(false)
-  const [shareBusy, setShareBusy] = useState(false)
   const loadEnabled = enabled && (shouldAutoLoad || requested)
 
   const reportQuery = useQuery({
@@ -47,7 +48,7 @@ const StudentReportViewer = ({
     isPending: isGeneratePending,
     isError: isGenerateError,
   } = useMutation({
-    mutationFn: generateReport,
+    mutationFn: (options?: { force?: boolean }) => generateReport(options),
     onSuccess: (data) => {
       queryClient.setQueryData([...queryKey], data)
       toast.success('Report ready')
@@ -93,32 +94,6 @@ const StudentReportViewer = ({
 
   const showRegenerate = hasReadyReport || generateFailed || loadFailed
 
-  const handleShare = async () => {
-    if (!report?.url) return
-    setShareBusy(true)
-    try {
-      if (typeof navigator.share === 'function') {
-        await navigator.share({
-          title: 'Student report',
-          url: report.url,
-        })
-        return
-      }
-      await navigator.clipboard.writeText(report.url)
-      toast.success('Report link copied')
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return
-      try {
-        await navigator.clipboard.writeText(report.url)
-        toast.success('Report link copied')
-      } catch {
-        toast.error('Unable to share report link')
-      }
-    } finally {
-      setShareBusy(false)
-    }
-  }
-
   const actions = (
     <div className="flex flex-wrap items-center gap-2">
       {hasReadyReport ? (
@@ -132,15 +107,17 @@ const StudentReportViewer = ({
           >
             Open in new tab
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="max-w-fit py-2 text-sm"
-            onClick={handleShare}
-            disabled={shareBusy || isGeneratePending}
-          >
-            Share
-          </Button>
+          {onNotifyParents ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="max-w-fit py-2 text-sm"
+              onClick={onNotifyParents}
+              disabled={isGeneratePending}
+            >
+              Send to guardians
+            </Button>
+          ) : null}
         </>
       ) : (
         <Button
@@ -152,7 +129,7 @@ const StudentReportViewer = ({
           onClick={() => {
             setRequested(true)
             if (missingReport || generateFailed) {
-              runGenerate()
+              runGenerate({ force: Boolean(generateFailed) })
             }
           }}
         >
@@ -166,7 +143,7 @@ const StudentReportViewer = ({
           className="max-w-fit py-2 text-sm"
           loading={isGeneratePending}
           loadingText="Generating"
-          onClick={() => runGenerate()}
+          onClick={() => runGenerate({ force: true })}
           disabled={!enabled || isGeneratePending}
         >
           Regenerate

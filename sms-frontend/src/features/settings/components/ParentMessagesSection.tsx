@@ -257,12 +257,11 @@ const ParentMessagesSection = () => {
           </div>
 
           <div className="rounded-md border border-dashed border-slate-300 bg-white p-4">
-            <h3 className="text-sm font-medium text-slate-800">SMS credits</h3>
+            <h3 className="text-sm font-medium text-slate-800">Messaging credits</h3>
             <p className="mt-1 text-sm text-slate-500">
-              School SMS credit balance and top-ups will live here. Delivery attempts are already
-              logged for billing later.
+              Prefer Messaging → Policies for day-to-day parent outreach settings. Credits and
+              add-ons are on Billing.
             </p>
-            <p className="mt-3 text-sm text-slate-400">Credits — coming soon</p>
           </div>
 
           <Button type="submit" loading={isPending} loadingText="Saving...">

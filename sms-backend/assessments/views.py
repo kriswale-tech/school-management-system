@@ -21,6 +21,8 @@ from assessments.serializers import (
     CorrectionActionSerializer,
     CorrectionReviewSerializer,
     PublishStudentsSerializer,
+    BulkReportGenerateRequestSerializer,
+    ReportGenerateJobSerializer,
     ReportReadyPreviewSerializer,
     ReportReadyRequestSerializer,
     ReportReadySendResultSerializer,
@@ -28,6 +30,10 @@ from assessments.serializers import (
     StoredStudentReportSerializer,
     StudentReportPreviewSerializer,
     AssessmentSettingsSerializer,
+)
+from assessments.services.bulk_reports import (
+    get_report_generate_job,
+    queue_bulk_report_generate,
 )
 from assessments.services.report_ready_notices import (
     preview_report_ready_notices,
@@ -408,6 +414,15 @@ class AdminStudentReportView(SchoolScopedAPIView):
 @extend_schema(
     tags=['Assessments'],
     summary='Generate or overwrite student report PDF',
+    parameters=[
+        OpenApiParameter(
+            name='force',
+            type=bool,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            description='When true, regenerate even if a file already exists on storage.',
+        ),
+    ],
     responses={200: StoredStudentReportSerializer},
 )
 class AdminStudentReportGenerateView(SchoolScopedAPIView):
@@ -415,14 +430,71 @@ class AdminStudentReportGenerateView(SchoolScopedAPIView):
     required_capability = Capability.ASSESSMENTS_RELEASE
 
     def post(self, request, stream_id, student_id):
+        force = str(request.query_params.get('force') or '').lower() in {
+            '1',
+            'true',
+            'yes',
+        }
         payload = generate_student_report(
             school=self.school,
             membership=self.membership,
             stream_id=stream_id,
             student_id=student_id,
             term_id=request.query_params.get('term_id') or None,
+            force=force,
         )
         return Response(StoredStudentReportSerializer(payload).data)
+
+
+@extend_schema(
+    tags=['Assessments'],
+    summary='Queue bulk report PDF generation',
+    request=BulkReportGenerateRequestSerializer,
+    responses={202: ReportGenerateJobSerializer},
+)
+class AdminBulkReportGenerateView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.ASSESSMENTS_RELEASE
+
+    def post(self, request, stream_id):
+        serializer = BulkReportGenerateRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            payload = queue_bulk_report_generate(
+                school=self.school,
+                membership=self.membership,
+                stream_id=stream_id,
+                term_id=(
+                    serializer.validated_data.get('term_id')
+                    or request.query_params.get('term_id')
+                    or None
+                ),
+                student_ids=serializer.validated_data['student_ids'],
+                force=serializer.validated_data.get('force', False),
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError(
+                exc.message_dict if hasattr(exc, 'message_dict') else exc.messages,
+            )
+        return Response(ReportGenerateJobSerializer(payload).data, status=status.HTTP_202_ACCEPTED)
+
+
+@extend_schema(
+    tags=['Assessments'],
+    summary='Bulk report generation job status',
+    responses={200: ReportGenerateJobSerializer},
+)
+class AdminBulkReportGenerateJobView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, HasCapability]
+    required_capability = Capability.ASSESSMENTS_RELEASE
+
+    def get(self, request, stream_id, job_id):
+        payload = get_report_generate_job(
+            school=self.school,
+            stream_id=stream_id,
+            job_id=job_id,
+        )
+        return Response(ReportGenerateJobSerializer(payload).data)
 
 
 @extend_schema(

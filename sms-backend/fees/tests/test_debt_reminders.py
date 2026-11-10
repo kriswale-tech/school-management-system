@@ -9,6 +9,7 @@ from rest_framework.test import APITestCase
 
 from academics.models import ClassLevel, Level
 from accounts.tests.factories import create_user, set_client_auth_cookies, user_school
+from communications.tests.helpers import seed_test_credits
 from fees.models import FeeItem, FeeStructure
 from fees.services import apply_fee_structure, publish_fee_structure
 from notifications.models import GuardianDelivery
@@ -118,6 +119,7 @@ class DebtReminderAPITests(APITestCase):
         settings_row.guardian_debt_reminder_enabled = True
         settings_row.guardian_debt_reminder_channels = SchoolSettings.GuardianChannel.BOTH
         settings_row.save()
+        seed_test_credits(self.school)
 
         self.preview_url = reverse('debt-reminder-preview')
         self.send_url = reverse('debt-reminder-send')
@@ -176,7 +178,10 @@ class DebtReminderAPITests(APITestCase):
         self.assertEqual(
             GuardianDelivery.objects.filter(
                 event_type=GuardianDelivery.EventType.DEBT_REMINDER,
-                status=GuardianDelivery.Status.SENT,
+                status__in=(
+                    GuardianDelivery.Status.SUBMITTED,
+                    GuardianDelivery.Status.SENT,
+                ),
             ).count(),
             2,
         )

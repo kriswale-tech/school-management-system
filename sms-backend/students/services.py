@@ -290,6 +290,10 @@ def onboard_student(
     if not guardians:
         raise ValidationError({'guardians': 'At least one guardian is required.'})
 
+    from billing.services.capacity import ensure_can_add_students
+
+    ensure_can_add_students(school, additional=1)
+
     term = get_active_term(school)
     stream = _resolve_stream(school=school, stream_id=stream_id)
     resolved_student_id = resolve_student_id(school=school, student_id=student_id)
@@ -707,6 +711,9 @@ def reactivate_student(*, school, membership, student_id):
 
     from activities.models import Activity
     from activities.services import record_activity
+    from billing.services.capacity import ensure_can_add_students
+
+    ensure_can_add_students(school, additional=1)
 
     previous_reason = student.leave_reason
     student.is_active = True

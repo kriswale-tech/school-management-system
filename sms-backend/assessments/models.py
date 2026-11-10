@@ -446,6 +446,12 @@ class Report(BaseModel):
         max_length=500,
     )
     generated_at = models.DateTimeField(null=True, blank=True)
+    generation_id = models.UUIDField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='Changes on each successful PDF write; used for notify idempotency.',
+    )
     generated_by = models.ForeignKey(
         'accounts.User',
         on_delete=models.SET_NULL,
@@ -464,6 +470,69 @@ class Report(BaseModel):
 
     def __str__(self):
         return f'report {self.student_id} {self.term_id}'
+
+
+class ReportGenerateJob(BaseModel):
+    """Background bulk report PDF generation for a class/term."""
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        RUNNING = 'running', 'Running'
+        COMPLETED = 'completed', 'Completed'
+        FAILED = 'failed', 'Failed'
+
+    school = models.ForeignKey(
+        'schools.School',
+        on_delete=models.CASCADE,
+        related_name='report_generate_jobs',
+    )
+    stream = models.ForeignKey(
+        'academics.ClassStream',
+        on_delete=models.CASCADE,
+        related_name='report_generate_jobs',
+    )
+    term = models.ForeignKey(
+        'schools.Term',
+        on_delete=models.CASCADE,
+        related_name='report_generate_jobs',
+    )
+    created_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='report_generate_jobs',
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    force = models.BooleanField(
+        default=False,
+        help_text='When true, regenerate even if an R2 file already exists.',
+    )
+    student_ids = models.JSONField(default=list, blank=True)
+    total = models.PositiveIntegerField(default=0)
+    generated = models.PositiveIntegerField(default=0)
+    skipped = models.PositiveIntegerField(default=0)
+    failed = models.PositiveIntegerField(default=0)
+    error_message = models.CharField(max_length=500, blank=True, default='')
+    failures = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='[{student_id, full_name, reason}, ...] truncated list.',
+    )
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['school', 'stream', 'term', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f'report-job {self.id} ({self.status})'
 
 
 class CorrectionRequest(BaseModel):

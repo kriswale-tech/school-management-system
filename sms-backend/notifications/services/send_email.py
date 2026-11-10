@@ -102,8 +102,25 @@ def deliver_notification_email(notification_id) -> str:
         logger.exception('Failed to send notification email %s', notification_id)
         notification.email_status = Notification.EmailStatus.FAILED
         notification.save(update_fields=['email_status', 'updated_at'])
+        try:
+            from notifications.services.platform_outbound import record_staff_email
+
+            record_staff_email(
+                notification=notification,
+                email=email,
+                ok=False,
+                error_message='send_failed',
+            )
+        except Exception:
+            logger.exception('Failed to record platform staff email failure')
         return Notification.EmailStatus.FAILED
 
     notification.email_status = Notification.EmailStatus.SENT
     notification.save(update_fields=['email_status', 'updated_at'])
+    try:
+        from notifications.services.platform_outbound import record_staff_email
+
+        record_staff_email(notification=notification, email=email, ok=True)
+    except Exception:
+        logger.exception('Failed to record platform staff email delivery')
     return Notification.EmailStatus.SENT

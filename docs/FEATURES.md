@@ -119,7 +119,7 @@ School-wide and teacher-scoped analytics at `/reports`. See
 | Results / subject scores / reports | Empty models | — | Stub |
 | Correction requests | Empty model | — | Stub |
 | Assessments nav page | No APIs | Placeholder | Stub |
-| Report card generation | Yes (R2 PDF; released only) | Assessments report page + student Reports tab (inline) | Done |
+| Report card generation | Yes (R2 PDF; released only; bulk Celery job + force regenerate) | Assessment details + report page + student assessment tab | Done — see [assessment-reports.md](./assessment-reports.md) |
 
 ## School settings (admin, after setup)
 
@@ -151,7 +151,17 @@ Alerts are in-app only: outstanding fees (admin and accountant), unreleased resu
 | Activity feed | Yes (`activities` app, `GET /activities/`, across terms by default) | Recent Activities card | Done |
 | In-app alerts | Yes (`GET /schools/alerts/`) | Navbar bell → Alerts | Done |
 | Personal notifications | Yes (`notifications` app) | Navbar inbox icon | Done (in-app Tier 1 + email when enabled) |
-| Parent messages (guardians) | Ward enrolled, receipts, debt reminders (manual + auto), report ready, next-term fees | Settings → Parent messages + Fees / Assessment desks | Partial |
+| Parent messages (guardians) | Ward enrolled, receipts, debt reminders (manual + auto), report ready (Send to guardians + auto per generation), next-term fees | Settings → Parent messages + Fees / Assessment desks | Partial — see [guardian-communications.md](./guardian-communications.md) |
+
+## Platform admin — schools
+
+Operator app (`platform-admin`), not the school app.
+
+| Feature | Backend | Frontend | Status |
+| --- | --- | --- | --- |
+| School directory | `GET /platform/schools/` and `/platform/schools/summary/` | `/schools` | Done — plan, renewal, admin, overdue, status actions. See [platform-admin-schools.md](./platform-admin-schools.md) |
+| Create school with starting plan | `POST /platform/schools/` (`plan_code`, `interval`, optional add-on SKUs) | Create school modal | Done |
+| Complimentary first year when no plan is sent | `ensure_complimentary_subscription` | Not offered in the modal | Done |
 
 ## Cross-cutting
 
@@ -170,7 +180,7 @@ Alerts are in-app only: outstanding fees (admin and accountant), unreleased resu
 | Guardian ward-enrolled SMS/email | Yes — onboard + bulk import; see [guardian-communications.md](./guardian-communications.md) |
 | Guardian payment + signed receipt link | Partial — opt-in setting; public HTML receipt |
 | Guardian manual debt reminders | Partial — Fees desk selection + preview/send |
-| Guardian report-ready signed links | Partial — Assessment details + auto-on-generate mode |
+| Guardian report-ready signed links | Done — Assessment details / report viewer **Send to guardians**; auto on new PDF generation; see [assessment-reports.md](./assessment-reports.md) |
 | Guardian next-term fee schedules | Partial — on structure apply + signed per-student HTML |
 | Guardian auto debt reminders | Partial — Celery beat; school frequency (default end of month) |
 | SMS credits billing UI | Not started (placeholder in Settings → Parent messages) |
@@ -179,9 +189,11 @@ Alerts are in-app only: outstanding fees (admin and accountant), unreleased resu
 
 ## Existing deep-dive notes
 
+- Platform admin school directory and create modal: [platform-admin-schools.md](./platform-admin-schools.md)
 - Teacher bulk import (frontend contract): [`sms-backend/docs/frontend-teacher-bulk-import.md`](../sms-backend/docs/frontend-teacher-bulk-import.md)
 - Student bulk import (dates + guardians): [`sms-backend/docs/student-bulk-import.md`](../sms-backend/docs/student-bulk-import.md)
 - Assessment structure per term: [assessment-config.md](./assessment-config.md)
+- Assessment report PDFs + guardian send: [assessment-reports.md](./assessment-reports.md)
 - Role dashboards (admin / teacher / accountant / staff), activity feed: [dashboard.md](./dashboard.md)
 - Reports & Insights: [`sms-backend/docs/reports-insights.md`](../sms-backend/docs/reports-insights.md)
 - Mark student as left: [`sms-backend/docs/mark-as-left.md`](../sms-backend/docs/mark-as-left.md)

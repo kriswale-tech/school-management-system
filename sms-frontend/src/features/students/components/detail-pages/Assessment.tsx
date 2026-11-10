@@ -306,8 +306,11 @@ const Assessment = ({ studentId }: AssessmentProps) => {
               getReport={() =>
                 getStudentAssessmentReport(studentId, { term: data.term_id ?? undefined })
               }
-              generateReport={() =>
-                generateStudentAssessmentReport(studentId, { term: data.term_id ?? undefined })
+              generateReport={(options) =>
+                generateStudentAssessmentReport(studentId, {
+                  term: data.term_id ?? undefined,
+                  force: options?.force,
+                })
               }
             />
           ) : null}

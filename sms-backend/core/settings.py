@@ -38,8 +38,12 @@ ALLOWED_HOSTS = ['*']
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3003',
     'http://127.0.0.1:3003',
+    'http://localhost:3004',
+    'http://127.0.0.1:3004',
     'http://localhost:5173',
     'http://127.0.0.1:5173',
+    'http://localhost:5174',
+    'http://127.0.0.1:5174',
 ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -65,8 +69,12 @@ FEE_SCHEDULE_LINK_MAX_AGE_SECONDS = int(
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3003',
     'http://127.0.0.1:3003',
+    'http://localhost:3004',
+    'http://127.0.0.1:3004',
     'http://localhost:5173',
     'http://127.0.0.1:5173',
+    'http://localhost:5174',
+    'http://127.0.0.1:5174',
 ]
 
 SESSION_COOKIE_SECURE = not DEBUG
@@ -109,6 +117,10 @@ INSTALLED_APPS = [
     'activities',
     'reports',
     'notifications',
+    'platform_admin',
+    'billing',
+    'communications',
+    'messaging',
 ]
 
 MIDDLEWARE = [
@@ -216,6 +228,21 @@ SIMPLE_JWT = {
     'AUTH_COOKIE_PATH': '/',
 }
 
+# Platform operator JWT cookies (separate realm from school phone-OTP auth).
+PLATFORM_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    'AUTH_COOKIE': 'platform_access_token',
+    'AUTH_COOKIE_REFRESH': 'platform_refresh_token',
+    'AUTH_COOKIE_HTTP_ONLY': True,
+    'AUTH_COOKIE_SECURE': not DEBUG,
+    'AUTH_COOKIE_SAMESITE': 'Lax',
+    'AUTH_COOKIE_PATH': '/',
+}
+PLATFORM_MFA_PENDING_MINUTES = int(os.getenv('PLATFORM_MFA_PENDING_MINUTES', '10'))
+PLATFORM_MFA_ISSUER = os.getenv('PLATFORM_MFA_ISSUER', 'SCHOOLASST Platform')
+
+
 OTP_EXPIRY_MINUTES = 5
 OTP_RESEND_COOLDOWN_SECONDS = 60
 
@@ -276,6 +303,11 @@ AUTH_USER_MODEL = 'accounts.User'
 # Arkesel settings
 ARKESEL_API_KEY = os.getenv('ARKESEL_API_KEY')
 ARKESEL_SMS_SENDER = os.getenv('ARKESEL_SMS_SENDER')
+
+# Paystack — SaaS billing only (school-fee Paystack, if any, stays separate).
+PAYSTACK_SAAS_SECRET_KEY = os.getenv('PAYSTACK_SAAS_SECRET_KEY', '')
+PAYSTACK_SAAS_PUBLIC_KEY = os.getenv('PAYSTACK_SAAS_PUBLIC_KEY', '')
+PAYSTACK_SAAS_WEBHOOK_SECRET = os.getenv('PAYSTACK_SAAS_WEBHOOK_SECRET', '')
 
 # cloudinary settings
 PARENT_CLOUDINARY_FOLDER = 'school-management-system'
@@ -345,7 +377,7 @@ STORAGES = {
 
 
 # ---------------------------------------------------------------------------
-# Email (Anymail → Resend) + Celery (staff notification email + guardian SMS/email batches)
+# Email (Amazon SES + Celery) — staff notification email + guardian batches
 # ---------------------------------------------------------------------------
 
 def _env_flag(name: str, default: str = 'false') -> bool:
@@ -353,18 +385,55 @@ def _env_flag(name: str, default: str = 'false') -> bool:
 
 
 EMAIL_ENABLED = _env_flag('EMAIL_ENABLED', 'false')
+# ``ses`` (default) or ``console``. Without AWS creds, SES mode still falls
+# back to the Django console/locmem backend so local testing works.
+EMAIL_PROVIDER = os.getenv('EMAIL_PROVIDER', 'ses').strip().lower() or 'ses'
+
+# Amazon SES / AWS placeholders — leave blank until accounts are created.
+AWS_REGION = os.getenv('AWS_REGION', '').strip() or os.getenv('AWS_DEFAULT_REGION', '').strip()
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', '').strip()
+AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', '').strip()
+# Optional SNS topic subscription secret / shared token for SES event webhooks.
+SES_WEBHOOK_AUTH_TOKEN = os.getenv('SES_WEBHOOK_AUTH_TOKEN', '').strip()
+
+# Legacy Resend env vars kept so old .env files do not crash imports.
 RESEND_API_KEY = os.getenv('RESEND_API_KEY', '').strip()
+RESEND_WEBHOOK_SECRET = os.getenv('RESEND_WEBHOOK_SECRET', '').strip()
+
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@localhost')
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
+# Messaging refund policy (v4.1 §2.14) — reverse school credits after provider
+# acceptance when the eventual DLR/webhook reports failure.
+MESSAGING_AUTO_REFUND_FAILED_SMS = os.getenv(
+    'MESSAGING_AUTO_REFUND_FAILED_SMS', 'true',
+).lower() in ('1', 'true', 'yes')
+MESSAGING_AUTO_REFUND_FAILED_EMAIL = os.getenv(
+    'MESSAGING_AUTO_REFUND_FAILED_EMAIL', 'true',
+).lower() in ('1', 'true', 'yes')
+
 ANYMAIL = {
+    # Kept for transitional installs; primary path is SES / console.
     'RESEND_API_KEY': RESEND_API_KEY,
+    'AMAZON_SES_CLIENT_PARAMS': {
+        'region_name': AWS_REGION or 'us-east-1',
+        'aws_access_key_id': AWS_ACCESS_KEY_ID or None,
+        'aws_secret_access_key': AWS_SECRET_ACCESS_KEY or None,
+    },
 }
 
-if EMAIL_ENABLED and RESEND_API_KEY:
-    EMAIL_BACKEND = 'anymail.backends.resend.EmailBackend'
+_ses_ready = bool(
+    EMAIL_ENABLED
+    and EMAIL_PROVIDER == 'ses'
+    and AWS_ACCESS_KEY_ID
+    and AWS_SECRET_ACCESS_KEY
+    and AWS_REGION
+)
+if _ses_ready:
+    # Staff/OTP single sends via Anymail → SES when credentials exist.
+    EMAIL_BACKEND = 'anymail.backends.amazon_ses.EmailBackend'
 else:
-    # Local / CI without Resend: print to console (tests override to locmem).
+    # Local / CI / pre-AWS: print to console (tests override to locmem).
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://redis:6379/0')
@@ -381,6 +450,23 @@ CELERY_BEAT_SCHEDULE = {
     'fees-auto-debt-reminders-daily': {
         'task': 'fees.run_auto_debt_reminders',
         'schedule': crontab(hour=8, minute=0),
+    },
+    'billing-dunning-daily': {
+        'task': 'billing.run_dunning_cycle',
+        'schedule': crontab(hour=7, minute=30),
+    },
+    # Arkesel DLR webhooks are primary; poll pending SMS as a safety net.
+    'notifications-poll-pending-sms-status': {
+        'task': 'notifications.poll_pending_sms_status',
+        'schedule': crontab(minute='*/5'),
+    },
+    'communications-sync-arkesel-balance-hourly': {
+        'task': 'communications.sync_arkesel_balance',
+        'schedule': crontab(minute=15),
+    },
+    'communications-sync-ses-usage-hourly': {
+        'task': 'communications.sync_ses_usage',
+        'schedule': crontab(minute=45),
     },
 }
 

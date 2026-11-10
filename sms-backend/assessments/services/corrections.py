@@ -260,10 +260,12 @@ def invalidate_student_report(*, school, stream_id, student_id, term_id, actor=N
         deleted = True
     report.file = None
     report.generated_at = None
+    report.generation_id = None
     report.generated_by = None
     report.save(update_fields=[
         'file',
         'generated_at',
+        'generation_id',
         'generated_by',
         'updated_at',
     ])

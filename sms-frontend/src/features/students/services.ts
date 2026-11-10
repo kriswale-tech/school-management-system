@@ -182,9 +182,13 @@ export const getStudentAssessmentReport = async (
 
 export const generateStudentAssessmentReport = async (
   studentId: string,
-  params: StudentAssessmentsQueryParams = {},
+  params: StudentAssessmentsQueryParams & { force?: boolean } = {},
 ): Promise<StoredStudentReport> => {
-  const url = getQueryUrl(`/students/${studentId}/assessments/report/generate/`, params)
+  const { force, ...query } = params
+  const url = getQueryUrl(`/students/${studentId}/assessments/report/generate/`, {
+    ...query,
+    ...(force ? { force: true } : {}),
+  })
   const response = await api.post<StoredStudentReport>(url)
   return response.data
 }

@@ -1,3 +1,4 @@
+import uuid
 from datetime import date
 from unittest.mock import patch
 
@@ -103,6 +104,7 @@ class ReportReadyNoticeAPITests(APITestCase):
             term=self.term,
             file='reports/test/ama_mensah.pdf',
             generated_at=timezone.now(),
+            generation_id=uuid.uuid4(),
             generated_by=self.user,
         )
 
@@ -230,6 +232,31 @@ class ReportReadyNoticeAPITests(APITestCase):
         maybe_auto_notify_report_ready(report=self.report)
         mock_sms.assert_called_once()
         self.assertEqual(len(mail.outbox), 1)
+
+    @patch(FILE_EXISTS_PATH, return_value=True)
+    @patch(SEND_SMS_PATH, return_value={'status': 'success', 'data': [{'id': 'rr-idem'}]})
+    def test_auto_notify_idempotent_per_generation(self, mock_sms, _mock_exists):
+        settings_row = get_school_settings(self.school)
+        settings_row.report_parent_notify_mode = SchoolSettings.ReportParentNotifyMode.AUTO
+        settings_row.save(update_fields=['report_parent_notify_mode', 'updated_at'])
+
+        maybe_auto_notify_report_ready(report=self.report)
+        maybe_auto_notify_report_ready(report=self.report)
+        self.assertEqual(mock_sms.call_count, 1)
+        self.assertEqual(
+            GuardianDelivery.objects.filter(
+                event_type=GuardianDelivery.EventType.REPORT_READY,
+                channel=GuardianDelivery.Channel.SMS,
+                status=GuardianDelivery.Status.SENT,
+            ).count(),
+            1,
+        )
+
+        self.report.generation_id = uuid.uuid4()
+        self.report.generated_at = timezone.now()
+        self.report.save(update_fields=['generation_id', 'generated_at', 'updated_at'])
+        maybe_auto_notify_report_ready(report=self.report)
+        self.assertEqual(mock_sms.call_count, 2)
 
     def test_public_report_bad_token(self):
         url = reverse('public-report', kwargs={'token': 'not-a-valid-token'})

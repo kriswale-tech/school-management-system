@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from notifications.models import GuardianDelivery, Notification
+from notifications.models import GuardianDelivery, GuardianMessageTemplate, Notification
 
 
 @admin.register(Notification)
@@ -38,3 +38,11 @@ class GuardianDeliveryAdmin(admin.ModelAdmin):
         'idempotency_key',
     )
     readonly_fields = ('created_at', 'updated_at', 'idempotency_key')
+
+
+@admin.register(GuardianMessageTemplate)
+class GuardianMessageTemplateAdmin(admin.ModelAdmin):
+    list_display = ('school', 'event_type', 'updated_at')
+    list_filter = ('event_type', 'school')
+    search_fields = ('school__name', 'sms_body', 'email_subject')
+    readonly_fields = ('created_at', 'updated_at')

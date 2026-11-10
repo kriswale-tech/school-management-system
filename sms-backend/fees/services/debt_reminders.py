@@ -56,45 +56,42 @@ def _student_balance_context(*, school, student, all_time: bool, term):
     }
 
 
-def _sample_messages(*, school_name, student_name, balance, all_time, term_label, terms_summary):
+def _sample_messages(
+    *,
+    school,
+    student_name,
+    balance,
+    all_time,
+    term_label,
+    terms_summary,
+):
+    from notifications.services.message_templates import compose_email, compose_sms
+
     amount = f'{balance:.2f}'
-    if all_time:
-        summary = terms_summary or 'multiple terms'
-        sms = (
-            f'{guardian_services._sms_prefix(school_name=school_name)}: Reminder — '
-            f'{student_name} owes GHS {amount} across terms ({summary}). '
-            f'Please contact the school to pay.'
-        )
-        email_body = (
-            f'This is a fees reminder from {school_name}.\n\n'
-            f'{student_name} has an outstanding balance of GHS {amount} across all terms.\n\n'
-            f'Terms owed:\n'
-            + (
-                '\n'.join(
-                    f"- {part.strip()}"
-                    for part in summary.split(';')
-                    if part.strip()
-                )
-                if terms_summary
-                else '- See the school for a breakdown.'
-            )
-            + '\n\nPlease contact the school to arrange payment.'
-        )
-    else:
-        sms = guardian_services._debt_reminder_sms_body(
-            student_name=student_name,
-            school_name=school_name,
-            balance=amount,
-            term_label=term_label,
-        )
-        email_body = (
-            f'This is a fees reminder from {school_name}.\n\n'
-            f'{student_name} has an outstanding balance of GHS {amount} for {term_label}.\n\n'
-            f'Please contact the school to arrange payment.'
-        )
+    summary = terms_summary or 'multiple terms'
+    ctx = {
+        'school_name': school.name,
+        'student_name': student_name,
+        'balance': amount,
+        'term_label': term_label,
+        'terms_summary': summary,
+        'all_time': all_time,
+        'greeting': '',
+    }
+    sms = compose_sms(
+        school=school,
+        event_type=GuardianDelivery.EventType.DEBT_REMINDER,
+        all_time=all_time,
+        context=ctx,
+    )
+    subject, email_body, _html = compose_email(
+        school=school,
+        event_type=GuardianDelivery.EventType.DEBT_REMINDER,
+        context=ctx,
+    )
     return {
         'sample_sms': sms,
-        'sample_email_subject': f'Fee reminder for {student_name}',
+        'sample_email_subject': subject,
         'sample_email_body': email_body,
     }
 
@@ -195,7 +192,7 @@ def preview_debt_reminders(*, school, term_id, student_ids) -> dict:
         full_name = guardian_services._student_display_name(student)
         if not sample['sample_sms']:
             sample = _sample_messages(
-                school_name=school.name,
+                school=school,
                 student_name=full_name,
                 balance=balance,
                 all_time=all_time,

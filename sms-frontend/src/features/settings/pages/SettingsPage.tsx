@@ -5,12 +5,13 @@ import { TabComponent } from '@/components/shared'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import AcademicYearSection from '../components/AcademicYearSection'
 import AlertsSection from '../components/AlertsSection'
-import ParentMessagesSection from '../components/ParentMessagesSection'
 import ProfileSection from '../components/ProfileSection'
 
 const FeeSettings = lazy(() => import('@/features/fees/pages/FeeSettings'))
 const AssessmentSettings = lazy(() => import('@/features/assessments/AssessmentSettings'))
 const ManageClasses = lazy(() => import('@/features/classes/manage-classes/ManageClasses'))
+const BillingPage = lazy(() => import('@/features/billing/pages/BillingPage'))
+const MessagingPage = lazy(() => import('@/features/messaging/pages/MessagingPage'))
 
 const TABS = [
   { label: 'School profile', slug: 'school-profile' },
@@ -18,8 +19,9 @@ const TABS = [
   { label: 'Classes', slug: 'classes' },
   { label: 'Assessments', slug: 'assessments' },
   { label: 'Fees', slug: 'fees' },
+  { label: 'Billing', slug: 'billing' },
+  { label: 'Messaging', slug: 'messaging' },
   { label: 'Alerts', slug: 'alerts' },
-  { label: 'Parent messages', slug: 'parent-messages' },
 ] as const
 
 type SettingsTabSlug = (typeof TABS)[number]['slug']
@@ -27,9 +29,17 @@ type SettingsTabSlug = (typeof TABS)[number]['slug']
 const isSettingsTab = (value: string | undefined): value is SettingsTabSlug =>
   TABS.some((tab) => tab.slug === value)
 
+const LEGACY_TAB_REDIRECTS: Record<string, SettingsTabSlug> = {
+  'parent-messages': 'messaging',
+}
+
 const SettingsPage = () => {
   const { tab } = useParams<{ tab: string }>()
   const navigate = useNavigate()
+
+  if (tab && LEGACY_TAB_REDIRECTS[tab]) {
+    return <Navigate to={`/settings/${LEGACY_TAB_REDIRECTS[tab]}`} replace />
+  }
 
   if (!isSettingsTab(tab)) {
     return <Navigate to="/settings/school-profile" replace />
@@ -45,7 +55,12 @@ const SettingsPage = () => {
         <TabComponent
           tabs={TABS.map((item) => ({
             label: item.label,
-            onClick: () => navigate(`/settings/${item.slug}`),
+            onClick: () =>
+              navigate(
+                item.slug === 'messaging' && tab === 'messaging'
+                  ? { pathname: `/settings/${item.slug}`, search: window.location.search }
+                  : `/settings/${item.slug}`,
+              ),
           }))}
           activeTab={activeTab.label}
         />
@@ -54,12 +69,17 @@ const SettingsPage = () => {
           {tab === 'school-profile' ? <ProfileSection /> : null}
           {tab === 'academic-year' ? <AcademicYearSection /> : null}
           {tab === 'alerts' ? <AlertsSection /> : null}
-          {tab === 'parent-messages' ? <ParentMessagesSection /> : null}
-          {tab === 'fees' || tab === 'assessments' || tab === 'classes' ? (
+          {tab === 'fees' ||
+          tab === 'assessments' ||
+          tab === 'classes' ||
+          tab === 'billing' ||
+          tab === 'messaging' ? (
             <Suspense fallback={<LoadingSpinner className="mx-auto" />}>
               {tab === 'fees' ? <FeeSettings embedded /> : null}
               {tab === 'assessments' ? <AssessmentSettings embedded /> : null}
               {tab === 'classes' ? <ManageClasses embedded /> : null}
+              {tab === 'billing' ? <BillingPage embedded /> : null}
+              {tab === 'messaging' ? <MessagingPage embedded /> : null}
             </Suspense>
           ) : null}
         </div>

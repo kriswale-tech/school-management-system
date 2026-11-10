@@ -281,6 +281,32 @@ class ReportReadyRequestSerializer(serializers.Serializer):
     term_id = serializers.UUIDField(required=False, allow_null=True)
 
 
+class BulkReportGenerateRequestSerializer(serializers.Serializer):
+    student_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        allow_empty=False,
+    )
+    term_id = serializers.UUIDField(required=False, allow_null=True)
+    force = serializers.BooleanField(required=False, default=False)
+
+
+class ReportGenerateJobSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    status = serializers.CharField()
+    force = serializers.BooleanField()
+    stream_id = serializers.UUIDField()
+    term_id = serializers.UUIDField()
+    total = serializers.IntegerField()
+    generated = serializers.IntegerField()
+    skipped = serializers.IntegerField()
+    failed = serializers.IntegerField()
+    error_message = serializers.CharField(allow_blank=True)
+    failures = serializers.ListField(child=serializers.DictField(), required=False)
+    created_at = serializers.CharField(allow_null=True)
+    finished_at = serializers.CharField(allow_null=True)
+    done = serializers.BooleanField()
+
+
 class ReportReadyEligibleSerializer(serializers.Serializer):
     student_id = serializers.CharField()
     report_id = serializers.CharField()

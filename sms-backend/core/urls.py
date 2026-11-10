@@ -4,6 +4,11 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from assessments.public_views import PublicReportView
 from fees.public_views import PublicFeeScheduleView, PublicReceiptView
+from notifications.views_webhooks import (
+    ArkeselSmsDlrWebhookView,
+    ResendWebhookView,
+    SesWebhookView,
+)
 
 v1_path = 'api/v1/'
 
@@ -31,6 +36,24 @@ urlpatterns = [
         PublicReportView.as_view(),
         name='public-report',
     ),
+    # public (no auth) — Arkesel SMS delivery reports (callback_url)
+    path(
+        f'{v1_path}webhooks/arkesel/sms-dlr/',
+        ArkeselSmsDlrWebhookView.as_view(),
+        name='arkesel-sms-dlr-webhook',
+    ),
+    # public (no auth) — Amazon SES email events (SNS → HTTP)
+    path(
+        f'{v1_path}webhooks/ses/',
+        SesWebhookView.as_view(),
+        name='ses-webhook',
+    ),
+    # legacy — Resend email events (Svix-signed)
+    path(
+        f'{v1_path}webhooks/resend/',
+        ResendWebhookView.as_view(),
+        name='resend-webhook',
+    ),
 
     # api urls
     path(f'{v1_path}accounts/', include('accounts.urls')),
@@ -42,4 +65,11 @@ urlpatterns = [
     path(f'{v1_path}activities/', include('activities.urls')),
     path(f'{v1_path}reports/', include('reports.urls')),
     path(f'{v1_path}notifications/', include('notifications.urls')),
+    path(f'{v1_path}platform/', include('platform_admin.urls')),
+    path(f'{v1_path}platform/billing/', include('billing.urls_platform')),
+    path(f'{v1_path}platform/communications/', include('communications.urls_platform')),
+    path(f'{v1_path}platform/messages/', include('communications.urls_messages')),
+    path(f'{v1_path}billing/', include('billing.urls')),
+    path(f'{v1_path}communications/', include('communications.urls')),
+    path(f'{v1_path}messaging/', include('messaging.urls')),
 ]

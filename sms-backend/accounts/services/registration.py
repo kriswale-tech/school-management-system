@@ -66,11 +66,53 @@ def ensure_school_name_available(user: User, school_name: str) -> None:
         raise ValidationError({'school_name': DUPLICATE_SCHOOL_NAME_MESSAGE})
 
 
-def _provision_school(*, name: str, phone_number: str) -> School:
-    school = School.objects.create(name=name, phone_number=phone_number)
+def _provision_school(
+    *,
+    name: str,
+    phone_number: str,
+    status: str | None = None,
+    email: str | None = None,
+    address: str | None = None,
+    region: str = '',
+    category: str = '',
+    phone_number_alt: str | None = None,
+) -> School:
+    from django.utils import timezone
+
+    school_status = status or School.Status.ACTIVE
+    school = School.objects.create(
+        name=name,
+        phone_number=phone_number,
+        phone_number_alt=phone_number_alt or None,
+        email=email or None,
+        address=address or None,
+        region=region or '',
+        category=category or '',
+        status=school_status,
+        activated_at=timezone.now() if school_status == School.Status.ACTIVE else None,
+    )
     SchoolSetup.objects.create(school=school)
     provision_school_curriculum(school)
+    if school_status == School.Status.ACTIVE:
+        from billing.services.migrate import ensure_complimentary_subscription
+
+        ensure_complimentary_subscription(school)
     return school
+
+
+def is_public_school_registration_enabled() -> bool:
+    from platform_admin.services.settings import get_platform_settings
+
+    return bool(get_platform_settings().public_school_registration_enabled)
+
+
+def ensure_public_registration_allowed() -> None:
+    from rest_framework.exceptions import PermissionDenied
+
+    if not is_public_school_registration_enabled():
+        raise PermissionDenied(
+            'Public school registration is disabled. Contact SCHOOLASST to get onboarded.',
+        )
 
 
 @dataclass
@@ -87,6 +129,7 @@ def register_school_admin(validated_data: dict) -> SignUpResult:
     resume that draft. Verified phones stage the school name for creation after
     OTP, so the create-school form works without bouncing them to login.
     """
+    ensure_public_registration_allowed()
     phone_number = validated_data['phone_number']
     school_name = validated_data['school_name']
 
@@ -171,6 +214,7 @@ def complete_pending_school_creation(user: User) -> SchoolMembership | None:
     if pending is None:
         return None
 
+    ensure_public_registration_allowed()
     school_name = pending['school_name']
     ensure_school_name_available(user, school_name)
 
@@ -191,6 +235,7 @@ def complete_pending_school_creation(user: User) -> SchoolMembership | None:
 @transaction.atomic
 def create_additional_school(user: User, validated_data: dict) -> SchoolMembership:
     """Let an already-verified person start another school they will administer."""
+    ensure_public_registration_allowed()
     school_name = validated_data['school_name']
     ensure_school_name_available(user, school_name)
 

@@ -9,19 +9,30 @@ from accounts.models import SchoolMembership, User
 
 logger = logging.getLogger(__name__)
 
+from schools.models import School
+
 NO_SCHOOL_ACCESS_MESSAGE = 'You do not have access to any school.'
 NO_ACTIVE_SCHOOL_MESSAGE = 'Select a school before using this endpoint.'
+SCHOOL_UNAVAILABLE_MESSAGE = (
+    'This school is suspended or archived and cannot be used right now.'
+)
+
+ACCESSIBLE_SCHOOL_STATUSES = (School.Status.PENDING, School.Status.ACTIVE)
 
 
 def active_memberships(user: User) -> QuerySet[SchoolMembership]:
     return (
-        SchoolMembership.objects.filter(user=user, is_active=True)
+        SchoolMembership.objects.filter(
+            user=user,
+            is_active=True,
+            school__status__in=ACCESSIBLE_SCHOOL_STATUSES,
+        )
         .select_related('school')
     )
 
 
 def get_active_membership(user: User, school_id) -> SchoolMembership | None:
-    return (
+    membership = (
         SchoolMembership.objects.filter(
             user=user,
             school_id=school_id,
@@ -30,13 +41,28 @@ def get_active_membership(user: User, school_id) -> SchoolMembership | None:
         .select_related('school')
         .first()
     )
+    if membership is None:
+        return None
+    if membership.school.status not in ACCESSIBLE_SCHOOL_STATUSES:
+        return None
+    return membership
 
 
 def resolve_membership(user: User, school_id) -> SchoolMembership:
     """Resolve a token's school claim, rejecting revoked access."""
-    membership = get_active_membership(user, school_id)
+    membership = (
+        SchoolMembership.objects.filter(
+            user=user,
+            school_id=school_id,
+            is_active=True,
+        )
+        .select_related('school')
+        .first()
+    )
     if membership is None:
         raise PermissionDenied('Your access to this school is no longer active.')
+    if membership.school.status not in ACCESSIBLE_SCHOOL_STATUSES:
+        raise PermissionDenied(SCHOOL_UNAVAILABLE_MESSAGE)
     return membership
 
 
@@ -67,13 +93,24 @@ def link_user_to_school(
     reactivate: bool = True,
 ) -> tuple[SchoolMembership, bool]:
     """Give an existing identity access to a school. Returns (membership, created)."""
-    membership, created = SchoolMembership.objects.get_or_create(
-        user=user,
-        school=school,
-        defaults={'role': role},
-    )
+    existing = SchoolMembership.objects.filter(user=user, school=school).first()
+    if existing is not None and existing.is_active:
+        raise ValidationError({
+            'phone_number': 'This person is already a member of this school.',
+        })
 
-    if created:
+    will_consume_seat = existing is None or (not existing.is_active and reactivate)
+    if will_consume_seat:
+        from billing.services.capacity import ensure_can_add_staff
+
+        ensure_can_add_staff(school, additional=1)
+
+    if existing is None:
+        membership = SchoolMembership.objects.create(
+            user=user,
+            school=school,
+            role=role,
+        )
         logger.info(
             'Linked user %s to school %s as %s',
             user.pk,
@@ -82,20 +119,15 @@ def link_user_to_school(
         )
         return membership, True
 
-    if membership.is_active:
-        raise ValidationError({
-            'phone_number': 'This person is already a member of this school.',
-        })
-
     if not reactivate:
         raise ValidationError({
             'phone_number': 'This person previously belonged to this school.',
         })
 
-    membership.is_active = True
-    membership.role = role
-    membership.save(update_fields=['is_active', 'role', 'updated_at'])
-    return membership, False
+    existing.is_active = True
+    existing.role = role
+    existing.save(update_fields=['is_active', 'role', 'updated_at'])
+    return existing, False
 
 
 def deactivate_membership(membership: SchoolMembership) -> None:

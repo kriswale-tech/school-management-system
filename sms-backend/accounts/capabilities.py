@@ -10,6 +10,8 @@ class Capability:
     NAV_CLASSES = 'nav.classes'
     NAV_ASSESSMENTS = 'nav.assessments'
     NAV_FEES = 'nav.fees'
+    NAV_BILLING = 'nav.billing'
+    NAV_MESSAGING = 'nav.messaging'
     NAV_STAFF = 'nav.staff'
     NAV_REPORTS = 'nav.reports'
 
@@ -29,6 +31,12 @@ class Capability:
     FEES_RECORD_PAYMENT = 'fees.record_payment'
     FEES_MANAGE_SETTINGS = 'fees.manage_settings'
 
+    BILLING_VIEW = 'billing.view'
+    BILLING_MANAGE = 'billing.manage'
+
+    MESSAGING_VIEW = 'messaging.view'
+    MESSAGING_MANAGE = 'messaging.manage'
+
     STAFF_VIEW = 'staff.view'
     STAFF_MANAGE = 'staff.manage'
 
@@ -42,6 +50,8 @@ SCHOOL_WIDE_CAPABILITIES = frozenset({
     Capability.NAV_CLASSES,
     Capability.NAV_ASSESSMENTS,
     Capability.NAV_FEES,
+    Capability.NAV_BILLING,
+    Capability.NAV_MESSAGING,
     Capability.NAV_STAFF,
     Capability.NAV_REPORTS,
     Capability.CLASSES_VIEW,
@@ -56,6 +66,10 @@ SCHOOL_WIDE_CAPABILITIES = frozenset({
     Capability.FEES_VIEW,
     Capability.FEES_RECORD_PAYMENT,
     Capability.FEES_MANAGE_SETTINGS,
+    Capability.BILLING_VIEW,
+    Capability.BILLING_MANAGE,
+    Capability.MESSAGING_VIEW,
+    Capability.MESSAGING_MANAGE,
     Capability.STAFF_VIEW,
     Capability.STAFF_MANAGE,
     Capability.REPORTS_VIEW,
@@ -67,12 +81,16 @@ ACCOUNTANT_CAPABILITIES = frozenset({
     Capability.NAV_STUDENTS,
     Capability.NAV_CLASSES,
     Capability.NAV_FEES,
+    Capability.NAV_BILLING,
+    Capability.NAV_MESSAGING,
     Capability.NAV_REPORTS,
     Capability.CLASSES_VIEW,
     Capability.STUDENTS_VIEW,
     Capability.FEES_VIEW,
     Capability.FEES_RECORD_PAYMENT,
     Capability.FEES_MANAGE_SETTINGS,
+    Capability.BILLING_VIEW,
+    Capability.MESSAGING_VIEW,
     Capability.REPORTS_VIEW,
 })
 
@@ -82,6 +100,7 @@ STAFF_CAPABILITIES = frozenset({
     Capability.NAV_STUDENTS,
     Capability.NAV_CLASSES,
     Capability.NAV_ASSESSMENTS,
+    Capability.NAV_MESSAGING,
     Capability.NAV_STAFF,
     Capability.NAV_REPORTS,
     Capability.CLASSES_VIEW,
@@ -91,6 +110,8 @@ STAFF_CAPABILITIES = frozenset({
     Capability.ASSESSMENTS_RECORD,
     Capability.ASSESSMENTS_APPROVE,
     Capability.ASSESSMENTS_RELEASE,
+    Capability.MESSAGING_VIEW,
+    Capability.MESSAGING_MANAGE,
     Capability.STAFF_VIEW,
     Capability.STAFF_MANAGE,
     Capability.REPORTS_VIEW,

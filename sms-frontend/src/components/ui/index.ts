@@ -1,5 +1,6 @@
 import FormLabel from './FormLabel'
 import CheckboxField from './CheckboxField'
+import ToggleField from './ToggleField'
 import InputField from './InputField'
 import SelectField from './SelectField'
 import SearchAndSelect from './SearchAndSelect'
@@ -21,6 +22,7 @@ export {
   SearchAndSelect,
   OTPInput,
   CheckboxField,
+  ToggleField,
   Button,
   AvatarComponent,
   LoadingSpinner,
