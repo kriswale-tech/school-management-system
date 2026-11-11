@@ -6,6 +6,7 @@ import type {
   PaginatedPayments,
   Plan,
   PlanInput,
+  SaasPayment,
   Subscription,
   TopUpPackage,
   TopUpPackageInput,
@@ -90,6 +91,35 @@ export async function scheduleSchoolPlanChange(
   return data
 }
 
+export type UpgradeQuote = {
+  plan_code: string
+  plan_name: string
+  amount_ghs: string
+  discount_ghs: string
+  remaining_days: number
+  total_days: number
+}
+
+export async function quoteSchoolUpgrade(schoolId: string, planCode: string) {
+  const { data } = await api.get<UpgradeQuote>(
+    `/platform/billing/schools/${schoolId}/subscription/upgrade-quote/`,
+    { params: { plan_code: planCode } },
+  )
+  return data
+}
+
+export async function recordSchoolTopUp(schoolId: string, packageCode: string) {
+  const { data } = await api.post<{
+    package_code: string
+    package_name: string
+    channel: string
+    credits: number
+    amount_ghs: string
+    status: string
+  }>(`/platform/billing/schools/${schoolId}/topups/`, { package_code: packageCode })
+  return data
+}
+
 export async function capacityUpgradeSchool(
   schoolId: string,
   payload: { plan_code?: string; mark_paid?: boolean } = {},
@@ -103,9 +133,48 @@ export async function capacityUpgradeSchool(
 
 type InvoiceLike = { id: string }
 
-export async function listSchoolInvoices(schoolId: string) {
+export const BILLING_PAGE_SIZE = 10
+
+export async function listSchoolInvoices(schoolId: string, page = 1) {
   const { data } = await api.get<PaginatedInvoices>(
     `/platform/billing/schools/${schoolId}/invoices/`,
+    { params: { page, page_size: BILLING_PAGE_SIZE } },
+  )
+  return data
+}
+
+export type SchoolFinance = {
+  total_paid_ghs: string
+  outstanding_ghs: string
+  billed_ghs: string
+  discount_ghs: string
+  successful_payments: number
+  open_invoices: number
+  paid_invoices: number
+  invoice_count: number
+  payment_overdue: boolean
+  by_purpose: Record<string, string>
+}
+
+export async function getSchoolFinance(schoolId: string) {
+  const { data } = await api.get<SchoolFinance>(
+    `/platform/billing/schools/${schoolId}/finance/`,
+  )
+  return data
+}
+
+export async function extendSchoolGrace(schoolId: string, until: string) {
+  const { data } = await api.post<Subscription>(
+    `/platform/billing/schools/${schoolId}/subscription/extend-grace/`,
+    { until },
+  )
+  return data
+}
+
+export async function assignSchoolDiscount(schoolId: string, campaignId: string) {
+  const { data } = await api.post<Subscription>(
+    `/platform/billing/schools/${schoolId}/discounts/`,
+    { campaign_id: campaignId },
   )
   return data
 }
@@ -115,10 +184,21 @@ export async function markInvoicePaid(invoiceId: string) {
   return data
 }
 
+export type CreditChannelUsage = {
+  balance: number
+  used: number
+  allowance: number
+  exhaustion_ratio: number | null
+}
+
 export type CreditBalances = {
   sms: number
   email: number
   billing_active: boolean
+  usage?: {
+    sms: CreditChannelUsage
+    email: CreditChannelUsage
+  }
 }
 
 export async function getSchoolCredits(schoolId: string) {
@@ -183,14 +263,25 @@ export async function listPayments(params?: {
   status?: string
   school?: string
   purpose?: string
+  page?: number
 }) {
-  const { data } = await api.get<PaginatedPayments>('/platform/billing/payments/', { params })
+  const { data } = await api.get<PaginatedPayments>('/platform/billing/payments/', {
+    params: { page_size: BILLING_PAGE_SIZE, ...params },
+  })
   return data
 }
 
-export async function listSchoolPayments(schoolId: string) {
+export async function verifyPayment(paymentId: string) {
+  const { data } = await api.post<SaasPayment>(
+    `/platform/billing/payments/${paymentId}/verify/`,
+  )
+  return data
+}
+
+export async function listSchoolPayments(schoolId: string, page = 1) {
   const { data } = await api.get<PaginatedPayments>(
     `/platform/billing/schools/${schoolId}/payments/`,
+    { params: { page, page_size: BILLING_PAGE_SIZE } },
   )
   return data
 }

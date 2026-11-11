@@ -4,7 +4,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { isAxiosError } from 'axios'
 import CreateSchoolModal from './CreateSchoolModal'
+import StatusChangeDialog, { statusActionLabel } from './StatusChangeDialog'
 import { createSchool, fetchSchoolSummary, listSchools, updateSchoolStatus } from './services'
+import { formatDate } from '@/lib/dates'
 import type { PlatformSchoolListItem, SchoolStatus } from './types'
 
 function errorMessage(error: unknown) {
@@ -29,23 +31,6 @@ const STATUS_OPTIONS: Array<SchoolStatus | ''> = [
 
 const STATUS_ACTIONS: SchoolStatus[] = ['active', 'pending', 'suspended', 'archived']
 
-function statusActionLabel(status: SchoolStatus) {
-  if (status === 'active') return 'Activate'
-  if (status === 'pending') return 'Mark pending'
-  if (status === 'suspended') return 'Suspend'
-  return 'Archive'
-}
-
-function formatRenewal(value: string | null) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
 
 function formatCount(value: number | undefined) {
   if (value === undefined) return '—'
@@ -93,8 +78,8 @@ export default function SchoolsPage() {
   })
 
   const statusMutation = useMutation({
-    mutationFn: ({ id, status: next }: { id: string; status: SchoolStatus }) =>
-      updateSchoolStatus(id, next),
+    mutationFn: ({ id, status: next, reason }: { id: string; status: SchoolStatus; reason: string }) =>
+      updateSchoolStatus(id, next, reason),
     onSuccess: () => {
       toast.success('School status updated')
       setPendingStatus(null)
@@ -106,11 +91,7 @@ export default function SchoolsPage() {
 
   function requestStatus(school: PlatformSchoolListItem, next: SchoolStatus) {
     if (next === school.status) return
-    if (next === 'suspended' || next === 'archived') {
-      setPendingStatus({ school, status: next })
-      return
-    }
-    statusMutation.mutate({ id: school.id, status: next })
+    setPendingStatus({ school, status: next })
   }
 
   const summary = summaryQuery.data
@@ -264,7 +245,7 @@ export default function SchoolsPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    {formatRenewal(school.next_renewal_at)}
+                    {formatDate(school.next_renewal_at)}
                   </td>
                   <td className="px-4 py-3 capitalize">{school.status}</td>
                   <td className="px-4 py-3">
@@ -347,43 +328,21 @@ export default function SchoolsPage() {
       />
 
       {pendingStatus && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/30 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-[var(--color-line)] bg-white p-5 shadow-lg">
-            <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold">
-              {pendingStatus.status === 'archived' ? 'Archive' : 'Suspend'}{' '}
-              {pendingStatus.school.name}?
-            </h2>
-            <p className="mt-2 text-sm text-[var(--color-ink)]/70">
-              {pendingStatus.status === 'archived'
-                ? 'The school stays in the directory and can be activated again later.'
-                : 'The school loses access until it is activated again.'}
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setPendingStatus(null)}
-                className="rounded-xl border border-[var(--color-line)] px-3 py-2 text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={statusMutation.isPending}
-                onClick={() =>
-                  statusMutation.mutate({
-                    id: pendingStatus.school.id,
-                    status: pendingStatus.status,
-                  })
-                }
-                className="rounded-xl bg-[var(--color-accent)] px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                {statusMutation.isPending
-                  ? 'Saving…'
-                  : statusActionLabel(pendingStatus.status)}
-              </button>
-            </div>
-          </div>
-        </div>
+        <StatusChangeDialog
+          schoolName={pendingStatus.school.name}
+          status={pendingStatus.status}
+          pending={statusMutation.isPending}
+          onClose={() => {
+            if (!statusMutation.isPending) setPendingStatus(null)
+          }}
+          onConfirm={(reason) =>
+            statusMutation.mutate({
+              id: pendingStatus.school.id,
+              status: pendingStatus.status,
+              reason,
+            })
+          }
+        />
       )}
     </div>
   )

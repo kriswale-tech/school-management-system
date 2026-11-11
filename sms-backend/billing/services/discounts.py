@@ -13,6 +13,7 @@ from decimal import Decimal
 
 from django.db import transaction
 from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 
 from billing.models import (
     InvoiceLine,
@@ -426,3 +427,85 @@ def subscription_discount_summaries(subscription: SchoolSubscription) -> list[di
             'ends_at': redemption.ends_at,
         })
     return rows
+
+
+@transaction.atomic
+def assign_school_discount(
+    *,
+    school,
+    campaign_id,
+    actor=None,
+    ip_address: str | None = None,
+) -> PromotionRedemption:
+    """Put this school on one discount and revoke any other active redemption."""
+    from platform_admin.services.audit import record_audit
+
+    subscription = (
+        SchoolSubscription.objects.filter(school=school, is_current=True)
+        .select_related('plan')
+        .first()
+    )
+    if subscription is None:
+        raise ValidationError({'detail': 'Start a subscription before assigning a discount.'})
+    campaign = PromotionCampaign.objects.filter(pk=campaign_id, is_active=True).first()
+    if campaign is None:
+        raise ValidationError({'campaign_id': 'Choose an active discount.'})
+    if campaign.billing_interval and campaign.billing_interval != subscription.interval:
+        raise ValidationError({
+            'campaign_id': 'This discount does not match the school billing interval.',
+        })
+    now = timezone.now()
+    if (
+        campaign.schedule == PromotionCampaign.Schedule.DATE_RANGE
+        and campaign.ends_at is not None
+        and campaign.ends_at <= now
+    ):
+        raise ValidationError({'campaign_id': 'This discount has already ended.'})
+
+    if campaign.audience == PromotionCampaign.Audience.SELECTED:
+        campaign.schools.add(school)
+
+    origin = school_billing_origin(school, fallback=subscription.current_period_start)
+    starts_at, ends_at = _campaign_window(campaign, origin)
+    if starts_at is None:
+        raise ValidationError({'campaign_id': 'This discount has no start date.'})
+
+    PromotionRedemption.objects.filter(
+        school=school,
+        revoked_at__isnull=True,
+    ).exclude(campaign=campaign).update(revoked_at=now, updated_at=now)
+
+    redemption = PromotionRedemption.objects.filter(school=school, campaign=campaign).first()
+    fields = {
+        'subscription': subscription,
+        'starts_at': starts_at,
+        'ends_at': ends_at,
+        'discount_percent': campaign.discount_percent,
+        'applies_to': campaign.applies_to,
+        'schedule': campaign.schedule,
+        'billing_interval': campaign.billing_interval or '',
+        'revoked_at': None,
+    }
+    if redemption is None:
+        redemption = PromotionRedemption.objects.create(
+            school=school,
+            campaign=campaign,
+            **fields,
+        )
+    else:
+        for key, value in fields.items():
+            setattr(redemption, key, value)
+        redemption.save(update_fields=[*fields.keys(), 'updated_at'])
+
+    record_audit(
+        actor=actor,
+        action='billing.discount.assigned',
+        target_type='school',
+        target_id=str(school.pk),
+        detail={
+            'campaign_code': campaign.code,
+            'redemption_id': str(redemption.pk),
+        },
+        ip_address=ip_address,
+    )
+    return redemption

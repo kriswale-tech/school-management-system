@@ -10,7 +10,7 @@ Distinct from:
 | **Notifications** | Staff inbox (`SchoolMembership`) + optional Celery email |
 | **Guardian communications** | Parent phone/email — no parent login required |
 
-**Status:** infra + **ward enrolled** (onboard + bulk import) + **payment receipt signed link** + **manual + automatic debt reminders** + **report-ready signed links** + **next-term fee schedules** wired. Guardian SMS/email send via **Celery** in batches of **100** (Arkesel multi-recipient + Resend batch API). SMS credits UI (per school in this app + platform admin elsewhere) is next.
+**Status:** infra + **ward enrolled** (onboard + bulk import) + **payment receipt signed link** + **manual + automatic debt reminders** + **report-ready signed links** + **next-term fee schedules** wired. Guardian SMS/email send via **Celery** in batches of **100** (Arkesel multi-recipient + Resend batch API). Settings → Messaging shows balances, a usage breakdown, and history with bulk resend. A send that does not fit the balance warns on the debt-reminder and report-ready previews, sends what fits, and notifies admins and staff. See [2026-11-11.md](./2026-11-11.md).
 
 ---
 
@@ -209,7 +209,7 @@ Term transition / re-enrollment does **not** re-notify ward enrolled. Dry-run bu
 
 ## Suggested next slices
 
-1. SMS credits ledger UI  
-2. Staff UI to browse `GuardianDelivery` (status + `error_message`)
+1. A toast after a debt-reminder or report-ready send that says how many were sent and how many were skipped
+2. Bulk resend beyond the latest 100 matching messages
 
 See also [notifications.md](./notifications.md) and [assessment-reports.md](./assessment-reports.md).

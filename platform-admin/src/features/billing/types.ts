@@ -104,6 +104,8 @@ export type Subscription = {
   pending_interval: string
   pending_sms_enabled: boolean | null
   pending_email_enabled: boolean | null
+  pending_sms_sku?: AddonSku | null
+  pending_email_sku?: AddonSku | null
   pending_change_effective_at: string | null
   app_price_snapshot_ghs: string | null
   capacity: Capacity
@@ -208,11 +210,19 @@ export type SaasPayment = {
   school_name?: string
   invoice: string | null
   purpose: string
+  purpose_label?: string
+  label?: string
+  tag?: string
+  topup_channel?: string | null
+  topup_credits?: number | null
+  package_name?: string | null
+  invoice_notes?: string
   provider: string
   status: string
   amount_ghs: string
   currency: string
   reference: string
+  provider_transaction_id?: string
   authorization_url: string
   paid_at: string | null
   created_at: string

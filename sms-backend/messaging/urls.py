@@ -1,6 +1,8 @@
 from django.urls import path
 
 from messaging.views import (
+    MessagingDeliveryBulkRetryView,
+    MessagingDeliveryEligibleView,
     MessagingDeliveryListView,
     MessagingDeliveryRetryView,
     MessagingDeliveryVerifyView,
@@ -13,6 +15,16 @@ from messaging.views import (
 urlpatterns = [
     path('overview/', MessagingOverviewView.as_view(), name='messaging-overview'),
     path('deliveries/', MessagingDeliveryListView.as_view(), name='messaging-deliveries'),
+    path(
+        'deliveries/eligible/',
+        MessagingDeliveryEligibleView.as_view(),
+        name='messaging-delivery-eligible',
+    ),
+    path(
+        'deliveries/bulk-retry/',
+        MessagingDeliveryBulkRetryView.as_view(),
+        name='messaging-delivery-bulk-retry',
+    ),
     path(
         'deliveries/<uuid:pk>/retry/',
         MessagingDeliveryRetryView.as_view(),

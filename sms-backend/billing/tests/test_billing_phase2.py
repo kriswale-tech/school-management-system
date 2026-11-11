@@ -12,8 +12,12 @@ from billing.services.capacity import ensure_can_add_students, get_capacity_snap
 from billing.services.catalog import seed_default_plans, seed_first_year_free_campaign
 from billing.services.migrate import ensure_complimentary_subscription, migrate_existing_schools
 from billing.services.subscriptions import schedule_plan_change, start_subscription
-from billing.services.upgrades import apply_capacity_upgrade, compute_capacity_upgrade_proration
-from platform_admin.models import PlatformUser
+from billing.services.upgrades import (
+    apply_capacity_upgrade,
+    compute_capacity_upgrade_proration,
+    quote_capacity_upgrade,
+)
+from platform_admin.models import PlatformAuditLog, PlatformUser
 from students.tests.factories import create_student
 
 
@@ -125,6 +129,7 @@ class BillingPhase2ServiceTests(APITestCase):
             period_end=subscription.current_period_end,
         )
         self.assertGreater(proration['amount_due_ghs'], Decimal('0.00'))
+        quote = quote_capacity_upgrade(school=self.school, new_plan=basic)
 
         subscription, invoice = apply_capacity_upgrade(
             school=self.school,
@@ -138,6 +143,14 @@ class BillingPhase2ServiceTests(APITestCase):
         self.assertTrue(
             invoice.lines.filter(kind=InvoiceLine.Kind.APPLICATION_PRORATION).exists(),
         )
+        self.assertEqual(Decimal(quote['amount_ghs']), invoice.total_ghs)
+        audit = PlatformAuditLog.objects.get(
+            action='billing.subscription.capacity_upgrade',
+            target_id=str(self.school.pk),
+        )
+        self.assertTrue(audit.detail['recorded_as_paid'])
+        self.assertEqual(audit.detail['old_plan'], 'starter')
+        self.assertEqual(audit.detail['new_plan'], 'basic')
 
     def test_migrate_existing_schools(self):
         other = create_school(name='Legacy School', phone_number='+233244000099')

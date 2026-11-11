@@ -6,6 +6,7 @@ import uuid
 
 from django.core.exceptions import ValidationError
 
+from communications.services.coverage import credit_coverage_for_send
 from fees.services.desk import FEE_DESK_ALL_TIME, resolve_fee_desk_term
 from fees.services.fees import get_student_term_balance
 from fees.services.payments import (
@@ -94,6 +95,15 @@ def _sample_messages(
         'sample_email_subject': subject,
         'sample_email_body': email_body,
     }
+
+
+def _credit_coverage(*, school, sms_count, email_count, sample_sms):
+    return credit_coverage_for_send(
+        school=school,
+        sms_count=sms_count,
+        email_count=email_count,
+        sample_sms=sample_sms,
+    )
 
 
 def preview_debt_reminders(*, school, term_id, student_ids) -> dict:
@@ -227,6 +237,12 @@ def preview_debt_reminders(*, school, term_id, student_ids) -> dict:
         'skipped': skipped[:25],
         'eligible_truncated': len(eligible) > 25,
         'skipped_truncated': len(skipped) > 25,
+        'credits': _credit_coverage(
+            school=school,
+            sms_count=sms_count if enabled else 0,
+            email_count=email_count if enabled else 0,
+            sample_sms=sample['sample_sms'],
+        ),
         **sample,
     }
 

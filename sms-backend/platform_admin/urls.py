@@ -11,6 +11,7 @@ from platform_admin.views import (
     PlatformMfaVerifyView,
     PlatformPublicConfigView,
     PlatformRefreshView,
+    PlatformSchoolAuditView,
     PlatformSchoolDetailView,
     PlatformSchoolInviteCreateView,
     PlatformSchoolInviteResendView,
@@ -47,6 +48,11 @@ urlpatterns = [
         'schools/<uuid:pk>/status/',
         PlatformSchoolStatusView.as_view(),
         name='platform-school-status',
+    ),
+    path(
+        'schools/<uuid:pk>/audit/',
+        PlatformSchoolAuditView.as_view(),
+        name='platform-school-audit',
     ),
     path(
         'schools/<uuid:pk>/invites/',

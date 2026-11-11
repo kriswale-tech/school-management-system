@@ -158,6 +158,7 @@ class DebtReminderPreviewSerializer(serializers.Serializer):
     sample_sms = serializers.CharField(allow_blank=True)
     sample_email_subject = serializers.CharField(allow_blank=True)
     sample_email_body = serializers.CharField(allow_blank=True)
+    credits = serializers.DictField()
 
 
 class DebtReminderSendResultSerializer(serializers.Serializer):

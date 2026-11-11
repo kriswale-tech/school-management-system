@@ -6,19 +6,26 @@ from rest_framework.views import APIView
 
 from billing.models import Invoice, Payment, Plan, SchoolSubscription, TopUpPackage
 from billing.serializers import (
+    AssignSchoolDiscountSerializer,
     CapacityUpgradeSerializer,
     ChangeIntervalSerializer,
+    ExtendGraceSerializer,
     InvoiceSerializer,
+    RecordTopUpSerializer,
     PaymentSerializer,
     PlanSerializer,
     PlanWriteSerializer,
     SchedulePlanChangeSerializer,
+    SchoolFinanceSerializer,
     StartSubscriptionSerializer,
     SubscriptionSerializer,
     TopUpPackageSerializer,
     TopUpPackageWriteSerializer,
 )
 from billing.services.capacity import active_staff_count, active_student_count
+from billing.services.dunning import extend_grace_period
+from billing.services.discounts import assign_school_discount
+from billing.services.finance import school_finance_summary
 from billing.services.catalog import plan_for_usage, seed_default_plans
 from billing.services.catalog_topups import seed_default_topup_packages
 from billing.services.interval_change import change_billing_interval
@@ -26,7 +33,8 @@ from billing.services.subscriptions import (
     schedule_plan_change,
     start_subscription,
 )
-from billing.services.upgrades import apply_capacity_upgrade
+from billing.services.payments import record_paid_topup, verify_platform_payment
+from billing.services.upgrades import apply_capacity_upgrade, quote_capacity_upgrade
 from core.pagination import StandardResultsSetPagination
 from platform_admin.authentication import PlatformJWTCookieAuthentication
 from platform_admin.permissions import IsPlatformAuthenticated
@@ -232,6 +240,46 @@ class PlatformSchoolCapacityUpgradeView(APIView):
         })
 
 
+class PlatformSchoolUpgradeQuoteView(APIView):
+    authentication_classes = [PlatformJWTCookieAuthentication]
+    permission_classes = [IsPlatformAuthenticated]
+
+    def get(self, request, pk):
+        school = _school_or_404(pk)
+        plan = _plan_by_code((request.query_params.get('plan_code') or '').strip())
+        return Response(quote_capacity_upgrade(school=school, new_plan=plan))
+
+
+class PlatformSchoolTopUpView(APIView):
+    authentication_classes = [PlatformJWTCookieAuthentication]
+    permission_classes = [IsPlatformAuthenticated]
+
+    @extend_schema(request=RecordTopUpSerializer)
+    def post(self, request, pk):
+        school = _school_or_404(pk)
+        serializer = RecordTopUpSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        package = TopUpPackage.objects.filter(
+            code=serializer.validated_data['package_code'],
+        ).first()
+        if package is None:
+            raise ValidationError({'package_code': 'Unknown package.'})
+        purchase = record_paid_topup(
+            school=school,
+            package=package,
+            actor=request.platform_user,
+            ip_address=client_ip(request),
+        )
+        return Response({
+            'package_code': purchase.package.code,
+            'package_name': purchase.package.name,
+            'channel': purchase.channel,
+            'credits': purchase.credits,
+            'amount_ghs': f'{purchase.amount_ghs:.2f}',
+            'status': purchase.status,
+        })
+
+
 class PlatformSchoolInvoiceListView(APIView):
     authentication_classes = [PlatformJWTCookieAuthentication]
     permission_classes = [IsPlatformAuthenticated]
@@ -248,6 +296,32 @@ class PlatformSchoolInvoiceListView(APIView):
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(qs, request, view=self)
         return paginator.get_paginated_response(InvoiceSerializer(page, many=True).data)
+
+
+class PlatformPaymentVerifyView(APIView):
+    authentication_classes = [PlatformJWTCookieAuthentication]
+    permission_classes = [IsPlatformAuthenticated]
+
+    @extend_schema(responses={200: PaymentSerializer})
+    def post(self, request, pk):
+        payment = Payment.objects.filter(pk=pk).first()
+        if payment is None:
+            raise NotFound('Payment not found.')
+        payment = verify_platform_payment(
+            payment=payment,
+            actor=request.platform_user,
+            ip_address=client_ip(request),
+        )
+        payment = (
+            Payment.objects.select_related(
+                'school',
+                'invoice',
+                'topup_purchase',
+                'topup_purchase__package',
+            )
+            .get(pk=payment.pk)
+        )
+        return Response(PaymentSerializer(payment).data)
 
 
 class PlatformInvoiceMarkPaidView(APIView):
@@ -408,3 +482,78 @@ class PlatformTopUpPackageSeedView(APIView):
     def post(self, request):
         packages = seed_default_topup_packages()
         return Response(TopUpPackageSerializer(packages, many=True).data)
+
+
+class PlatformSchoolExtendGraceView(APIView):
+    authentication_classes = [PlatformJWTCookieAuthentication]
+    permission_classes = [IsPlatformAuthenticated]
+
+    @extend_schema(request=ExtendGraceSerializer, responses={200: SubscriptionSerializer})
+    def post(self, request, pk):
+        school = _school_or_404(pk)
+        serializer = ExtendGraceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        extend_grace_period(
+            school=school,
+            until=serializer.validated_data['until'],
+            actor=request.platform_user,
+            ip_address=client_ip(request),
+        )
+        subscription = (
+            SchoolSubscription.objects.filter(school=school, is_current=True)
+            .select_related(
+                'plan',
+                'pending_plan',
+                'sms_sku',
+                'email_sku',
+                'pending_sms_sku',
+                'pending_email_sku',
+            )
+            .first()
+        )
+        return Response(SubscriptionSerializer(subscription).data)
+
+
+class PlatformSchoolFinanceView(APIView):
+    authentication_classes = [PlatformJWTCookieAuthentication]
+    permission_classes = [IsPlatformAuthenticated]
+
+    @extend_schema(responses={200: SchoolFinanceSerializer})
+    def get(self, request, pk):
+        school = _school_or_404(pk)
+        return Response(SchoolFinanceSerializer(school_finance_summary(school)).data)
+
+
+class PlatformSchoolDiscountAssignView(APIView):
+    authentication_classes = [PlatformJWTCookieAuthentication]
+    permission_classes = [IsPlatformAuthenticated]
+
+    @extend_schema(
+        request=AssignSchoolDiscountSerializer,
+        responses={200: SubscriptionSerializer},
+    )
+    def post(self, request, pk):
+        school = _school_or_404(pk)
+        serializer = AssignSchoolDiscountSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        assign_school_discount(
+            school=school,
+            campaign_id=serializer.validated_data['campaign_id'],
+            actor=request.platform_user,
+            ip_address=client_ip(request),
+        )
+        subscription = (
+            SchoolSubscription.objects.filter(school=school, is_current=True)
+            .select_related(
+                'plan',
+                'pending_plan',
+                'sms_sku',
+                'email_sku',
+                'pending_sms_sku',
+                'pending_email_sku',
+            )
+            .first()
+        )
+        if subscription is None:
+            raise NotFound('No current subscription.')
+        return Response(SubscriptionSerializer(subscription).data)

@@ -3,12 +3,19 @@ import type {
   MessageTemplate,
   MessageTemplatePreview,
   MessageTemplateUpdatePayload,
+  EligibleResendSelection,
   MessagingOverview,
   PaginatedDeliveries,
 } from './types'
 
-export async function getMessagingOverview() {
-  const { data } = await api.get<MessagingOverview>('/messaging/overview/')
+export async function getMessagingOverview(
+  options: { period?: '7d' | '30d'; start?: string; end?: string } = {},
+) {
+  const params =
+    options.start && options.end
+      ? { start: options.start, end: options.end }
+      : { period: options.period ?? '7d' }
+  const { data } = await api.get<MessagingOverview>('/messaging/overview/', { params })
   return data
 }
 
@@ -20,6 +27,26 @@ export async function getMessagingDeliveries(params?: {
   page?: number
 }) {
   const { data } = await api.get<PaginatedDeliveries>('/messaging/deliveries/', { params })
+  return data
+}
+
+export async function getEligibleMessagingDeliveries(params?: {
+  channel?: string
+  status?: string
+  event_type?: string
+  search?: string
+}) {
+  const { data } = await api.get<EligibleResendSelection>('/messaging/deliveries/eligible/', {
+    params,
+  })
+  return data
+}
+
+export async function retryMessagingDeliveries(ids: string[]) {
+  const { data } = await api.post<{
+    queued: number
+    skipped: { id: string; detail: string }[]
+  }>('/messaging/deliveries/bulk-retry/', { ids })
   return data
 }
 

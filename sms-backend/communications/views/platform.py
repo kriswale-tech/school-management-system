@@ -17,6 +17,7 @@ from communications.serializers import (
 )
 from communications.services.addons import schedule_addon_change
 from communications.services.catalog import seed_default_skus
+from communications.services.aggregates import ledger_unit_metrics
 from communications.services.gates import communications_billing_active
 from communications.services.ledger import get_balances, manual_adjust
 from core.pagination import StandardResultsSetPagination
@@ -24,6 +25,35 @@ from platform_admin.authentication import PlatformJWTCookieAuthentication
 from platform_admin.permissions import IsPlatformAuthenticated
 from platform_admin.utils import client_ip
 from schools.models import School
+
+
+def _period_credit_usage(school, subscription, balances: dict) -> dict:
+    usage = {}
+    for channel in ('sms', 'email'):
+        allowance = 0
+        used = 0
+        if subscription is not None:
+            sku = subscription.sms_sku if channel == 'sms' else subscription.email_sku
+            enabled = (
+                subscription.sms_addon_enabled if channel == 'sms' else subscription.email_addon_enabled
+            )
+            if enabled and sku is not None:
+                allowance = int(sku.credits_per_period)
+            metrics = ledger_unit_metrics(
+                start=subscription.current_period_start,
+                end=subscription.current_period_end,
+                channel=channel,
+                school=school,
+            )
+            used = int(metrics['consumed_units'])
+        ratio = round(used / allowance, 4) if allowance else None
+        usage[channel] = {
+            'balance': int(balances.get(channel, 0)),
+            'used': used,
+            'allowance': allowance,
+            'exhaustion_ratio': ratio,
+        }
+    return usage
 
 
 def _school_or_404(pk) -> School:
@@ -126,10 +156,17 @@ class PlatformSchoolCreditsView(APIView):
     def get(self, request, pk):
         school = _school_or_404(pk)
         balances = get_balances(school)
+        subscription = (
+            SchoolSubscription.objects.filter(school=school, is_current=True)
+            .select_related('sms_sku', 'email_sku')
+            .first()
+        )
+        usage = _period_credit_usage(school, subscription, balances)
         return Response({
             'sms': balances.get('sms', 0),
             'email': balances.get('email', 0),
             'billing_active': communications_billing_active(school),
+            'usage': usage,
         })
 
 

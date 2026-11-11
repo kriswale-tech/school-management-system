@@ -135,6 +135,7 @@ export type SaasPayment = {
   currency: string
   reference: string
   authorization_url: string
+  access_code?: string
   paid_at: string | null
   created_at: string
 }

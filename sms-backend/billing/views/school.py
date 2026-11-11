@@ -9,7 +9,7 @@ from decimal import Decimal
 
 from django.db.models import Sum
 
-from billing.models import Invoice, Payment, Plan, SchoolSubscription
+from billing.models import Invoice, InvoiceLine, Payment, Plan, SchoolSubscription
 from billing.serializers import (
     CapacitySerializer,
     CapacityUpgradeSerializer,
@@ -141,8 +141,13 @@ class SchoolPaymentListView(SchoolScopedAPIView):
 
     @extend_schema(responses={200: PaymentSerializer(many=True)})
     def get(self, request):
+        topup_invoice_ids = Invoice.objects.filter(
+            school=self.school,
+            lines__kind=InvoiceLine.Kind.TOPUP,
+        ).values('pk')
         qs = (
             Payment.objects.filter(school=self.school)
+            .exclude(purpose=Payment.Purpose.INVOICE, invoice_id__in=topup_invoice_ids)
             .select_related('invoice', 'topup_purchase', 'topup_purchase__package')
             .order_by('-created_at')
         )

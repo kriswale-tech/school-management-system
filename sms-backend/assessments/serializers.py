@@ -341,6 +341,7 @@ class ReportReadyPreviewSerializer(serializers.Serializer):
     skipped = ReportReadySkippedSerializer(many=True)
     eligible_truncated = serializers.BooleanField()
     skipped_truncated = serializers.BooleanField()
+    credits = serializers.DictField()
 
 
 class ReportReadySendResultSerializer(serializers.Serializer):

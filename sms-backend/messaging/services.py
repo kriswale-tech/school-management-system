@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from uuid import uuid4
 
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, F, Q, Sum
+from django.db.models.functions import Trim
 from django.utils import timezone
 from rest_framework.exceptions import NotFound, ValidationError
 
@@ -29,50 +30,42 @@ SUCCESS_LIKE = frozenset({
 })
 
 
-def messaging_overview(school) -> dict:
-    balances = get_balances(school)
-    since = timezone.now() - timedelta(days=7)
-    deliveries = GuardianDelivery.objects.filter(school=school, created_at__gte=since)
+OVERVIEW_PERIODS = {
+    '7d': 7,
+    '30d': 30,
+}
+
+_SENT_STATUSES = [
+    GuardianDelivery.Status.SUBMITTED,
+    GuardianDelivery.Status.DELIVERED,
+    GuardianDelivery.Status.SENT,
+]
+
+
+def _usage_between(school, start, end=None) -> dict:
+    deliveries = GuardianDelivery.objects.filter(school=school, created_at__gte=start)
+    if end is not None:
+        deliveries = deliveries.filter(created_at__lt=end)
     aggregates = deliveries.aggregate(
-        sms_sent=Count(
-            'id',
-            filter=Q(
-                channel='sms',
-                status__in=[
-                    GuardianDelivery.Status.SUBMITTED,
-                    GuardianDelivery.Status.DELIVERED,
-                    GuardianDelivery.Status.SENT,
-                ],
-            ),
-        ),
+        sms_sent=Count('id', filter=Q(channel='sms', status__in=_SENT_STATUSES)),
         sms_failed=Count('id', filter=Q(channel='sms', status=GuardianDelivery.Status.FAILED)),
         sms_skipped=Count('id', filter=Q(channel='sms', status=GuardianDelivery.Status.SKIPPED)),
-        email_sent=Count(
-            'id',
-            filter=Q(
-                channel='email',
-                status__in=[
-                    GuardianDelivery.Status.SUBMITTED,
-                    GuardianDelivery.Status.DELIVERED,
-                    GuardianDelivery.Status.SENT,
-                ],
-            ),
-        ),
-        email_failed=Count(
-            'id',
-            filter=Q(channel='email', status=GuardianDelivery.Status.FAILED),
-        ),
+        email_sent=Count('id', filter=Q(channel='email', status__in=_SENT_STATUSES)),
+        email_failed=Count('id', filter=Q(channel='email', status=GuardianDelivery.Status.FAILED)),
         email_skipped=Count(
             'id',
             filter=Q(channel='email', status=GuardianDelivery.Status.SKIPPED),
         ),
     )
+    credits_used = CreditLedgerEntry.objects.filter(
+        school=school,
+        entry_type=CreditLedgerEntry.EntryType.USAGE_DEBIT,
+        occurred_at__gte=start,
+    )
+    if end is not None:
+        credits_used = credits_used.filter(occurred_at__lt=end)
     credits_used = (
-        CreditLedgerEntry.objects.filter(
-            school=school,
-            entry_type=CreditLedgerEntry.EntryType.USAGE_DEBIT,
-            occurred_at__gte=since,
-        )
+        credits_used
         .values('channel')
         .annotate(used=Sum('delta'))
     )
@@ -80,6 +73,63 @@ def messaging_overview(school) -> dict:
         row['channel']: abs(int(row['used'] or 0))
         for row in credits_used
     }
+    by_event = []
+    rows = (
+        deliveries.values('channel', 'event_type')
+        .annotate(
+            sent=Count('id', filter=Q(status__in=_SENT_STATUSES)),
+            failed=Count('id', filter=Q(status=GuardianDelivery.Status.FAILED)),
+            skipped=Count('id', filter=Q(status=GuardianDelivery.Status.SKIPPED)),
+            credits_used=Sum(F('credits_charged') - F('credits_refunded')),
+        )
+        .order_by('channel', 'event_type')
+    )
+    for row in rows:
+        by_event.append({
+            'channel': row['channel'],
+            'event_type': row['event_type'],
+            'sent': row['sent'] or 0,
+            'failed': row['failed'] or 0,
+            'skipped': row['skipped'] or 0,
+            'credits_used': max(0, int(row['credits_used'] or 0)),
+        })
+    return {
+        'sms_sent': aggregates['sms_sent'] or 0,
+        'sms_failed': aggregates['sms_failed'] or 0,
+        'sms_skipped': aggregates['sms_skipped'] or 0,
+        'email_sent': aggregates['email_sent'] or 0,
+        'email_failed': aggregates['email_failed'] or 0,
+        'email_skipped': aggregates['email_skipped'] or 0,
+        'sms_credits_used': used_by_channel.get('sms', 0),
+        'email_credits_used': used_by_channel.get('email', 0),
+        'by_event': by_event,
+    }
+
+
+def messaging_overview(school, period: str = '7d', start_date=None, end_date=None) -> dict:
+    balances = get_balances(school)
+    now = timezone.now()
+    if start_date is not None or end_date is not None:
+        if start_date is None or end_date is None:
+            raise ValidationError({'detail': 'Choose both a start date and an end date.'})
+        if end_date < start_date:
+            raise ValidationError({'end': 'End date must be on or after the start date.'})
+        if (end_date - start_date).days > 366:
+            raise ValidationError({'end': 'Choose a range of one year or less.'})
+        start = timezone.make_aware(datetime.combine(start_date, time.min))
+        end = timezone.make_aware(datetime.combine(end_date + timedelta(days=1), time.min))
+        usage = _usage_between(school, start, end)
+        period_key = 'custom'
+        period_start = start_date.isoformat()
+        period_end = end_date.isoformat()
+    else:
+        days = OVERVIEW_PERIODS.get(period, 7)
+        period_key = period if period in OVERVIEW_PERIODS else '7d'
+        start = now - timedelta(days=days)
+        usage = _usage_between(school, start)
+        period_start = start.date().isoformat()
+        period_end = now.date().isoformat()
+    usage_7d = usage if period_key == '7d' else _usage_between(school, now - timedelta(days=7))
     open_failures = GuardianDelivery.objects.filter(
         school=school,
         status__in=[
@@ -89,21 +139,16 @@ def messaging_overview(school) -> dict:
     ).count()
 
     return {
+        'period': period_key,
+        'period_start': period_start,
+        'period_end': period_end,
         'credits': {
             'sms': balances.get('sms', 0),
             'email': balances.get('email', 0),
             'billing_active': communications_billing_active(school),
         },
-        'usage_7d': {
-            'sms_sent': aggregates['sms_sent'] or 0,
-            'sms_failed': aggregates['sms_failed'] or 0,
-            'sms_skipped': aggregates['sms_skipped'] or 0,
-            'email_sent': aggregates['email_sent'] or 0,
-            'email_failed': aggregates['email_failed'] or 0,
-            'email_skipped': aggregates['email_skipped'] or 0,
-            'sms_credits_used': used_by_channel.get('sms', 0),
-            'email_credits_used': used_by_channel.get('email', 0),
-        },
+        'usage': usage,
+        'usage_7d': {key: value for key, value in usage_7d.items() if key != 'by_event'},
         'open_failures': open_failures,
     }
 
@@ -114,6 +159,78 @@ def delivery_queryset(school):
         .select_related('parent', 'student', 'source_delivery')
         .order_by('-created_at')
     )
+
+
+def apply_delivery_filters(qs, *, channel='', status='', event_type='', search=''):
+    if channel:
+        qs = qs.filter(channel=channel)
+    if status:
+        qs = qs.filter(status=status)
+    if event_type:
+        qs = qs.filter(event_type=event_type)
+    if search:
+        qs = qs.filter(
+            Q(recipient_address__icontains=search) | Q(parent__name__icontains=search),
+        )
+    return qs
+
+
+RESEND_SELECTION_LIMIT = 100
+
+
+def eligible_resend_selection(
+    school,
+    *,
+    channel='',
+    status='',
+    event_type='',
+    search='',
+) -> dict:
+    """Failed or skipped messages with a body, matching the history filters.
+
+    Returns at most ``RESEND_SELECTION_LIMIT`` rows, newest first — the same
+    order as the history list.
+    """
+    qs = apply_delivery_filters(
+        delivery_queryset(school),
+        channel=channel,
+        status=status,
+        event_type=event_type,
+        search=search,
+    )
+    qs = qs.filter(
+        status__in=(GuardianDelivery.Status.FAILED, GuardianDelivery.Status.SKIPPED),
+    ).alias(
+        trimmed_text=Trim('body_text'),
+        trimmed_preview=Trim('body_preview'),
+    ).filter(
+        Q(trimmed_text__gt='') | (Q(body_text='') & Q(trimmed_preview__gt='')),
+    )
+    total = qs.count()
+    rows = list(qs.values('id', 'channel', 'segments')[:RESEND_SELECTION_LIMIT])
+    items = []
+    sms_credits = 0
+    email_credits = 0
+    for row in rows:
+        segments = int(row['segments'] or 0)
+        items.append({
+            'id': row['id'],
+            'channel': row['channel'],
+            'segments': segments,
+        })
+        if row['channel'] == GuardianDelivery.Channel.SMS:
+            sms_credits += max(1, segments or 1)
+        elif row['channel'] == GuardianDelivery.Channel.EMAIL:
+            email_credits += 1
+    return {
+        'total': total,
+        'limit': RESEND_SELECTION_LIMIT,
+        'capped': total > RESEND_SELECTION_LIMIT,
+        'ids': [item['id'] for item in items],
+        'items': items,
+        'sms_credits': sms_credits,
+        'email_credits': email_credits,
+    }
 
 
 def _delivery_for_school(*, school, delivery_id) -> GuardianDelivery:
@@ -219,8 +336,11 @@ def retry_guardian_delivery(*, school, delivery_id, actor=None) -> dict:
             raise ValidationError({
                 'detail': f'Cannot resend a message with status “{delivery.status}”.',
             })
-        if delivery.status != GuardianDelivery.Status.FAILED:
-            raise ValidationError({'detail': 'Only failed SMS messages can be resent.'})
+        if delivery.status not in (
+            GuardianDelivery.Status.FAILED,
+            GuardianDelivery.Status.SKIPPED,
+        ):
+            raise ValidationError({'detail': 'Only failed or skipped SMS messages can be resent.'})
     else:
         if delivery.status not in (
             GuardianDelivery.Status.FAILED,
@@ -263,3 +383,28 @@ def retry_guardian_delivery(*, school, delivery_id, actor=None) -> dict:
         'idempotency_key': new_key,
         'source_delivery_id': str(delivery.pk),
     }
+
+
+def retry_guardian_deliveries(*, school, delivery_ids) -> dict:
+    """Resend many eligible deliveries. Ineligible ids are reported, not fatal."""
+    ids = list(dict.fromkeys(delivery_ids))
+    if not ids:
+        raise ValidationError({'ids': 'Select at least one message.'})
+    if len(ids) > 100:
+        raise ValidationError({'ids': 'Resend at most 100 messages at a time.'})
+
+    queued = 0
+    skipped = []
+    for delivery_id in ids:
+        try:
+            result = retry_guardian_delivery(school=school, delivery_id=delivery_id)
+        except ValidationError as exc:
+            detail = exc.detail
+            if isinstance(detail, dict):
+                detail = detail.get('detail') or next(iter(detail.values()))
+            if isinstance(detail, list):
+                detail = detail[0]
+            skipped.append({'id': str(delivery_id), 'detail': str(detail)})
+            continue
+        queued += int(result.get('queued') or 0)
+    return {'queued': queued, 'skipped': skipped}

@@ -79,6 +79,7 @@ class BillingPhase5PaymentTests(APITestCase):
         self.assertEqual(payment.purpose, Payment.Purpose.TOPUP)
         self.assertEqual(payment.status, Payment.Status.PENDING)
         self.assertTrue(payment.authorization_url)
+        self.assertEqual(response.data['access_code'], 'access_test')
 
         purchase = TopUpPurchase.objects.get(payment=payment)
         self.assertEqual(purchase.credits, 100)
@@ -145,6 +146,15 @@ class BillingPhase5PaymentTests(APITestCase):
         # starter was previous — plan applied via proration confirm
         self.assertNotEqual(self.subscription.plan_id, starter.pk)
 
+    def test_dashboard_webhook_path_rejects_bad_signature(self):
+        response = self.client.post(
+            '/api/payments/paystack/webhook/',
+            data=b'{"event":"charge.success","data":{}}',
+            content_type='application/json',
+            HTTP_X_PAYSTACK_SIGNATURE='invalid',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_webhook_endpoint_rejects_bad_signature(self):
         url = reverse('school-billing-paystack-webhook')
         response = self.client.post(
@@ -185,3 +195,160 @@ class BillingPhase5PaymentTests(APITestCase):
         payment.refresh_from_db()
         self.assertEqual(payment.status, Payment.Status.SUCCESS)
         self.assertEqual(get_balances(self.school)['email'], 500)
+
+    @patch('billing.services.payments.initialize_transaction')
+    def test_topup_invoice_is_not_a_second_payment(self, mock_init):
+        mock_init.side_effect = self._fake_initialize
+        started = self.client.post(
+            reverse('school-billing-topup-purchase'),
+            {'package_code': 'sms-100'},
+            format='json',
+        )
+        self.assertEqual(started.status_code, status.HTTP_200_OK, started.data)
+        invoice_id = started.data['invoice']
+        pay = self.client.post(reverse('school-billing-invoice-pay', kwargs={'pk': invoice_id}))
+        self.assertEqual(pay.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Payment.objects.filter(invoice_id=invoice_id).count(), 1)
+
+        source = Payment.objects.get(reference=started.data['reference'])
+        duplicate = Payment.objects.create(
+            school=self.school,
+            invoice_id=invoice_id,
+            purpose=Payment.Purpose.INVOICE,
+            provider=Payment.Provider.PAYSTACK,
+            status=Payment.Status.PENDING,
+            amount_ghs=source.amount_ghs,
+            currency='GHS',
+            reference='inv_duplicate_topup',
+        )
+        listed = self.client.get(reverse('school-billing-payments'))
+        self.assertEqual(listed.status_code, status.HTTP_200_OK, listed.data)
+        references = [row['reference'] for row in listed.data['results']]
+        self.assertIn(source.reference, references)
+        self.assertNotIn(duplicate.reference, references)
+
+        upcoming = self.client.get(reverse('school-billing-upcoming'))
+        self.assertNotEqual(upcoming.data.get('open_invoice_id'), str(invoice_id))
+
+    def test_platform_topup_is_recorded_as_paid_and_audited(self):
+        from django.conf import settings
+
+        from platform_admin.models import PlatformAuditLog, PlatformUser
+
+        ops = PlatformUser.objects.create_user(
+            email='topup-ops@schoolasst.test',
+            password='SecurePass123!',
+        )
+        platform = self.client_class()
+        login = platform.post(
+            reverse('platform-login'),
+            {'email': ops.email, 'password': 'SecurePass123!'},
+            format='json',
+        )
+        platform.cookies[settings.PLATFORM_JWT['AUTH_COOKIE']] = (
+            login.cookies[settings.PLATFORM_JWT['AUTH_COOKIE']].value
+        )
+        response = platform.post(
+            reverse('platform-school-topup', kwargs={'pk': self.school.pk}),
+            {'package_code': 'sms-100'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['credits'], 100)
+        self.assertEqual(response.data['status'], 'paid')
+        self.assertEqual(get_balances(self.school)['sms'], 100)
+        payment = Payment.objects.get(school=self.school, purpose=Payment.Purpose.TOPUP)
+        self.assertEqual(payment.provider, Payment.Provider.MANUAL)
+        self.assertEqual(payment.status, Payment.Status.SUCCESS)
+        purchase = TopUpPurchase.objects.get(payment=payment)
+        self.assertEqual(purchase.status, TopUpPurchase.Status.PAID)
+        audit = PlatformAuditLog.objects.get(
+            action='billing.topup.recorded_paid',
+            target_id=str(self.school.pk),
+        )
+        self.assertTrue(audit.detail['recorded_as_paid'])
+        self.assertEqual(audit.detail['package_code'], 'sms-100')
+        self.assertEqual(audit.actor_id, ops.pk)
+
+    @patch('billing.services.payments.verify_transaction')
+    @patch('billing.services.payments.initialize_transaction')
+    def test_platform_verify_completes_a_confirmed_payment(self, mock_init, mock_verify):
+        from django.conf import settings
+
+        from billing.services.paystack import to_pesewas
+        from platform_admin.models import PlatformAuditLog, PlatformUser
+
+        mock_init.side_effect = self._fake_initialize
+        started = self.client.post(
+            reverse('school-billing-topup-purchase'),
+            {'package_code': 'sms-100'},
+            format='json',
+        )
+        self.assertEqual(started.status_code, status.HTTP_200_OK, started.data)
+        payment = Payment.objects.get(reference=started.data['reference'])
+        mock_verify.return_value = {
+            'status': 'success',
+            'amount': to_pesewas(payment.amount_ghs),
+            'id': 99,
+        }
+        ops = PlatformUser.objects.create_user(
+            email='verify-ops@schoolasst.test',
+            password='SecurePass123!',
+        )
+        platform = self.client_class()
+        login = platform.post(
+            reverse('platform-login'),
+            {'email': ops.email, 'password': 'SecurePass123!'},
+            format='json',
+        )
+        platform.cookies[settings.PLATFORM_JWT['AUTH_COOKIE']] = (
+            login.cookies[settings.PLATFORM_JWT['AUTH_COOKIE']].value
+        )
+        verified = platform.post(
+            reverse('platform-payment-verify', kwargs={'pk': payment.pk}),
+        )
+        self.assertEqual(verified.status_code, status.HTTP_200_OK, verified.data)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, Payment.Status.SUCCESS)
+        self.assertEqual(get_balances(self.school)['sms'], 100)
+        audit = PlatformAuditLog.objects.get(
+            action='billing.payment.verified',
+            target_id=str(self.school.pk),
+        )
+        self.assertEqual(audit.detail['outcome'], 'success')
+        self.assertEqual(audit.detail['reference'], payment.reference)
+
+    @patch('billing.services.payments.verify_transaction')
+    @patch('billing.services.payments.initialize_transaction')
+    def test_platform_verify_leaves_an_unconfirmed_payment(self, mock_init, mock_verify):
+        from django.conf import settings
+
+        from platform_admin.models import PlatformUser
+
+        mock_init.side_effect = self._fake_initialize
+        started = self.client.post(
+            reverse('school-billing-topup-purchase'),
+            {'package_code': 'email-500'},
+            format='json',
+        )
+        payment = Payment.objects.get(reference=started.data['reference'])
+        mock_verify.return_value = {'status': 'abandoned', 'amount': 0, 'id': 1}
+        ops = PlatformUser.objects.create_user(
+            email='verify-ops-2@schoolasst.test',
+            password='SecurePass123!',
+        )
+        platform = self.client_class()
+        login = platform.post(
+            reverse('platform-login'),
+            {'email': ops.email, 'password': 'SecurePass123!'},
+            format='json',
+        )
+        platform.cookies[settings.PLATFORM_JWT['AUTH_COOKIE']] = (
+            login.cookies[settings.PLATFORM_JWT['AUTH_COOKIE']].value
+        )
+        verified = platform.post(
+            reverse('platform-payment-verify', kwargs={'pk': payment.pk}),
+        )
+        self.assertEqual(verified.status_code, status.HTTP_400_BAD_REQUEST)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, Payment.Status.PENDING)

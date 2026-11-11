@@ -9,6 +9,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from academics.models import ClassLevel, Level
+from communications.tests.helpers import seed_test_credits
 from accounts.tests.factories import create_user, set_client_auth_cookies, user_school
 from assessments.models import Report, StudentResult
 from assessments.services.report_links import build_report_public_url, make_report_token
@@ -29,6 +30,7 @@ class ReportReadyNoticeAPITests(APITestCase):
         self.user = create_user(is_active=True)
         set_client_auth_cookies(self.client, self.user)
         self.school = user_school(self.user)
+        seed_test_credits(self.school)
         self.academic_year = AcademicYear.objects.create(
             school=self.school,
             academic_year='2025/2026',
@@ -182,7 +184,7 @@ class ReportReadyNoticeAPITests(APITestCase):
         self.assertEqual(
             GuardianDelivery.objects.filter(
                 event_type=GuardianDelivery.EventType.REPORT_READY,
-                status=GuardianDelivery.Status.SENT,
+                status=GuardianDelivery.Status.SUBMITTED,
             ).count(),
             2,
         )
@@ -247,7 +249,7 @@ class ReportReadyNoticeAPITests(APITestCase):
             GuardianDelivery.objects.filter(
                 event_type=GuardianDelivery.EventType.REPORT_READY,
                 channel=GuardianDelivery.Channel.SMS,
-                status=GuardianDelivery.Status.SENT,
+                status=GuardianDelivery.Status.SUBMITTED,
             ).count(),
             1,
         )

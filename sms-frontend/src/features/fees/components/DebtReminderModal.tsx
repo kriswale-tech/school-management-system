@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { Button, Modal } from '@/components/ui'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { getApiErrorMessage } from '@/utils'
+import CreditShortfallNotice from '@/features/messaging/components/CreditShortfallNotice'
 import { previewDebtReminders, sendDebtReminders } from '../services'
 import type { DebtReminderPreview } from '../types'
 
@@ -102,6 +103,8 @@ const DebtReminderModal = ({
             <dt className="text-slate-500">Skipped</dt>
             <dd>{displayPreview.skipped_count}</dd>
           </dl>
+
+          <CreditShortfallNotice credits={displayPreview.credits} />
 
           {displayPreview.sample_sms || displayPreview.sample_email_body ? (
             <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-3">

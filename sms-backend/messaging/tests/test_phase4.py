@@ -46,6 +46,16 @@ class MessagingPhase4Tests(APITestCase):
         self.assertEqual(overview.status_code, status.HTTP_200_OK)
         self.assertIn('credits', overview.data)
         self.assertEqual(overview.data['open_failures'], 1)
+        self.assertEqual(overview.data['period'], '7d')
+        breakdown = self.client.get(reverse('messaging-overview'), {'period': '30d'})
+        self.assertEqual(breakdown.status_code, status.HTTP_200_OK)
+        self.assertEqual(breakdown.data['period'], '30d')
+        debt = [
+            row
+            for row in breakdown.data['usage']['by_event']
+            if row['event_type'] == 'debt_reminder' and row['channel'] == 'sms'
+        ]
+        self.assertEqual(debt[0]['failed'], 1)
 
         listing = self.client.get(
             reverse('messaging-deliveries'),
@@ -86,6 +96,115 @@ class MessagingPhase4Tests(APITestCase):
             reverse('messaging-delivery-retry', kwargs={'pk': submitted.pk}),
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_overview_custom_date_range(self):
+        response = self.client.get(
+            reverse('messaging-overview'),
+            {'start': '2020-01-01', 'end': '2020-01-31'},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['period'], 'custom')
+        self.assertEqual(response.data['period_start'], '2020-01-01')
+        self.assertEqual(response.data['usage']['sms_failed'], 0)
+
+    def test_bulk_retry_resends_only_eligible_messages(self):
+        skipped = GuardianDelivery.objects.create(
+            school=self.school,
+            parent=self.parent,
+            student=self.student,
+            event_type=GuardianDelivery.EventType.DEBT_REMINDER,
+            channel=GuardianDelivery.Channel.EMAIL,
+            status=GuardianDelivery.Status.SKIPPED,
+            recipient_address='parent@example.com',
+            body_preview='Please settle fees.',
+            body_text='Please settle fees.',
+            idempotency_key='orig-skip-email',
+        )
+        submitted = GuardianDelivery.objects.create(
+            school=self.school,
+            parent=self.parent,
+            student=self.student,
+            event_type=GuardianDelivery.EventType.DEBT_REMINDER,
+            channel=GuardianDelivery.Channel.SMS,
+            status=GuardianDelivery.Status.SUBMITTED,
+            recipient_address=self.parent.phone_number,
+            body_preview='Hi',
+            body_text='Hi',
+            idempotency_key='orig-sub-bulk',
+        )
+        with (
+            patch('messaging.services.enqueue_guardian_sms', return_value=1) as sms,
+            patch('messaging.services.enqueue_guardian_email', return_value=1) as email,
+        ):
+            response = self.client.post(
+                reverse('messaging-delivery-bulk-retry'),
+                {'ids': [str(self.failed.pk), str(skipped.pk), str(submitted.pk)]},
+                format='json',
+            )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['queued'], 2)
+        self.assertEqual(len(response.data['skipped']), 1)
+        self.assertEqual(response.data['skipped'][0]['id'], str(submitted.pk))
+        sms.assert_called_once()
+        email.assert_called_once()
+
+    def test_eligible_selection_follows_filters_and_skips_ineligible(self):
+        skipped = GuardianDelivery.objects.create(
+            school=self.school,
+            parent=self.parent,
+            student=self.student,
+            event_type=GuardianDelivery.EventType.REPORT_READY,
+            channel=GuardianDelivery.Channel.EMAIL,
+            status=GuardianDelivery.Status.SKIPPED,
+            recipient_address='parent@example.com',
+            body_preview='Report ready',
+            body_text='',
+            segments=0,
+            idempotency_key='eligible-skip-email',
+        )
+        GuardianDelivery.objects.create(
+            school=self.school,
+            parent=self.parent,
+            student=self.student,
+            event_type=GuardianDelivery.EventType.DEBT_REMINDER,
+            channel=GuardianDelivery.Channel.SMS,
+            status=GuardianDelivery.Status.SUBMITTED,
+            recipient_address=self.parent.phone_number,
+            body_preview='Already sent',
+            body_text='Already sent',
+            idempotency_key='eligible-submitted',
+        )
+        GuardianDelivery.objects.create(
+            school=self.school,
+            parent=self.parent,
+            student=self.student,
+            event_type=GuardianDelivery.EventType.DEBT_REMINDER,
+            channel=GuardianDelivery.Channel.SMS,
+            status=GuardianDelivery.Status.FAILED,
+            recipient_address=self.parent.phone_number,
+            body_preview='',
+            body_text='',
+            idempotency_key='eligible-empty-body',
+        )
+        self.failed.segments = 2
+        self.failed.save(update_fields=['segments'])
+
+        response = self.client.get(reverse('messaging-delivery-eligible'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['total'], 2)
+        self.assertFalse(response.data['capped'])
+        ids = {str(item) for item in response.data['ids']}
+        self.assertEqual(ids, {str(self.failed.pk), str(skipped.pk)})
+        self.assertEqual(response.data['sms_credits'], 2)
+        self.assertEqual(response.data['email_credits'], 1)
+
+        sms_only = self.client.get(
+            reverse('messaging-delivery-eligible'),
+            {'channel': 'sms', 'status': 'failed'},
+        )
+        self.assertEqual(sms_only.status_code, status.HTTP_200_OK)
+        self.assertEqual(sms_only.data['total'], 1)
+        self.assertEqual(str(sms_only.data['ids'][0]), str(self.failed.pk))
 
     def test_arkesel_dlr_webhook_updates_status(self):
         row = GuardianDelivery.objects.create(

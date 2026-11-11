@@ -7,6 +7,7 @@ import uuid
 from django.core.exceptions import ValidationError
 
 from assessments.models import Report, StudentResult
+from communications.services.coverage import credit_coverage_for_send
 from assessments.services.admin_overview import _load_stream
 from assessments.services.report_pdf import _report_file_exists
 from notifications.models import GuardianDelivery
@@ -157,6 +158,11 @@ def preview_report_ready_notices(*, school, stream_id, term_id, student_ids) -> 
         'skipped': skipped[:25],
         'eligible_truncated': len(eligible) > 25,
         'skipped_truncated': len(skipped) > 25,
+        'credits': credit_coverage_for_send(
+            school=school,
+            sms_count=sms_count if enabled else 0,
+            email_count=email_count if enabled else 0,
+        ),
     }
 
 

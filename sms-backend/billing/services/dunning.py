@@ -177,6 +177,77 @@ def send_grace_reminder(*, subscription: SchoolSubscription) -> bool:
     return True
 
 
+@transaction.atomic
+def extend_grace_period(
+    *,
+    school: School,
+    until,
+    actor=None,
+    ip_address: str | None = None,
+) -> SchoolSubscription:
+    """Move one school's grace end later. The platform default is unchanged."""
+    from datetime import datetime, time
+
+    subscription = (
+        SchoolSubscription.objects.select_for_update()
+        .filter(school=school, is_current=True)
+        .select_related('school')
+        .first()
+    )
+    if subscription is None:
+        from rest_framework.exceptions import ValidationError
+
+        raise ValidationError({'detail': 'This school has no current subscription.'})
+    if subscription.status not in {
+        SchoolSubscription.Status.PAST_DUE,
+        SchoolSubscription.Status.SUSPENDED,
+    }:
+        from rest_framework.exceptions import ValidationError
+
+        raise ValidationError({
+            'detail': 'Grace can be extended once a renewal is unpaid.',
+        })
+
+    grace_end = timezone.make_aware(datetime.combine(until, time(23, 59, 59)))
+    current_end = subscription.grace_period_ends_at
+    if current_end is not None and grace_end <= current_end and current_end > timezone.now():
+        from rest_framework.exceptions import ValidationError
+
+        raise ValidationError({
+            'until': 'Choose a date after the current grace end.',
+        })
+
+    subscription.grace_period_ends_at = grace_end
+    subscription.status = SchoolSubscription.Status.PAST_DUE
+    update_fields = ['grace_period_ends_at', 'status', 'updated_at']
+    if grace_end > timezone.now() + timedelta(days=2):
+        subscription.dunning_notice_sent_at = None
+        update_fields.append('dunning_notice_sent_at')
+    if subscription.billing_suspended_school:
+        subscription.billing_suspended_school = False
+        update_fields.append('billing_suspended_school')
+        if school.status == School.Status.SUSPENDED:
+            school.status = School.Status.ACTIVE
+            school.suspended_at = None
+            school.activated_at = school.activated_at or timezone.now()
+            school.save(
+                update_fields=['status', 'suspended_at', 'activated_at', 'updated_at'],
+            )
+    subscription.save(update_fields=update_fields)
+    record_audit(
+        actor=actor,
+        action='billing.dunning.grace_extended',
+        target_type='school',
+        target_id=str(school.pk),
+        detail={
+            'subscription_id': str(subscription.pk),
+            'grace_period_ends_at': grace_end.isoformat(),
+        },
+        ip_address=ip_address,
+    )
+    return subscription
+
+
 def run_dunning_cycle(*, notice_days_before: int = 2) -> dict:
     """Daily dunning: grace reminders, then suspend after grace expires."""
     now = timezone.now()

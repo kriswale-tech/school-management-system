@@ -1,3 +1,4 @@
+import type { CreditCoverage } from '@/features/messaging/types'
 import type { PaginatedResponse } from '@/types/generalTypes'
 import type { QueryParamValue } from '@/utils/get-query-url'
 
@@ -172,6 +173,7 @@ export type DebtReminderPreview = {
   sample_sms: string
   sample_email_subject: string
   sample_email_body: string
+  credits?: CreditCoverage
 }
 
 export type DebtReminderSendResult = {

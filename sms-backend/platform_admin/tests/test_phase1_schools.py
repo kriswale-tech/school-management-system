@@ -171,6 +171,52 @@ class PlatformPhase1SchoolTests(APITestCase):
 
         self.assertIsNone(get_active_membership(user, school.id))
 
+    def test_status_change_requires_reason_and_lists_audit(self):
+        from platform_admin.models import PlatformAuditLog
+
+        school = create_school(name='Reason Academy', phone_number='0244000123')
+        missing = self.client.post(
+            reverse('platform-school-status', kwargs={'pk': school.id}),
+            {'status': School.Status.SUSPENDED},
+            format='json',
+        )
+        self.assertEqual(missing.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('reason', str(missing.data))
+
+        blank = self.client.post(
+            reverse('platform-school-status', kwargs={'pk': school.id}),
+            {'status': School.Status.SUSPENDED, 'reason': '   '},
+            format='json',
+        )
+        self.assertEqual(blank.status_code, status.HTTP_400_BAD_REQUEST)
+
+        changed = self.client.post(
+            reverse('platform-school-status', kwargs={'pk': school.id}),
+            {'status': School.Status.SUSPENDED, 'reason': '  Non-payment  '},
+            format='json',
+        )
+        self.assertEqual(changed.status_code, status.HTTP_200_OK)
+        school.refresh_from_db()
+        self.assertEqual(school.status, School.Status.SUSPENDED)
+        entry = PlatformAuditLog.objects.get(
+            action='platform.school.status_changed',
+            target_id=str(school.pk),
+        )
+        self.assertEqual(entry.detail['from'], School.Status.ACTIVE)
+        self.assertEqual(entry.detail['to'], School.Status.SUSPENDED)
+        self.assertEqual(entry.detail['reason'], 'Non-payment')
+
+        detail = self.client.get(reverse('platform-school-detail', kwargs={'pk': school.id}))
+        self.assertEqual(detail.status_code, status.HTTP_200_OK)
+        self.assertEqual(detail.data['status_reason'], 'Non-payment')
+
+        audit = self.client.get(reverse('platform-school-audit', kwargs={'pk': school.id}))
+        self.assertEqual(audit.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(audit.data['count'], 1)
+        self.assertEqual(audit.data['results'][0]['action'], 'platform.school.status_changed')
+        self.assertEqual(audit.data['results'][0]['detail']['reason'], 'Non-payment')
+        self.assertEqual(audit.data['results'][0]['actor_email'], 'ops@schoolasst.test')
+
 
 class ExistingSchoolMigrationSmokeTests(APITestCase):
     def test_create_school_factory_defaults_active(self):

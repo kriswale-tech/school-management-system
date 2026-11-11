@@ -15,6 +15,7 @@ from platform_admin.views.invites import (
 )
 from platform_admin.views.public import PlatformPublicConfigView
 from platform_admin.views.schools import (
+    PlatformSchoolAuditView,
     PlatformSchoolDetailView,
     PlatformSchoolListCreateView,
     PlatformSchoolStatusView,
@@ -33,6 +34,7 @@ __all__ = [
     'PlatformMfaVerifyView',
     'PlatformPublicConfigView',
     'PlatformRefreshView',
+    'PlatformSchoolAuditView',
     'PlatformSchoolDetailView',
     'PlatformSchoolInviteCreateView',
     'PlatformSchoolInviteResendView',

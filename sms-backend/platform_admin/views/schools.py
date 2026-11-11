@@ -10,6 +10,7 @@ from platform_admin.authentication import PlatformJWTCookieAuthentication
 from platform_admin.models import SchoolAdminInvite
 from platform_admin.permissions import IsPlatformAuthenticated
 from platform_admin.serializers import (
+    PlatformSchoolAuditSerializer,
     PlatformSchoolCreateSerializer,
     PlatformSchoolListSerializer,
     PlatformSchoolSerializer,
@@ -113,6 +114,7 @@ class PlatformSchoolDetailView(APIView):
         ).data
         payload['staff_count'] = school_services.active_staff_count(school)
         payload['student_count'] = school_services.active_student_count(school)
+        payload['status_reason'] = school_services.latest_status_reason(school)
         return Response(payload)
 
     @extend_schema(
@@ -148,6 +150,25 @@ class PlatformSchoolStatusView(APIView):
             actor=request.platform_user,
             school=school,
             status=serializer.validated_data['status'],
+            reason=serializer.validated_data['reason'],
             ip_address=client_ip(request),
         )
         return Response(PlatformSchoolSerializer(school).data)
+
+
+class PlatformSchoolAuditView(APIView):
+    authentication_classes = [PlatformJWTCookieAuthentication]
+    permission_classes = [IsPlatformAuthenticated]
+    pagination_class = StandardResultsSetPagination
+
+    @extend_schema(responses={200: PlatformSchoolAuditSerializer(many=True)})
+    def get(self, request, pk):
+        school = _get_school_or_404(pk)
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(
+            school_services.school_audit_logs(school),
+            request,
+            view=self,
+        )
+        serializer = PlatformSchoolAuditSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)

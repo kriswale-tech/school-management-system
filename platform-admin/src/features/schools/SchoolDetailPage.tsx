@@ -1,28 +1,96 @@
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { isAxiosError } from 'axios'
-import {
-  adjustSchoolCredits,
-  capacityUpgradeSchool,
-  getSchoolCredits,
-  getSchoolSubscription,
-  listPlans,
-  listSchoolInvoices,
-  listSchoolPayments,
-  markInvoicePaid,
-  scheduleSchoolAddon,
-  scheduleSchoolPlanChange,
-  startSchoolSubscription,
-} from '@/features/billing/services'
+import InviteAdminModal, { type InviteAdminPayload } from './InviteAdminModal'
+import SchoolBillingPanel from './SchoolBillingPanel'
+import StatusChangeDialog from './StatusChangeDialog'
 import {
   getSchool,
   inviteSchoolAdmin,
+  listSchoolAudit,
   resendSchoolAdminInvite,
   updateSchoolStatus,
 } from './services'
-import type { SchoolStatus } from './types'
+import { formatDateTime } from '@/lib/dates'
+import type { PlatformSchoolAuditEntry, SchoolStatus } from './types'
+
+const ACTION_LABELS: Record<string, string> = {
+  'platform.school.created': 'School created',
+  'platform.school.updated': 'School updated',
+  'platform.school.status_changed': 'Status changed',
+  'platform.school.invite_sent': 'Admin invite sent',
+  'platform.school.invite_resent': 'Admin invite resent',
+  'platform.school.invite_accepted': 'Admin invite accepted',
+  'billing.subscription.started': 'Subscription started',
+  'billing.subscription.change_scheduled': 'Plan change scheduled',
+  'billing.subscription.capacity_upgrade': 'Plan upgraded',
+  'billing.topup.recorded_paid': 'Credits added',
+  'billing.payment.verified': 'Payment verified',
+  'billing.dunning.grace_extended': 'Grace period extended',
+}
+
+function displayReason(reason: string) {
+  if (reason === 'admin_invite_accepted') return 'Admin accepted their invite'
+  return reason
+}
+
+function actionLabel(action: string) {
+  return ACTION_LABELS[action] ?? action.replaceAll('.', ' ').replaceAll('_', ' ')
+}
+
+function auditSummary(entry: PlatformSchoolAuditEntry) {
+  const detail = entry.detail ?? {}
+  if (entry.action === 'billing.subscription.capacity_upgrade') {
+    const amount = typeof detail.amount_ghs === 'string' ? detail.amount_ghs : ''
+    const paid = detail.recorded_as_paid ? ` · GH₵ ${amount} recorded as paid` : ''
+    return `${detail.old_plan ?? ''} → ${detail.new_plan ?? ''}${paid}`
+  }
+  if (entry.action === 'billing.payment.verified') {
+    const reference = typeof detail.reference === 'string' ? detail.reference : ''
+    const outcome = typeof detail.outcome === 'string' ? detail.outcome : ''
+    if (outcome === 'success') return `${reference} · Paystack confirmed`
+    return `${reference} · Paystack says ${outcome || 'unconfirmed'}`
+  }
+  if (entry.action === 'billing.topup.recorded_paid') {
+    return `${detail.package_name} · +${detail.credits} ${detail.channel} · GH₵ ${detail.amount_ghs} recorded as paid`
+  }
+  if (typeof detail.pending_plan === 'string' || typeof detail.pending_interval === 'string') {
+    const parts = [detail.pending_plan, detail.pending_interval].filter(
+      (part): part is string => typeof part === 'string' && part.length > 0,
+    )
+    return parts.length > 0 ? `Next renewal · ${parts.join(' · ')}` : ''
+  }
+  const reason = typeof detail.reason === 'string' ? displayReason(detail.reason) : ''
+  const from = typeof detail.from === 'string' ? detail.from : ''
+  const to = typeof detail.to === 'string' ? detail.to : ''
+  const titled = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
+  if (from && to) {
+    return `${titled(from)} → ${titled(to)}${reason ? `. ${reason}` : ''}`
+  }
+  if (reason) return reason
+  if (Array.isArray(detail.fields) && detail.fields.length > 0) {
+    return `Updated ${detail.fields.join(', ')}`
+  }
+  if (typeof detail.plan_code === 'string' && detail.plan_code) {
+    const interval = typeof detail.interval === 'string' ? detail.interval : ''
+    return interval ? `${detail.plan_code} · ${interval}` : detail.plan_code
+  }
+  if (typeof detail.email === 'string' && detail.email) return detail.email
+  return ''
+}
+
+function factTone(kind: 'active' | 'pending' | 'suspended' | 'archived' | 'complete' | 'incomplete') {
+  if (kind === 'active' || kind === 'complete') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-900'
+  }
+  if (kind === 'pending' || kind === 'incomplete') {
+    return 'border-amber-200 bg-amber-50 text-amber-950'
+  }
+  if (kind === 'suspended') return 'border-red-200 bg-red-50 text-red-900'
+  return 'border-slate-200 bg-slate-100 text-slate-700'
+}
 
 function errorMessage(error: unknown) {
   if (isAxiosError(error)) {
@@ -35,16 +103,10 @@ function errorMessage(error: unknown) {
 export default function SchoolDetailPage() {
   const { id = '' } = useParams()
   const queryClient = useQueryClient()
-  const [inviteForm, setInviteForm] = useState({
-    first_name: '',
-    last_name: '',
-    phone_number: '',
-    email: '',
-  })
-  const [intervalConfirm, setIntervalConfirm] = useState<{
-    kind: 'schedule' | 'cancel'
-    interval: 'monthly' | 'annual'
-  } | null>(null)
+  const [showInvite, setShowInvite] = useState(false)
+  const [pendingStatus, setPendingStatus] = useState<SchoolStatus | null>(null)
+  const [auditOpen, setAuditOpen] = useState(false)
+  const [auditPage, setAuditPage] = useState(1)
 
   const schoolQuery = useQuery({
     queryKey: ['platform-school', id],
@@ -52,54 +114,36 @@ export default function SchoolDetailPage() {
     enabled: Boolean(id),
   })
 
-  const subscriptionQuery = useQuery({
-    queryKey: ['platform-school-subscription', id],
-    queryFn: () => getSchoolSubscription(id),
-    enabled: Boolean(id),
-    retry: false,
-  })
-
-  const plansQuery = useQuery({
-    queryKey: ['platform-billing-plans'],
-    queryFn: listPlans,
-  })
-
-  const invoicesQuery = useQuery({
-    queryKey: ['platform-school-invoices', id],
-    queryFn: () => listSchoolInvoices(id),
-    enabled: Boolean(id),
-  })
-
-  const paymentsQuery = useQuery({
-    queryKey: ['platform-school-payments', id],
-    queryFn: () => listSchoolPayments(id),
-    enabled: Boolean(id),
-  })
-
-  const creditsQuery = useQuery({
-    queryKey: ['platform-school-credits', id],
-    queryFn: () => getSchoolCredits(id),
-    enabled: Boolean(id),
+  const auditQuery = useQuery({
+    queryKey: ['platform-school-audit', id, auditPage],
+    queryFn: () => listSchoolAudit(id, auditPage),
+    enabled: Boolean(id) && auditOpen,
   })
 
   const statusMutation = useMutation({
-    mutationFn: (status: SchoolStatus) => updateSchoolStatus(id, status),
+    mutationFn: ({ status, reason }: { status: SchoolStatus; reason: string }) =>
+      updateSchoolStatus(id, status, reason),
     onSuccess: () => {
       toast.success('Status updated')
+      setPendingStatus(null)
       void queryClient.invalidateQueries({ queryKey: ['platform-school', id] })
+      void queryClient.invalidateQueries({ queryKey: ['platform-schools'] })
+      void queryClient.invalidateQueries({ queryKey: ['platform-school-directory-summary'] })
+      void queryClient.invalidateQueries({ queryKey: ['platform-school-audit', id] })
     },
     onError: (error) => toast.error(errorMessage(error)),
   })
 
   const inviteMutation = useMutation({
-    mutationFn: () => inviteSchoolAdmin(id, inviteForm),
+    mutationFn: (payload: InviteAdminPayload) => inviteSchoolAdmin(id, payload),
     onSuccess: (invite) => {
       toast.success('Invite sent')
       if (invite.accept_url) {
         toast(`Invite link: ${invite.accept_url}`, { duration: 8000 })
       }
-      setInviteForm({ first_name: '', last_name: '', phone_number: '', email: '' })
+      setShowInvite(false)
       void queryClient.invalidateQueries({ queryKey: ['platform-school', id] })
+      void queryClient.invalidateQueries({ queryKey: ['platform-school-audit', id] })
     },
     onError: (error) => toast.error(errorMessage(error)),
   })
@@ -112,94 +156,12 @@ export default function SchoolDetailPage() {
         toast(`Invite link: ${invite.accept_url}`, { duration: 8000 })
       }
       void queryClient.invalidateQueries({ queryKey: ['platform-school', id] })
+      void queryClient.invalidateQueries({ queryKey: ['platform-school-audit', id] })
     },
     onError: (error) => toast.error(errorMessage(error)),
   })
-
-  const startSubMutation = useMutation({
-    mutationFn: () => startSchoolSubscription(id, { apply_first_year_free: true }),
-    onSuccess: () => {
-      toast.success('Subscription started')
-      void queryClient.invalidateQueries({ queryKey: ['platform-school-subscription', id] })
-      void queryClient.invalidateQueries({ queryKey: ['platform-school-invoices', id] })
-    },
-    onError: (error) => toast.error(errorMessage(error)),
-  })
-
-  const scheduleMutation = useMutation({
-    mutationFn: (planCode: string) => scheduleSchoolPlanChange(id, { plan_code: planCode }),
-    onSuccess: () => {
-      toast.success('Plan change scheduled')
-      void queryClient.invalidateQueries({ queryKey: ['platform-school-subscription', id] })
-    },
-    onError: (error) => toast.error(errorMessage(error)),
-  })
-
-  const upgradeMutation = useMutation({
-    mutationFn: (planCode: string) =>
-      capacityUpgradeSchool(id, { plan_code: planCode, mark_paid: true }),
-    onSuccess: () => {
-      toast.success('Capacity upgraded')
-      void queryClient.invalidateQueries({ queryKey: ['platform-school-subscription', id] })
-      void queryClient.invalidateQueries({ queryKey: ['platform-school-invoices', id] })
-    },
-    onError: (error) => toast.error(errorMessage(error)),
-  })
-
-  const addonMutation = useMutation({
-    mutationFn: (payload: { channel: 'sms' | 'email'; enabled: boolean }) =>
-      scheduleSchoolAddon(id, payload),
-    onSuccess: () => {
-      toast.success('Add-on change scheduled')
-      void queryClient.invalidateQueries({ queryKey: ['platform-school-subscription', id] })
-    },
-    onError: (error) => toast.error(errorMessage(error)),
-  })
-
-  const creditAdjustMutation = useMutation({
-    mutationFn: (payload: { channel: 'sms' | 'email'; delta: number }) =>
-      adjustSchoolCredits(id, { ...payload, reason: 'platform_manual_adjust' }),
-    onSuccess: () => {
-      toast.success('Credits adjusted')
-      void queryClient.invalidateQueries({ queryKey: ['platform-school-credits', id] })
-    },
-    onError: (error) => toast.error(errorMessage(error)),
-  })
-
-  const markPaidMutation = useMutation({
-    mutationFn: (invoiceId: string) => markInvoicePaid(invoiceId),
-    onSuccess: () => {
-      toast.success('Invoice marked paid')
-      void queryClient.invalidateQueries({ queryKey: ['platform-school-invoices', id] })
-      void queryClient.invalidateQueries({ queryKey: ['platform-school-subscription', id] })
-      void queryClient.invalidateQueries({ queryKey: ['platform-school-credits', id] })
-      void queryClient.invalidateQueries({ queryKey: ['platform-school', id] })
-    },
-    onError: (error) => toast.error(errorMessage(error)),
-  })
-
-  const intervalMutation = useMutation({
-    mutationFn: (interval: 'monthly' | 'annual') =>
-      scheduleSchoolPlanChange(id, { interval }),
-    onSuccess: (data) => {
-      toast.success(
-        data.pending_interval
-          ? 'Interval change scheduled for next renewal'
-          : 'Scheduled interval change cancelled',
-      )
-      setIntervalConfirm(null)
-      void queryClient.invalidateQueries({ queryKey: ['platform-school-subscription', id] })
-    },
-    onError: (error) => toast.error(errorMessage(error)),
-  })
-
-  function onInvite(event: FormEvent) {
-    event.preventDefault()
-    inviteMutation.mutate()
-  }
 
   const school = schoolQuery.data
-  const subscription = subscriptionQuery.data
 
   return (
     <div>
@@ -214,7 +176,7 @@ export default function SchoolDetailPage() {
 
       {school && (
         <>
-          <header className="mt-4 mb-8 flex flex-wrap items-start justify-between gap-4">
+          <header className="mt-4 mb-4 flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="font-[family-name:var(--font-display)] text-3xl font-semibold">
                 {school.name}
@@ -224,14 +186,6 @@ export default function SchoolDetailPage() {
                 {school.email ? ` · ${school.email}` : ''}
                 {school.region ? ` · ${school.region}` : ''}
               </p>
-              <p className="mt-1 text-sm capitalize">
-                Status: <strong>{school.status}</strong>
-                {school.setup_completed ? ' · Setup complete' : ' · Setup incomplete'}
-                {typeof school.staff_count === 'number' ? ` · Staff ${school.staff_count}` : ''}
-                {typeof school.student_count === 'number'
-                  ? ` · Students ${school.student_count}`
-                  : ''}
-              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               {(['active', 'pending', 'suspended', 'archived'] as SchoolStatus[]).map((status) => (
@@ -239,7 +193,7 @@ export default function SchoolDetailPage() {
                   key={status}
                   type="button"
                   disabled={statusMutation.isPending || school.status === status}
-                  onClick={() => statusMutation.mutate(status)}
+                  onClick={() => setPendingStatus(status)}
                   className="rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-xs font-medium capitalize disabled:opacity-50"
                 >
                   Mark {status}
@@ -248,392 +202,224 @@ export default function SchoolDetailPage() {
             </div>
           </header>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <section className="rounded-2xl border border-[var(--color-line)] bg-white/90 p-5">
+          <div className="mb-8 flex flex-wrap gap-3">
+            <div className={`min-w-36 rounded-2xl border px-4 py-3 ${factTone(school.status)}`}>
+              <p className="text-xs font-semibold tracking-wide uppercase opacity-70">Status</p>
+              <p className="mt-1 text-xl font-semibold capitalize">{school.status}</p>
+            </div>
+            <div
+              className={`min-w-36 rounded-2xl border px-4 py-3 ${factTone(
+                school.setup_completed ? 'complete' : 'incomplete',
+              )}`}
+            >
+              <p className="text-xs font-semibold tracking-wide uppercase opacity-70">Setup</p>
+              <p className="mt-1 text-xl font-semibold">
+                {school.setup_completed ? 'Complete' : 'Incomplete'}
+              </p>
+            </div>
+            <div className="min-w-28 rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3">
+              <p className="text-xs font-semibold tracking-wide text-[var(--color-ink)]/55 uppercase">
+                Staff
+              </p>
+              <p className="mt-1 font-[family-name:var(--font-display)] text-3xl font-semibold text-[var(--color-accent)]">
+                {(school.staff_count ?? 0).toLocaleString()}
+              </p>
+            </div>
+            <div className="min-w-28 rounded-2xl border border-[var(--color-line)] bg-white px-4 py-3">
+              <p className="text-xs font-semibold tracking-wide text-[var(--color-ink)]/55 uppercase">
+                Students
+              </p>
+              <p className="mt-1 font-[family-name:var(--font-display)] text-3xl font-semibold text-[#1d4e89]">
+                {(school.student_count ?? 0).toLocaleString()}
+              </p>
+            </div>
+          </div>
+          {school.status_reason ? (
+            <p className="-mt-5 mb-8 text-sm text-[var(--color-ink)]/70">
+              Last status change: {displayReason(school.status_reason)}
+            </p>
+          ) : null}
+
+          <section className="rounded-2xl border border-[var(--color-line)] bg-white/90 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold">
                 Admins
               </h2>
-              <ul className="mt-3 space-y-2 text-sm">
-                {school.admins.length === 0 && (
-                  <li className="text-[var(--color-ink)]/60">No admins yet.</li>
-                )}
-                {school.admins.map((admin) => (
-                  <li key={admin.membership_id}>
-                    <span className="font-medium">{admin.full_name || admin.phone_number}</span>
-                    <span className="text-[var(--color-ink)]/60"> · {admin.phone_number}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-
-            <section className="rounded-2xl border border-[var(--color-line)] bg-white/90 p-5">
-              <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold">
+              <button
+                type="button"
+                onClick={() => setShowInvite(true)}
+                className="rounded-xl bg-[var(--color-accent)] px-3 py-2 text-xs font-semibold text-white"
+              >
                 Invite admin
-              </h2>
-              <form onSubmit={onInvite} className="mt-3 space-y-3">
-                {(
-                  [
-                    ['first_name', 'First name'],
-                    ['last_name', 'Last name'],
-                    ['phone_number', 'Phone'],
-                    ['email', 'Email'],
-                  ] as const
-                ).map(([key, label]) => (
-                  <label key={key} className="block text-sm">
-                    <span className="mb-1 block font-medium">{label}</span>
-                    <input
-                      required={key !== 'last_name'}
-                      value={inviteForm[key]}
-                      onChange={(e) =>
-                        setInviteForm((prev) => ({ ...prev, [key]: e.target.value }))
-                      }
-                      className="w-full rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] px-3 py-2"
-                    />
-                  </label>
-                ))}
-                <button
-                  type="submit"
-                  disabled={inviteMutation.isPending}
-                  className="rounded-xl bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  {inviteMutation.isPending ? 'Sending…' : 'Send invite'}
-                </button>
-              </form>
-            </section>
-          </div>
-
-          <section className="mt-4 rounded-2xl border border-[var(--color-line)] bg-white/90 p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold">
-                  Subscription
-                </h2>
-                <p className="mt-1 text-sm text-[var(--color-ink)]/70">
-                  Application plan, capacity, and renewal.
-                </p>
-              </div>
-              {!subscription && !subscriptionQuery.isLoading && (
-                <button
-                  type="button"
-                  onClick={() => startSubMutation.mutate()}
-                  disabled={startSubMutation.isPending}
-                  className="rounded-xl bg-[var(--color-accent)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
-                >
-                  Start first-year free
-                </button>
-              )}
+              </button>
             </div>
-
-            {subscriptionQuery.isLoading && (
-              <p className="mt-3 text-sm text-[var(--color-ink)]/60">Loading subscription…</p>
-            )}
-            {subscriptionQuery.isError && !subscription && (
-              <p className="mt-3 text-sm text-[var(--color-ink)]/60">
-                No current subscription for this school.
-              </p>
-            )}
-            {subscription && (
-              <div className="mt-4 space-y-3 text-sm">
-                <p>
-                  <strong>{subscription.plan.name}</strong> · {subscription.interval} ·{' '}
-                  <span className="capitalize">{subscription.status}</span>
-                  {subscription.billing_suspended_school ? ' · school locked by billing' : ''}
-                </p>
-                <div className="text-[var(--color-ink)]/80">
-                  {(subscription.discounts ?? []).length === 0 ? (
-                    <p>No discount is currently reducing this school's invoices.</p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {(subscription.discounts ?? []).map((discount) => (
-                        <li key={discount.id}>
-                          <strong>{discount.name}</strong> · {Number(discount.discount_percent)}% off
-                          {discount.schedule === 'recurring'
-                            ? ' · every invoice'
-                            : discount.ends_at
-                              ? ` · until ${new Date(discount.ends_at).toLocaleDateString('en-GB')}`
-                              : ''}
-                        </li>
-                      ))}
-                    </ul>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[36rem] text-left text-sm">
+                <thead className="text-xs tracking-wide text-[var(--color-ink)]/55 uppercase">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold">Name</th>
+                    <th className="px-3 py-2 font-semibold">Phone</th>
+                    <th className="px-3 py-2 font-semibold">Email</th>
+                    <th className="px-3 py-2 font-semibold">Role</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {school.admins.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-4 text-[var(--color-ink)]/60">
+                        No admins yet.
+                      </td>
+                    </tr>
                   )}
-                </div>
-                <p className="text-[var(--color-ink)]/70">
-                  Students {subscription.capacity.active_students}
-                  {subscription.capacity.capacity_max != null
-                    ? ` / ${subscription.capacity.capacity_max}`
-                    : ' (open)'}
-                  {' · '}Staff {subscription.capacity.active_staff}
-                  {subscription.capacity.staff_capacity_max != null
-                    ? ` / ${subscription.capacity.staff_capacity_max}`
-                    : ' (open)'}
-                  {' · '}Renews{' '}
-                  {new Date(subscription.current_period_end).toLocaleDateString('en-GB')}
-                </p>
-                {subscription.grace_period_ends_at && (
-                  <p className="text-amber-800">
-                    Grace ends{' '}
-                    {new Date(subscription.grace_period_ends_at).toLocaleDateString('en-GB')}
-                  </p>
-                )}
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {subscription.pending_interval &&
-                  subscription.pending_interval !== subscription.interval ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setIntervalConfirm({
-                          kind: 'cancel',
-                          interval: subscription.interval,
-                        })
-                      }
-                      disabled={intervalMutation.isPending}
-                      className="rounded-xl border border-[var(--color-line)] px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-                    >
-                      Cancel scheduled {subscription.pending_interval}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setIntervalConfirm({
-                          kind: 'schedule',
-                          interval:
-                            subscription.interval === 'annual' ? 'monthly' : 'annual',
-                        })
-                      }
-                      disabled={intervalMutation.isPending}
-                      className="rounded-xl border border-[var(--color-line)] px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-                    >
-                      Schedule{' '}
-                      {subscription.interval === 'annual' ? 'monthly' : 'annual'} at renewal
-                    </button>
-                  )}
-                </div>
-                {(subscription.pending_plan || subscription.pending_interval) && (
-                  <p className="text-amber-800">
-                    Pending:
-                    {subscription.pending_plan ? ` ${subscription.pending_plan.name}` : ''}
-                    {subscription.pending_interval
-                      ? ` ${subscription.pending_interval}`
-                      : ''}{' '}
-                    on{' '}
-                    {subscription.pending_change_effective_at
-                      ? new Date(subscription.pending_change_effective_at).toLocaleDateString(
-                          'en-GB',
-                        )
-                      : 'next period'}
-                  </p>
-                )}
-                <p className="text-[var(--color-ink)]/70">
-                  SMS add-on: {subscription.sms_addon_enabled ? 'on' : 'off'}
-                  {' · '}Email add-on: {subscription.email_addon_enabled ? 'on' : 'off'}
-                </p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      addonMutation.mutate({
-                        channel: 'sms',
-                        enabled: !subscription.sms_addon_enabled,
-                      })
-                    }
-                    disabled={addonMutation.isPending}
-                    className="rounded-xl border border-[var(--color-line)] px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-                  >
-                    {subscription.sms_addon_enabled ? 'Schedule SMS off' : 'Schedule SMS on'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      addonMutation.mutate({
-                        channel: 'email',
-                        enabled: !subscription.email_addon_enabled,
-                      })
-                    }
-                    disabled={addonMutation.isPending}
-                    className="rounded-xl border border-[var(--color-line)] px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-                  >
-                    {subscription.email_addon_enabled
-                      ? 'Schedule email off'
-                      : 'Schedule email on'}
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {(plansQuery.data ?? [])
-                    .filter((plan) => plan.code !== subscription.plan.code)
-                    .map((plan) => (
-                      <div key={plan.id} className="flex gap-1">
-                        <button
-                          type="button"
-                          onClick={() => scheduleMutation.mutate(plan.code)}
-                          disabled={scheduleMutation.isPending}
-                          className="rounded-xl border border-[var(--color-line)] px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-                        >
-                          Schedule {plan.name}
-                        </button>
-                        {plan.sort_order > subscription.plan.sort_order && (
-                          <button
-                            type="button"
-                            onClick={() => upgradeMutation.mutate(plan.code)}
-                            disabled={upgradeMutation.isPending}
-                            className="rounded-xl border border-[var(--color-line)] px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-                          >
-                            Upgrade now
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-
-            <div className="mt-5 border-t border-[var(--color-line)] pt-4">
-              <h3 className="text-sm font-semibold">Messaging credits</h3>
-              <p className="mt-1 text-sm text-[var(--color-ink)]/70">
-                SMS {creditsQuery.data?.sms ?? 0} · Email {creditsQuery.data?.email ?? 0}
-                {' · credits metered'}
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => creditAdjustMutation.mutate({ channel: 'sms', delta: 100 })}
-                  disabled={creditAdjustMutation.isPending}
-                  className="rounded-xl border border-[var(--color-line)] px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-                >
-                  +100 SMS
-                </button>
-                <button
-                  type="button"
-                  onClick={() => creditAdjustMutation.mutate({ channel: 'email', delta: 100 })}
-                  disabled={creditAdjustMutation.isPending}
-                  className="rounded-xl border border-[var(--color-line)] px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-                >
-                  +100 email
-                </button>
-              </div>
+                  {school.admins.map((admin) => (
+                    <tr key={admin.membership_id} className="border-t border-[var(--color-line)]">
+                      <td className="px-3 py-3 font-medium">
+                        {admin.full_name || admin.phone_number}
+                      </td>
+                      <td className="px-3 py-3">{admin.phone_number}</td>
+                      <td className="px-3 py-3">{admin.email || '—'}</td>
+                      <td className="px-3 py-3 capitalize">{admin.role}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
-            <div className="mt-5 border-t border-[var(--color-line)] pt-4">
-              <h3 className="text-sm font-semibold">Invoices</h3>
-              <ul className="mt-2 space-y-2 text-sm">
-                {(invoicesQuery.data?.results ?? []).length === 0 && (
-                  <li className="text-[var(--color-ink)]/60">No invoices yet.</li>
+            <div className="mt-6 border-t border-[var(--color-line)] pt-4">
+              <h3 className="text-sm font-semibold">Invites</h3>
+              <ul className="mt-3 space-y-3 text-sm">
+                {school.invites.length === 0 && (
+                  <li className="text-[var(--color-ink)]/60">No invites yet.</li>
                 )}
-                {(invoicesQuery.data?.results ?? []).map((invoice) => (
-                  <li key={invoice.id} className="flex flex-wrap items-center justify-between gap-3">
-                    <span>
-                      GH₵ {invoice.total_ghs} · {invoice.status}
-                      {invoice.notes ? ` · ${invoice.notes}` : ''}
-                    </span>
-                    <span className="flex items-center gap-2 text-[var(--color-ink)]/60">
-                      {new Date(invoice.created_at).toLocaleDateString('en-GB')}
-                      {invoice.status === 'open' && Number(invoice.total_ghs) > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => markPaidMutation.mutate(invoice.id)}
-                          disabled={markPaidMutation.isPending}
-                          className="rounded-lg border border-[var(--color-line)] px-2 py-1 text-xs font-medium text-[var(--color-ink)] disabled:opacity-50"
-                        >
-                          Mark paid
-                        </button>
-                      )}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="mt-5 border-t border-[var(--color-line)] pt-4">
-              <h3 className="text-sm font-semibold">Payments</h3>
-              <ul className="mt-2 space-y-2 text-sm">
-                {(paymentsQuery.data?.results ?? []).length === 0 && (
-                  <li className="text-[var(--color-ink)]/60">No Paystack payments yet.</li>
-                )}
-                {(paymentsQuery.data?.results ?? []).map((payment) => (
-                  <li key={payment.id} className="flex justify-between gap-3">
-                    <span>
-                      GH₵ {payment.amount_ghs} · {payment.purpose} · {payment.status}
-                    </span>
-                    <span className="font-mono text-xs text-[var(--color-ink)]/60">
-                      {payment.reference}
-                    </span>
+                {school.invites.map((invite) => (
+                  <li
+                    key={invite.id}
+                    className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-line)] pt-3 first:border-t-0 first:pt-0"
+                  >
+                    <div>
+                      <p className="font-medium">
+                        {invite.first_name} {invite.last_name} · {invite.phone_number}
+                      </p>
+                      <p className="text-[var(--color-ink)]/60">
+                        {invite.email} · <span className="capitalize">{invite.status}</span>
+                      </p>
+                    </div>
+                    {(invite.status === 'pending' || invite.status === 'expired') && (
+                      <button
+                        type="button"
+                        onClick={() => resendMutation.mutate(invite.id)}
+                        className="rounded-xl border border-[var(--color-line)] px-3 py-1.5 text-xs font-medium"
+                      >
+                        Resend
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
             </div>
           </section>
 
-          <section className="mt-4 rounded-2xl border border-[var(--color-line)] bg-white/90 p-5">
-            <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold">
-              Invites
-            </h2>
-            <ul className="mt-3 space-y-3 text-sm">
-              {school.invites.length === 0 && (
-                <li className="text-[var(--color-ink)]/60">No invites yet.</li>
-              )}
-              {school.invites.map((invite) => (
-                <li
-                  key={invite.id}
-                  className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-line)] pt-3 first:border-t-0 first:pt-0"
-                >
-                  <div>
-                    <p className="font-medium">
-                      {invite.first_name} {invite.last_name} · {invite.phone_number}
-                    </p>
-                    <p className="text-[var(--color-ink)]/60">
-                      {invite.email} · <span className="capitalize">{invite.status}</span>
-                    </p>
-                  </div>
-                  {(invite.status === 'pending' || invite.status === 'expired') && (
+          <SchoolBillingPanel schoolId={id} />
+
+          <section className="mt-4 rounded-2xl border border-[var(--color-line)] bg-white/90">
+            <button
+              type="button"
+              onClick={() => setAuditOpen((open) => !open)}
+              className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+              aria-expanded={auditOpen}
+            >
+              <span>
+                <span className="block font-[family-name:var(--font-display)] text-lg font-semibold">
+                  Audit log
+                </span>
+                <span className="mt-0.5 block text-sm text-[var(--color-ink)]/60">
+                  Status changes, invites, and billing events for this school.
+                </span>
+              </span>
+              <span className="text-sm font-medium text-[var(--color-accent)]">
+                {auditOpen ? 'Hide' : 'Show'}
+              </span>
+            </button>
+            {auditOpen && (
+              <div className="border-t border-[var(--color-line)] px-5 py-4">
+                {auditQuery.isLoading && (
+                  <p className="text-sm text-[var(--color-ink)]/60">Loading audit log…</p>
+                )}
+                {auditQuery.isError && (
+                  <p className="text-sm text-red-700">Could not load the audit log.</p>
+                )}
+                {auditQuery.data && auditQuery.data.results.length === 0 && (
+                  <p className="text-sm text-[var(--color-ink)]/60">No audit entries yet.</p>
+                )}
+                {auditQuery.data && auditQuery.data.results.length > 0 && (
+                  <ul className="space-y-3 text-sm">
+                    {auditQuery.data.results.map((entry) => {
+                      const summary = auditSummary(entry)
+                      return (
+                        <li key={entry.id} className="border-t border-[var(--color-line)] pt-3 first:border-t-0 first:pt-0">
+                          <p className="font-medium">{actionLabel(entry.action)}</p>
+                          {summary ? (
+                            <p className="text-[var(--color-ink)]/75">{summary}</p>
+                          ) : null}
+                          <p className="text-xs text-[var(--color-ink)]/55">
+                            {entry.actor_name || entry.actor_email || 'System'}
+                            {' · '}
+                            {formatDateTime(entry.created_at)}
+                          </p>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+                {auditQuery.data && auditQuery.data.count > auditQuery.data.results.length && (
+                  <div className="mt-4 flex gap-2">
                     <button
                       type="button"
-                      onClick={() => resendMutation.mutate(invite.id)}
-                      className="rounded-xl border border-[var(--color-line)] px-3 py-1.5 text-xs font-medium"
+                      disabled={!auditQuery.data.previous}
+                      onClick={() => setAuditPage((page) => Math.max(1, page - 1))}
+                      className="rounded-lg border border-[var(--color-line)] px-3 py-1.5 text-xs disabled:opacity-40"
                     >
-                      Resend
+                      Previous
                     </button>
-                  )}
-                </li>
-              ))}
-            </ul>
+                    <button
+                      type="button"
+                      disabled={!auditQuery.data.next}
+                      onClick={() => setAuditPage((page) => page + 1)}
+                      className="rounded-lg border border-[var(--color-line)] px-3 py-1.5 text-xs disabled:opacity-40"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
         </>
       )}
 
-      {intervalConfirm && subscription && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-[var(--color-line)] bg-white p-5 shadow-lg">
-            <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold">
-              {intervalConfirm.kind === 'cancel'
-                ? 'Cancel scheduled interval change?'
-                : 'Schedule billing interval change?'}
-            </h3>
-            <p className="mt-3 text-sm text-[var(--color-ink)]/70">
-              {intervalConfirm.kind === 'cancel'
-                ? `This cancels the pending switch. The school stays on ${subscription.interval} billing through the next renewal (${new Date(subscription.current_period_end).toLocaleDateString('en-GB')}).`
-                : `Schedule a switch from ${subscription.interval} to ${intervalConfirm.interval}. Nothing changes today — the new interval starts at the next renewal on ${new Date(subscription.current_period_end).toLocaleDateString('en-GB')}.`}
-            </p>
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                className="rounded-xl border border-[var(--color-line)] px-3 py-2 text-sm font-medium disabled:opacity-50"
-                disabled={intervalMutation.isPending}
-                onClick={() => setIntervalConfirm(null)}
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                className="rounded-xl bg-[var(--color-accent)] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                disabled={intervalMutation.isPending}
-                onClick={() => intervalMutation.mutate(intervalConfirm.interval)}
-              >
-                {intervalConfirm.kind === 'cancel' ? 'Cancel schedule' : 'Confirm schedule'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {school && pendingStatus && (
+        <StatusChangeDialog
+          schoolName={school.name}
+          status={pendingStatus}
+          pending={statusMutation.isPending}
+          onClose={() => {
+            if (!statusMutation.isPending) setPendingStatus(null)
+          }}
+          onConfirm={(reason) => statusMutation.mutate({ status: pendingStatus, reason })}
+        />
       )}
+
+      {school && (
+        <InviteAdminModal
+          open={showInvite}
+          pending={inviteMutation.isPending}
+          onClose={() => {
+            if (!inviteMutation.isPending) setShowInvite(false)
+          }}
+          onInvite={(payload) => inviteMutation.mutate(payload)}
+        />
+      )}
+
     </div>
   )
 }

@@ -3,6 +3,7 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from assessments.public_views import PublicReportView
+from billing.views import PaystackSaaSWebhookView
 from fees.public_views import PublicFeeScheduleView, PublicReceiptView
 from notifications.views_webhooks import (
     ArkeselSmsDlrWebhookView,
@@ -70,6 +71,12 @@ urlpatterns = [
     path(f'{v1_path}platform/communications/', include('communications.urls_platform')),
     path(f'{v1_path}platform/messages/', include('communications.urls_messages')),
     path(f'{v1_path}billing/', include('billing.urls')),
+    # Paystack dashboard URL (ngrok or production). Same handler as the v1 billing webhook.
+    path(
+        'api/payments/paystack/webhook/',
+        PaystackSaaSWebhookView.as_view(),
+        name='paystack-saas-webhook',
+    ),
     path(f'{v1_path}communications/', include('communications.urls')),
     path(f'{v1_path}messaging/', include('messaging.urls')),
 ]

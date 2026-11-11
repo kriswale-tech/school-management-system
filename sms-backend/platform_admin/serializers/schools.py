@@ -186,6 +186,34 @@ class PlatformSchoolCreateSerializer(serializers.Serializer):
 
 class PlatformSchoolStatusSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=School.Status.choices)
+    reason = serializers.CharField(max_length=500)
+
+    def validate_reason(self, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise serializers.ValidationError('Enter a reason for this status change.')
+        return cleaned
+
+
+class PlatformSchoolAuditSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    action = serializers.CharField()
+    actor_name = serializers.SerializerMethodField()
+    actor_email = serializers.SerializerMethodField()
+    detail = serializers.JSONField()
+    created_at = serializers.DateTimeField()
+
+    def get_actor_name(self, entry) -> str:
+        actor = entry.actor
+        if actor is None:
+            return ''
+        return actor.full_name
+
+    def get_actor_email(self, entry) -> str:
+        actor = entry.actor
+        if actor is None:
+            return ''
+        return actor.email
 
 
 class PlatformSchoolAdminSerializer(serializers.Serializer):

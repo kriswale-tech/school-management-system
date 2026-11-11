@@ -117,7 +117,7 @@ def build_upcoming_renewal_preview(subscription: SchoolSubscription) -> dict:
             school_id=subscription.school_id,
             status=Invoice.Status.OPEN,
         )
-        .exclude(lines__kind=InvoiceLine.Kind.INTERVAL_CHANGE)
+        .exclude(lines__kind__in=[InvoiceLine.Kind.INTERVAL_CHANGE, InvoiceLine.Kind.TOPUP])
         .order_by('-created_at')
         .prefetch_related('lines')
         .first()

@@ -8,6 +8,7 @@ import {
   sendReportReadyNotices,
 } from '@/features/classes/services'
 import type { ReportReadyPreview } from '@/features/classes/assessment/types'
+import CreditShortfallNotice from '@/features/messaging/components/CreditShortfallNotice'
 import { getApiErrorMessage } from '@/utils'
 
 type ReportReadyModalProps = {
@@ -117,6 +118,8 @@ const ReportReadyModal = ({
             <dt className="text-slate-500">Skipped</dt>
             <dd>{displayPreview.skipped_count}</dd>
           </dl>
+
+          <CreditShortfallNotice credits={displayPreview.credits} />
 
           {displayPreview.eligible.length > 0 ? (
             <div className="space-y-2">

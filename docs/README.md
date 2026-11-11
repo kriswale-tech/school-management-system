@@ -8,6 +8,7 @@ Project status and reference docs for the SMS monorepo (`sms-backend` + `sms-fro
 | --- | --- |
 | [platform-admin-billing-architecture-v4.md](./platform-admin-billing-architecture-v4.md) | **Source of truth:** Platform Admin & SaaS billing v4 (locked) + v4.1 Messages/communications extension — plans, capacity, proration, credit ledger, provider economics |
 | [platform-admin-schools.md](./platform-admin-schools.md) | Platform admin school directory: summary counts, list columns, overdue, and the create-school modal |
+| [2026-11-11.md](./2026-11-11.md) | 11 Nov 2026: platform school billing controls, school Paystack checkout, messaging usage and bulk resend |
 | [HOW_IT_WORKS.md](./HOW_IT_WORKS.md) | Simple walkthrough: signup → access → modules |
 | [STATUS.md](./STATUS.md) | What is built vs what is left |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Stack, apps, multi-school model, API layout |
@@ -28,4 +29,4 @@ Related backend-only notes live under [`sms-backend/docs/`](../sms-backend/docs/
 
 URL tab conventions for page-level panels are summarized in [HOW_IT_WORKS.md](./HOW_IT_WORKS.md) (§ URL tabs).
 
-**Last reviewed:** 2026-11-10
+**Last reviewed:** 2026-11-11

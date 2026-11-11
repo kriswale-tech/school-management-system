@@ -4,7 +4,11 @@ from notifications.models import GuardianDelivery
 
 
 class MessagingOverviewSerializer(serializers.Serializer):
+    period = serializers.CharField()
+    period_start = serializers.CharField()
+    period_end = serializers.CharField()
     credits = serializers.DictField()
+    usage = serializers.DictField()
     usage_7d = serializers.DictField()
     open_failures = serializers.IntegerField()
 
@@ -86,12 +90,38 @@ class GuardianDeliverySerializer(serializers.ModelSerializer):
         return (obj.user_error_message or obj.error_message or obj.skip_reason or '').strip()
 
     def get_can_resend(self, obj) -> bool:
-        if obj.channel == GuardianDelivery.Channel.SMS:
-            return obj.status == GuardianDelivery.Status.FAILED
+        body = (obj.body_text or obj.body_preview or '').strip()
+        if not body:
+            return False
         return obj.status in (
             GuardianDelivery.Status.FAILED,
             GuardianDelivery.Status.SKIPPED,
         )
+
+
+class EligibleDeliveryItemSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    channel = serializers.CharField()
+    segments = serializers.IntegerField()
+
+
+class EligibleResendSelectionSerializer(serializers.Serializer):
+    total = serializers.IntegerField()
+    limit = serializers.IntegerField()
+    capped = serializers.BooleanField()
+    ids = serializers.ListField(child=serializers.UUIDField())
+    items = EligibleDeliveryItemSerializer(many=True)
+    sms_credits = serializers.IntegerField()
+    email_credits = serializers.IntegerField()
+
+
+class BulkRetryDeliverySerializer(serializers.Serializer):
+    ids = serializers.ListField(child=serializers.UUIDField(), allow_empty=False, max_length=100)
+
+
+class BulkRetryResultSerializer(serializers.Serializer):
+    queued = serializers.IntegerField()
+    skipped = serializers.ListField(child=serializers.DictField())
 
 
 class RetryDeliverySerializer(serializers.Serializer):

@@ -187,13 +187,82 @@ def apply_capacity_upgrade(
             'old_plan': old_plan.code,
             'new_plan': target.code,
             'invoice_id': str(invoice.pk),
-            'amount_ghs': str(invoice.total_ghs),
+            'amount_ghs': f'{invoice.total_ghs:.2f}',
             'period_end_unchanged': subscription.current_period_end.isoformat(),
             'plan_applied': invoice.status == invoice.Status.PAID,
+            'recorded_as_paid': bool(
+                mark_paid and invoice.status == invoice.Status.PAID
+            ),
         },
         ip_address=ip_address,
     )
     return subscription, invoice
+
+
+def quote_capacity_upgrade(*, school, new_plan: Plan) -> dict:
+    """Prorated upgrade total, including the school's discount, without writing an invoice."""
+    subscription = current_subscription(school)
+    if subscription is None:
+        raise ValidationError({'detail': 'School has no current subscription.'})
+
+    old_plan = subscription.plan
+    students = active_student_count(school)
+    staff = active_staff_count(school)
+    if new_plan.sort_order <= old_plan.sort_order:
+        raise ValidationError({'plan': 'Target plan must be a higher capacity tier.'})
+    if not new_plan.covers_usage(students=students, staff=staff):
+        raise ValidationError({
+            'plan': (
+                f'{new_plan.name} cannot cover {students} students / {staff} staff. '
+                'Choose a higher plan.'
+            ),
+        })
+
+    now = timezone.now()
+    proration = compute_capacity_upgrade_proration(
+        old_plan=old_plan,
+        new_plan=new_plan,
+        interval=subscription.interval,
+        period_start=subscription.current_period_start,
+        period_end=subscription.current_period_end,
+        now=now,
+    )
+    lines = [
+        {
+            'kind': InvoiceLine.Kind.APPLICATION_PRORATION,
+            'description': f'Capacity upgrade {old_plan.name} → {new_plan.name}',
+            'quantity': '1',
+            'unit_price_ghs': str(proration['amount_due_ghs']),
+            'amount_ghs': str(proration['amount_due_ghs']),
+            'metadata': {},
+        },
+    ]
+    lines, _redemption = apply_subscription_discount(
+        lines,
+        subscription=subscription,
+        period_start=now,
+        period_end=subscription.current_period_end,
+        period_origin=subscription.current_period_start,
+        interval=subscription.interval,
+        persist=False,
+    )
+    subtotal = Decimal('0.00')
+    discount = Decimal('0.00')
+    for line in lines:
+        amount = Decimal(str(line['amount_ghs'])).quantize(Decimal('0.01'))
+        if line['kind'] == InvoiceLine.Kind.DISCOUNT:
+            discount += abs(amount)
+        else:
+            subtotal += amount
+    total = max(Decimal('0.00'), subtotal - discount).quantize(Decimal('0.01'))
+    return {
+        'plan_code': new_plan.code,
+        'plan_name': new_plan.name,
+        'amount_ghs': f'{total:.2f}',
+        'discount_ghs': f'{discount:.2f}',
+        'remaining_days': proration['remaining_days'],
+        'total_days': proration['total_days'],
+    }
 
 
 @transaction.atomic

@@ -45,6 +45,13 @@ def _assert_open_invoice(invoice: Invoice) -> None:
         raise ValidationError({'detail': 'Only open invoices can be paid.'})
     if invoice.total_ghs <= 0:
         raise ValidationError({'detail': 'Invoice total must be greater than zero.'})
+    if invoice.lines.filter(kind=InvoiceLine.Kind.TOPUP).exists():
+        raise ValidationError({
+            'detail': (
+                'This invoice is a credit top-up. Confirm that top-up charge '
+                'instead of starting another payment.'
+            ),
+        })
 
 
 @transaction.atomic
@@ -185,6 +192,108 @@ def start_topup_checkout(*, school, package: TopUpPackage, actor_user=None) -> P
     return payment
 
 
+@transaction.atomic
+def record_paid_topup(*, school, package: TopUpPackage, actor=None, ip_address: str | None = None) -> TopUpPurchase:
+    """Record a platform top-up as already paid and grant the credits. No Paystack charge."""
+    from platform_admin.models import PlatformUser
+    from platform_admin.services.audit import record_audit
+
+    if not package.is_active:
+        raise ValidationError({'package_code': 'Package is not available.'})
+    subscription = (
+        SchoolSubscription.objects.filter(school=school, is_current=True)
+        .select_related('plan')
+        .first()
+    )
+    if subscription is None:
+        raise ValidationError({'detail': 'School has no current subscription.'})
+
+    now = timezone.now()
+    invoice = create_invoice_with_lines(
+        school=school,
+        subscription=subscription,
+        period_start=now,
+        period_end=subscription.current_period_end,
+        lines=[
+            {
+                'kind': InvoiceLine.Kind.TOPUP,
+                'description': f'{package.name} (+{package.credits} {package.channel})',
+                'quantity': '1',
+                'unit_price_ghs': str(package.price_ghs),
+                'amount_ghs': str(package.price_ghs),
+                'metadata': {
+                    'package_code': package.code,
+                    'channel': package.channel,
+                    'credits': package.credits,
+                    'recorded_by': 'platform',
+                },
+            },
+        ],
+        notes='Communication credit top-up recorded as paid by platform',
+        mark_paid_if_zero=False,
+    )
+    reference = make_reference('top')
+    payment = Payment.objects.create(
+        school=school,
+        invoice=invoice,
+        purpose=Payment.Purpose.TOPUP,
+        provider=Payment.Provider.MANUAL,
+        status=Payment.Status.SUCCESS,
+        amount_ghs=package.price_ghs,
+        currency='GHS',
+        reference=reference,
+        paid_at=now,
+        metadata={
+            'package_code': package.code,
+            'recorded_by': 'platform',
+        },
+    )
+    purchase = TopUpPurchase.objects.create(
+        school=school,
+        package=package,
+        invoice=invoice,
+        payment=payment,
+        channel=package.channel,
+        credits=package.credits,
+        amount_ghs=package.price_ghs,
+        status=TopUpPurchase.Status.PENDING,
+    )
+    mark_invoice_paid(invoice, amount=package.price_ghs)
+    entry = grant_topup(
+        school=school,
+        channel=package.channel,
+        credits=package.credits,
+        idempotency_key=f'topup:{reference}',
+        invoice=invoice,
+        metadata={
+            'package_code': package.code,
+            'payment_reference': reference,
+            'recorded_by': 'platform',
+        },
+    )
+    purchase.status = TopUpPurchase.Status.PAID
+    purchase.ledger_entry = entry
+    purchase.save(update_fields=['status', 'ledger_entry', 'updated_at'])
+    record_audit(
+        actor=actor if isinstance(actor, PlatformUser) else None,
+        action='billing.topup.recorded_paid',
+        target_type='school',
+        target_id=str(school.pk),
+        detail={
+            'package_code': package.code,
+            'package_name': package.name,
+            'channel': package.channel,
+            'credits': package.credits,
+            'amount_ghs': f'{package.price_ghs:.2f}',
+            'invoice_id': str(invoice.pk),
+            'payment_reference': reference,
+            'recorded_as_paid': True,
+        },
+        ip_address=ip_address,
+    )
+    return purchase
+
+
 def _fulfill_topup(*, payment: Payment, invoice: Invoice) -> None:
     purchase = getattr(payment, 'topup_purchase', None)
     if purchase is None:
@@ -308,7 +417,11 @@ def fulfill_payment(
     provider_transaction_id: str = '',
     amount_ghs: Decimal | None = None,
 ) -> Payment:
-    payment = Payment.objects.select_for_update().select_related('invoice', 'school').get(pk=payment.pk)
+    payment = (
+        Payment.objects.select_for_update(of=('self',))
+        .select_related('invoice', 'school')
+        .get(pk=payment.pk)
+    )
     if payment.status == Payment.Status.SUCCESS:
         return payment
 
@@ -345,7 +458,7 @@ def fulfill_payment(
 @transaction.atomic
 def verify_and_fulfill(*, reference: str) -> Payment:
     payment = (
-        Payment.objects.select_for_update()
+        Payment.objects.select_for_update(of=('self',))
         .select_related('invoice', 'school')
         .filter(reference=reference)
         .first()
@@ -372,6 +485,59 @@ def verify_and_fulfill(*, reference: str) -> Payment:
     )
 
 
+def verify_platform_payment(*, payment: Payment, actor=None, ip_address: str | None = None) -> Payment:
+    """Ask Paystack about a checkout. Complete it only when Paystack says success."""
+    from platform_admin.models import PlatformUser
+    from platform_admin.services.audit import record_audit
+
+    if payment.provider != Payment.Provider.PAYSTACK:
+        raise ValidationError({'detail': 'Only a Paystack payment can be verified.'})
+    if payment.status == Payment.Status.SUCCESS:
+        return payment
+
+    data = verify_transaction(payment.reference)
+    outcome = (data.get('status') or '').lower() or 'unknown'
+    if outcome != 'success':
+        record_audit(
+            actor=actor if isinstance(actor, PlatformUser) else None,
+            action='billing.payment.verified',
+            target_type='school',
+            target_id=str(payment.school_id),
+            detail={
+                'payment_id': str(payment.pk),
+                'reference': payment.reference,
+                'outcome': outcome,
+                'amount_ghs': f'{payment.amount_ghs:.2f}',
+            },
+            ip_address=ip_address,
+        )
+        raise ValidationError({
+            'detail': f'Paystack has not confirmed this payment ({outcome}).',
+        })
+
+    amount = from_pesewas(data.get('amount') or 0)
+    payment = fulfill_payment(
+        payment=payment,
+        provider_payload=data,
+        provider_transaction_id=str(data.get('id') or ''),
+        amount_ghs=amount,
+    )
+    record_audit(
+        actor=actor if isinstance(actor, PlatformUser) else None,
+        action='billing.payment.verified',
+        target_type='school',
+        target_id=str(payment.school_id),
+        detail={
+            'payment_id': str(payment.pk),
+            'reference': payment.reference,
+            'outcome': 'success',
+            'amount_ghs': f'{payment.amount_ghs:.2f}',
+        },
+        ip_address=ip_address,
+    )
+    return payment
+
+
 @transaction.atomic
 def handle_paystack_webhook_event(event: dict) -> Payment | None:
     event_name = (event.get('event') or '').strip()
@@ -384,7 +550,7 @@ def handle_paystack_webhook_event(event: dict) -> Payment | None:
         raise ValidationError({'detail': 'Webhook missing reference.'})
 
     payment = (
-        Payment.objects.select_for_update()
+        Payment.objects.select_for_update(of=('self',))
         .select_related('invoice', 'school')
         .filter(reference=reference)
         .first()

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
 import toast from 'react-hot-toast'
 import { listSchools } from '@/features/schools/services'
+import { formatDate } from '@/lib/dates'
 import {
   createDiscount,
   deleteDiscount,
@@ -459,7 +460,7 @@ export default function DiscountsPage() {
                 {redemption.revoked_at
                   ? ' · revoked'
                   : redemption.ends_at
-                    ? ` · until ${new Date(redemption.ends_at).toLocaleDateString('en-GB')}`
+                    ? ` · until ${formatDate(redemption.ends_at)}`
                     : ' · recurring'}
               </span>
               {openId && redemption.revoked_at ? (

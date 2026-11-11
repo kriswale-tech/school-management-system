@@ -22,8 +22,12 @@ export async function getBillingPlans() {
   return data
 }
 
-export async function getBillingInvoices() {
-  const { data } = await api.get<PaginatedInvoices>('/billing/invoices/')
+export const BILLING_PAGE_SIZE = 10
+
+export async function getBillingInvoices(page = 1) {
+  const { data } = await api.get<PaginatedInvoices>('/billing/invoices/', {
+    params: { page, page_size: BILLING_PAGE_SIZE },
+  })
   return data
 }
 
@@ -32,8 +36,10 @@ export async function getUpcomingBill() {
   return data
 }
 
-export async function getBillingPayments() {
-  const { data } = await api.get<PaginatedPayments>('/billing/payments/')
+export async function getBillingPayments(page = 1) {
+  const { data } = await api.get<PaginatedPayments>('/billing/payments/', {
+    params: { page, page_size: BILLING_PAGE_SIZE },
+  })
   return data
 }
 

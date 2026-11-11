@@ -1,6 +1,7 @@
 import api from '@/lib/api'
 import type {
   Paginated,
+  PlatformSchoolAuditEntry,
   PlatformSchoolDetail,
   PlatformSchoolListItem,
   PlatformSchoolSummary,
@@ -47,10 +48,19 @@ export async function getSchool(id: string) {
   return data
 }
 
-export async function updateSchoolStatus(id: string, status: SchoolStatus) {
+export async function updateSchoolStatus(id: string, status: SchoolStatus, reason: string) {
   const { data } = await api.post<PlatformSchoolDetail>(`/platform/schools/${id}/status/`, {
     status,
+    reason,
   })
+  return data
+}
+
+export async function listSchoolAudit(id: string, page = 1) {
+  const { data } = await api.get<Paginated<PlatformSchoolAuditEntry>>(
+    `/platform/schools/${id}/audit/`,
+    { params: { page, page_size: 20 } },
+  )
   return data
 }
 

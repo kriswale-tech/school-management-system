@@ -13,6 +13,7 @@ from platform_admin.serializers.invites import (
 )
 from platform_admin.serializers.schools import (
     PlatformSchoolAdminSerializer,
+    PlatformSchoolAuditSerializer,
     PlatformSchoolCreateSerializer,
     PlatformSchoolListSerializer,
     PlatformSchoolSerializer,
@@ -31,6 +32,7 @@ __all__ = [
     'PlatformMfaVerifySerializer',
     'PlatformPublicConfigSerializer',
     'PlatformSchoolAdminSerializer',
+    'PlatformSchoolAuditSerializer',
     'PlatformSchoolCreateSerializer',
     'PlatformSchoolListSerializer',
     'PlatformSchoolSerializer',

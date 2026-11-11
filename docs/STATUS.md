@@ -172,16 +172,15 @@ Under `/api/v1/`:
 - `notifications/` — personal in-app inbox (list, unread count, mark read) + guardian delivery log
 - Guardian communications — ward enrolled (onboard + bulk import), payment receipt links, manual + automatic debt reminders (end-of-month default), report-ready signed links, next-term fee schedules; Celery batch SMS/email (100) + beat; see [guardian-communications.md](./guardian-communications.md)
 
-**Still light / deferred:** advance refund; SMS credits UI (per school here + platform admin elsewhere).
+**Still light / deferred:** advance refund. SMS and email credit balances, usage, and top-up checkout are on Settings → Messaging ([2026-11-11.md](./2026-11-11.md)).
 
 ---
 
 ## Suggested next build order
 
 1. Turn on Resend in prod/staging (`EMAIL_ENABLED=true` + verified `DEFAULT_FROM_EMAIL`) — see [notifications.md](./notifications.md)  
-2. SMS credits — see [guardian-communications.md](./guardian-communications.md)  
-3. Signup OTP via Arkesel (login already wired)  
-4. Tier 2 staff notification events + preferences  
-5. Remaining fees polish (advance refunds, pure advance top-up)
+2. Signup OTP via Arkesel is still DEBUG-only (login OTP is already wired)  
+3. Tier 2 staff notification events + preferences  
+4. Remaining fees polish (advance refunds, pure advance top-up)
 
 See also [FEATURES.md](./FEATURES.md) for a domain-by-domain checklist and [ARCHITECTURE.md](./ARCHITECTURE.md) for how the pieces fit.

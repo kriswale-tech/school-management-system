@@ -1,3 +1,4 @@
+import type { CreditCoverage } from '@/features/messaging/types'
 import type { PaginatedResponse } from '@/types/generalTypes'
 
 export type AssessmentStatus = 'Incomplete' | 'Complete' | 'Published'
@@ -258,6 +259,7 @@ export type ReportReadyPreview = {
   }>
   eligible_truncated: boolean
   skipped_truncated: boolean
+  credits?: CreditCoverage
 }
 
 export type ReportReadySendResult = {

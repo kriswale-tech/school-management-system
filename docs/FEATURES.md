@@ -135,6 +135,8 @@ Signup setup is unchanged. These screens edit the school after the wizard, under
 | Fee catalog | Same as `/fees/settings` | `/settings/fees` and `/fees/settings` | Done |
 | Assessment structure | Same as `/assessments/settings` | `/settings/assessments` and `/assessments/settings` | Done |
 | Classes and subjects | Same as `/classes/manage` | `/settings/classes` and `/classes/manage` | Done |
+| SaaS billing checkout | Paystack initialize, verify, and `/api/payments/paystack/webhook/` | Settings → Billing. Modal checkout and Confirm payment on a pending row | Done — see [2026-11-11.md](./2026-11-11.md) |
+| Messaging usage and history | `GET /messaging/overview/`, deliveries, bulk retry | Settings → Messaging. 7-day, 30-day, or custom range. Bulk resend of failed or skipped messages | Done — see [2026-11-11.md](./2026-11-11.md) |
 
 The calendar lists every year. Past years are view-only. **Add** saves the next year’s three terms and leaves the current term active. Assessment settings are copied onto any new term that does not have them yet.
 
@@ -161,6 +163,7 @@ Operator app (`platform-admin`), not the school app.
 | --- | --- | --- | --- |
 | School directory | `GET /platform/schools/` and `/platform/schools/summary/` | `/schools` | Done — plan, renewal, admin, overdue, status actions. See [platform-admin-schools.md](./platform-admin-schools.md) |
 | Create school with starting plan | `POST /platform/schools/` (`plan_code`, `interval`, optional add-on SKUs) | Create school modal | Done |
+| School detail | `GET /platform/schools/<id>/`, status with reason, `GET .../audit/` | `/schools/:id` — chips, admins table, invite modal, collapsed audit log, subscription, invoices, and payments | Done |
 | Complimentary first year when no plan is sent | `ensure_complimentary_subscription` | Not offered in the modal | Done |
 
 ## Cross-cutting
@@ -183,13 +186,14 @@ Operator app (`platform-admin`), not the school app.
 | Guardian report-ready signed links | Done — Assessment details / report viewer **Send to guardians**; auto on new PDF generation; see [assessment-reports.md](./assessment-reports.md) |
 | Guardian next-term fee schedules | Partial — on structure apply + signed per-student HTML |
 | Guardian auto debt reminders | Partial — Celery beat; school frequency (default end of month) |
-| SMS credits billing UI | Not started (placeholder in Settings → Parent messages) |
+| SMS and email credits | Done — Settings → Messaging balances, top-up checkout, usage breakdown, and shortfall notices. See [2026-11-11.md](./2026-11-11.md) |
 
 ---
 
 ## Existing deep-dive notes
 
 - Platform admin school directory and create modal: [platform-admin-schools.md](./platform-admin-schools.md)
+- 11 Nov 2026 school Paystack checkout, messaging usage, and platform billing controls: [2026-11-11.md](./2026-11-11.md)
 - Teacher bulk import (frontend contract): [`sms-backend/docs/frontend-teacher-bulk-import.md`](../sms-backend/docs/frontend-teacher-bulk-import.md)
 - Student bulk import (dates + guardians): [`sms-backend/docs/student-bulk-import.md`](../sms-backend/docs/student-bulk-import.md)
 - Assessment structure per term: [assessment-config.md](./assessment-config.md)

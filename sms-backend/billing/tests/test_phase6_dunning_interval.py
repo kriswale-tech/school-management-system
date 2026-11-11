@@ -77,6 +77,51 @@ class Phase6DunningIntervalTests(APITestCase):
         again = run_dunning_cycle(notice_days_before=2)
         self.assertEqual(again['reminded'], 0)
 
+    def test_extend_grace_reopens_a_suspended_subscription(self):
+        from django.conf import settings
+
+        from platform_admin.models import PlatformUser
+
+        ops = PlatformUser.objects.create_user(
+            email='grace-ops@schoolasst.test',
+            password='SecurePass123!',
+            role=PlatformUser.Role.SUPER_ADMIN,
+        )
+        platform = self.client_class()
+        login = platform.post(
+            reverse('platform-login'),
+            {'email': ops.email, 'password': 'SecurePass123!'},
+            format='json',
+        )
+        platform.cookies[settings.PLATFORM_JWT['AUTH_COOKIE']] = (
+            login.cookies[settings.PLATFORM_JWT['AUTH_COOKIE']].value
+        )
+        too_soon = platform.post(
+            reverse('platform-school-extend-grace', kwargs={'pk': self.school.pk}),
+            {'until': (timezone.localdate() + timedelta(days=10)).isoformat()},
+            format='json',
+        )
+        self.assertEqual(too_soon.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.subscription.status = SchoolSubscription.Status.SUSPENDED
+        self.subscription.grace_period_ends_at = timezone.now() - timedelta(hours=1)
+        self.subscription.save(update_fields=['status', 'grace_period_ends_at', 'updated_at'])
+        until = timezone.localdate() + timedelta(days=14)
+        extended = platform.post(
+            reverse('platform-school-extend-grace', kwargs={'pk': self.school.pk}),
+            {'until': until.isoformat()},
+            format='json',
+        )
+        self.assertEqual(extended.status_code, status.HTTP_200_OK, extended.data)
+        self.subscription.refresh_from_db()
+        self.assertEqual(self.subscription.status, SchoolSubscription.Status.PAST_DUE)
+        self.assertGreater(
+            self.subscription.grace_period_ends_at,
+            timezone.now() + timedelta(days=13),
+        )
+        result = run_dunning_cycle()
+        self.assertEqual(result['suspended'], 0)
+
     def test_mid_period_interval_change_is_disabled(self):
         with self.assertRaises(ValidationError):
             change_billing_interval(

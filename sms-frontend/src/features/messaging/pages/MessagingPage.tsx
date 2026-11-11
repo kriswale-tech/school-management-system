@@ -5,7 +5,6 @@ import { Icon } from '@iconify/react'
 import { isAxiosError } from 'axios'
 import toast from 'react-hot-toast'
 import ActionBar from '@/components/shared/ActionBar'
-import StatsCard from '@/components/shared/StatsCard'
 import { Pagination, TabComponent } from '@/components/shared'
 import { Button, Modal } from '@/components/ui'
 import { Capability } from '@/features/auth/capabilities'
@@ -15,15 +14,19 @@ import {
   purchaseTopUp,
   verifySaasPayment,
 } from '@/features/billing/services'
+import { openPaystackCheckout } from '@/features/billing/openPaystackCheckout'
 import type { TopUpPackage } from '@/features/billing/types'
+import MessagingUsagePanel from '../components/MessagingUsage'
 import ParentMessagesPolicies from '../components/ParentMessagesPolicies'
 import {
+  getEligibleMessagingDeliveries,
   getMessagingDeliveries,
   getMessagingOverview,
+  retryMessagingDeliveries,
   retryMessagingDelivery,
   verifyMessagingDelivery,
 } from '../services'
-import type { DeliveryStatus, GuardianDelivery } from '../types'
+import type { DeliveryStatus, EligibleDeliveryItem, GuardianDelivery } from '../types'
 
 function errorMessage(error: unknown) {
   if (isAxiosError(error)) {
@@ -46,10 +49,6 @@ function formatDateTime(value: string) {
 function formatGhs(value: string | number | null | undefined) {
   const amount = Number(value ?? 0)
   return `GH₵ ${amount.toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
-
-function redirectToPaystack(authorizationUrl: string) {
-  window.location.assign(authorizationUrl)
 }
 
 function titleCaseEventType(value: string) {
@@ -140,6 +139,11 @@ const MessagingPage = ({ embedded = false }: MessagingPageProps) => {
   const canManageBilling = useCan(Capability.BILLING_MANAGE)
   const [searchParams, setSearchParams] = useSearchParams()
   const [resendTarget, setResendTarget] = useState<GuardianDelivery | null>(null)
+  const [selectedItems, setSelectedItems] = useState<EligibleDeliveryItem[]>([])
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [usagePeriod, setUsagePeriod] = useState<'7d' | '30d' | 'custom'>('7d')
+  const [usageStart, setUsageStart] = useState('')
+  const [usageEnd, setUsageEnd] = useState('')
 
   const tab = parseTab(searchParams.get('view'))
   const channel = searchParams.get('channel') || ''
@@ -147,6 +151,10 @@ const MessagingPage = ({ embedded = false }: MessagingPageProps) => {
   const eventTypeFilter = searchParams.get('type') || ''
   const search = searchParams.get('q') || ''
   const page = parsePage(searchParams.get('page'))
+
+  useEffect(() => {
+    setSelectedItems([])
+  }, [channel, statusFilter, eventTypeFilter, search])
 
   useEffect(() => {
     if (searchParams.get('view') !== 'policies') return
@@ -178,9 +186,17 @@ const MessagingPage = ({ embedded = false }: MessagingPageProps) => {
     setSearchParams(next, { replace: true })
   }
 
+  const customRangeReady = usagePeriod !== 'custom' || Boolean(usageStart && usageEnd)
+
   const overviewQuery = useQuery({
-    queryKey: ['messaging-overview'],
-    queryFn: getMessagingOverview,
+    queryKey: ['messaging-overview', usagePeriod, usageStart, usageEnd],
+    queryFn: () =>
+      getMessagingOverview(
+        usagePeriod === 'custom'
+          ? { start: usageStart, end: usageEnd }
+          : { period: usagePeriod },
+      ),
+    enabled: customRangeReady,
   })
 
   const topupsQuery = useQuery({
@@ -207,6 +223,18 @@ const MessagingPage = ({ embedded = false }: MessagingPageProps) => {
         page,
       }),
     enabled: tab === 'history',
+  })
+
+  const eligibleQuery = useQuery({
+    queryKey: ['messaging-eligible', channel, statusFilter, eventTypeFilter, search],
+    queryFn: () =>
+      getEligibleMessagingDeliveries({
+        channel: channel || undefined,
+        status: statusFilter || undefined,
+        event_type: eventTypeFilter || undefined,
+        search: search || undefined,
+      }),
+    enabled: tab === 'history' && canManageMessaging,
   })
 
   const invalidateAfterTopup = () => {
@@ -247,6 +275,23 @@ const MessagingPage = ({ embedded = false }: MessagingPageProps) => {
     }
   }, [paymentReference, paymentReturn])
 
+  const bulkRetryMutation = useMutation({
+    mutationFn: retryMessagingDeliveries,
+    onSuccess: (data) => {
+      const queued = data.queued
+      toast.success(`Queued ${queued} resend${queued === 1 ? '' : 's'}`)
+      if (data.skipped.length > 0) {
+        toast.error(`${data.skipped.length} could not be resent`)
+      }
+      setSelectedItems([])
+      setBulkOpen(false)
+      void queryClient.invalidateQueries({ queryKey: ['messaging-eligible'] })
+      void queryClient.invalidateQueries({ queryKey: ['messaging-deliveries'] })
+      void queryClient.invalidateQueries({ queryKey: ['messaging-overview'] })
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+
   const retryMutation = useMutation({
     mutationFn: retryMessagingDelivery,
     onSuccess: () => {
@@ -280,8 +325,19 @@ const MessagingPage = ({ embedded = false }: MessagingPageProps) => {
   const topupMutation = useMutation({
     mutationFn: (pkg: TopUpPackage) => purchaseTopUp(pkg.code),
     onSuccess: (payment) => {
-      toast.success('Redirecting to Paystack…')
-      redirectToPaystack(payment.authorization_url)
+      openPaystackCheckout(payment, {
+        onSuccess: async (reference) => {
+          try {
+            await verifySaasPayment(reference)
+            toast.success('Payment confirmed')
+            invalidateAfterTopup()
+          } catch (error) {
+            toast.error(errorMessage(error))
+          }
+        },
+        onCancel: () => toast('Checkout closed'),
+        onError: (message) => toast.error(message),
+      })
     },
     onError: (error) => toast.error(errorMessage(error)),
   })
@@ -294,6 +350,59 @@ const MessagingPage = ({ embedded = false }: MessagingPageProps) => {
 
   const updateHistoryFilter = (key: 'channel' | 'status' | 'type' | 'q', value: string) => {
     patchParams({ [key]: value || null, page: null }, true)
+  }
+
+  const historyRows = deliveriesQuery.data?.results ?? []
+  const pageEligible = historyRows.filter((row) => row.can_resend)
+  const selectedIds = selectedItems.map((item) => item.id)
+  const selectedIdSet = new Set(selectedIds)
+  const filterItems = eligibleQuery.data?.items ?? []
+  const totalEligible = eligibleQuery.data?.total ?? 0
+  const selectionMatchesFilters =
+    filterItems.length > 0 &&
+    selectedItems.length === filterItems.length &&
+    filterItems.every((item) => selectedIdSet.has(item.id))
+  const smsCreditsNeeded = selectedItems
+    .filter((item) => item.channel === 'sms')
+    .reduce((total, item) => total + Math.max(1, item.segments || 1), 0)
+  const emailCreditsNeeded = selectedItems.filter((item) => item.channel === 'email').length
+  const selectionSummary =
+    selectedItems.length === 0
+      ? 'Select failed or skipped messages to resend.'
+      : selectionMatchesFilters && eligibleQuery.data?.capped
+        ? `${selectedItems.length} of ${totalEligible} eligible messages matching these filters`
+        : selectionMatchesFilters
+          ? `All ${selectedItems.length} eligible messages matching these filters`
+          : `${selectedItems.length} selected`
+
+  const selectPageEligible = () => {
+    setSelectedItems(
+      pageEligible.map((row) => ({
+        id: row.id,
+        channel: row.channel,
+        segments: row.segments ?? 0,
+      })),
+    )
+  }
+
+  const selectFilterEligible = () => {
+    setSelectedItems(filterItems)
+  }
+
+  const toggleSelected = (row: GuardianDelivery) => {
+    setSelectedItems((current) => {
+      if (current.some((item) => item.id === row.id)) {
+        return current.filter((item) => item.id !== row.id)
+      }
+      if (current.length >= 100) {
+        toast.error('You can resend 100 messages at a time.')
+        return current
+      }
+      return [
+        ...current,
+        { id: row.id, channel: row.channel, segments: row.segments ?? 0 },
+      ]
+    })
   }
 
   return (
@@ -312,65 +421,38 @@ const MessagingPage = ({ embedded = false }: MessagingPageProps) => {
         <div className="mt-6">
           {tab === 'overview' && (
             <div className="space-y-6">
+              {usagePeriod === 'custom' && (!usageStart || !usageEnd) && (
+                <p className="text-sm text-slate-500">Choose a start date and an end date.</p>
+              )}
               {overviewQuery.isLoading && (
                 <p className="text-sm text-slate-500">Loading overview…</p>
               )}
               {overview && (
                 <>
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <StatsCard title="SMS credits" value={String(overview.credits.sms)} />
-                    <StatsCard title="Email credits" value={String(overview.credits.email)} />
-                    <StatsCard
-                      title="Sent (7 days)"
-                      value={String(
-                        overview.usage_7d.sms_sent + overview.usage_7d.email_sent,
-                      )}
-                    />
-                    <StatsCard
-                      title="Open failures"
-                      value={String(overview.open_failures)}
-                    />
+                  <MessagingUsagePanel
+                    overview={overview}
+                    period={usagePeriod}
+                    start={usageStart}
+                    end={usageEnd}
+                    onPeriodChange={setUsagePeriod}
+                    onStartChange={setUsageStart}
+                    onEndChange={setUsageEnd}
+                  />
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    <Link
+                      to="/settings/billing"
+                      className="font-medium text-sky-700 hover:underline"
+                    >
+                      Manage add-ons on Billing →
+                    </Link>
+                    <button
+                      type="button"
+                      className="cursor-pointer font-medium text-sky-700 hover:underline"
+                      onClick={() => setTab('history')}
+                    >
+                      View delivery history →
+                    </button>
                   </div>
-
-                  <section className="rounded-2xl border border-slate-200 p-5 text-sm">
-                    <h2 className="text-base font-semibold text-slate-900">Credit status</h2>
-                    {overview.credits.sms <= 0 && overview.credits.email <= 0 ? (
-                      <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
-                        You have 0 credits. Guardian SMS and email cannot send until you buy a
-                        top-up below (or receive credits from a Billing add-on at renewal).
-                      </p>
-                    ) : overview.credits.sms <= 0 || overview.credits.email <= 0 ? (
-                      <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
-                        {overview.credits.sms <= 0
-                          ? 'SMS balance is 0 — SMS sends are blocked until you top up.'
-                          : 'Email balance is 0 — email sends are blocked until you top up.'}
-                      </p>
-                    ) : (
-                      <p className="mt-2 text-slate-600">
-                        Guardian SMS/email debit credits after successful sends. Balances roll
-                        over.
-                      </p>
-                    )}
-                    <p className="mt-2 text-slate-500">
-                      Last 7 days used {overview.usage_7d.sms_credits_used} SMS credits and{' '}
-                      {overview.usage_7d.email_credits_used} email credits.
-                    </p>
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <Link
-                        to="/settings/billing"
-                        className="text-sm font-medium text-sky-700 hover:underline"
-                      >
-                        Manage add-ons on Billing →
-                      </Link>
-                      <button
-                        type="button"
-                        className="text-sm font-medium text-sky-700 hover:underline"
-                        onClick={() => setTab('history')}
-                      >
-                        View delivery history →
-                      </button>
-                    </div>
-                  </section>
 
                   {canManageBilling && (topupsQuery.data?.length ?? 0) > 0 && (
                     <section className="rounded-2xl border border-slate-200 p-5">
@@ -453,16 +535,63 @@ const MessagingPage = ({ embedded = false }: MessagingPageProps) => {
                 <p className="text-sm text-slate-500">No deliveries match these filters.</p>
               )}
 
+              {canManageMessaging &&
+              (selectedItems.length > 0 || pageEligible.length > 0 || totalEligible > 0) ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                  <p className="font-medium text-slate-800">{selectionSummary}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedItems.length > 0 ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="!w-auto px-3 py-1.5"
+                        onClick={() => setSelectedItems([])}
+                      >
+                        Clear
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="!w-auto px-3 py-1.5"
+                      disabled={pageEligible.length === 0}
+                      onClick={selectPageEligible}
+                    >
+                      Select eligible on this page
+                    </Button>
+                    {totalEligible > pageEligible.length && !selectionMatchesFilters ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="!w-auto px-3 py-1.5"
+                        disabled={eligibleQuery.isLoading}
+                        onClick={selectFilterEligible}
+                      >
+                        {eligibleQuery.data?.capped
+                          ? `Select latest 100 of ${totalEligible}`
+                          : `Select all ${totalEligible} eligible`}
+                      </Button>
+                    ) : null}
+                    {selectedItems.length > 0 ? (
+                      <Button
+                        type="button"
+                        className="!w-auto px-3 py-1.5"
+                        onClick={() => setBulkOpen(true)}
+                      >
+                        Resend selected
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
               <div className="overflow-hidden rounded-2xl border border-slate-200">
                 <ul className="divide-y divide-slate-100">
                   {(deliveriesQuery.data?.results ?? []).map((row) => {
                     const statusLabel = row.status_label || titleCaseEventType(row.status)
                     const displayError =
                       row.display_error || row.user_error_message || row.error_message
-                    const showResend =
-                      canManageMessaging &&
-                      Boolean(row.can_resend) &&
-                      Boolean(row.body_preview)
+                    const showResend = canManageMessaging && Boolean(row.can_resend)
                     const showVerify =
                       canManageMessaging &&
                       row.channel === 'sms' &&
@@ -472,6 +601,17 @@ const MessagingPage = ({ embedded = false }: MessagingPageProps) => {
                         key={row.id}
                         className="flex flex-wrap items-start justify-between gap-3 p-4 text-sm"
                       >
+                        {showResend ? (
+                          <input
+                            type="checkbox"
+                            className="mt-1 size-4"
+                            checked={selectedIdSet.has(row.id)}
+                            aria-label={`Select message to ${row.parent_name}`}
+                            onChange={() => toggleSelected(row)}
+                          />
+                        ) : (
+                          <span className="mt-1 size-4" />
+                        )}
                         <div className="min-w-0 flex-1 space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <span
@@ -586,6 +726,67 @@ const MessagingPage = ({ embedded = false }: MessagingPageProps) => {
           )}
         </div>
       </div>
+
+      <Modal
+        open={bulkOpen}
+        title="Resend selected messages"
+        onClose={() => {
+          if (!bulkRetryMutation.isPending) setBulkOpen(false)
+        }}
+      >
+        <div className="space-y-4 text-sm">
+          <p className="text-slate-600">
+            Queue a new send for {selectedItems.length} message
+            {selectedItems.length === 1 ? '' : 's'}. Original history entries are kept. Messages
+            that do not fit the credit balance are skipped.
+            {selectionMatchesFilters && eligibleQuery.data?.capped
+              ? ` These are the latest 100 of ${totalEligible} eligible messages matching the current filters.`
+              : ''}
+          </p>
+          <dl className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <dt className="text-slate-500">SMS credits needed</dt>
+            <dd className="text-right font-medium text-slate-900">{smsCreditsNeeded}</dd>
+            <dt className="text-slate-500">Email credits needed</dt>
+            <dd className="text-right font-medium text-slate-900">{emailCreditsNeeded}</dd>
+            <dt className="text-slate-500">SMS credits left</dt>
+            <dd className="text-right font-medium text-slate-900">
+              {overviewQuery.data?.credits.sms ?? '—'}
+            </dd>
+            <dt className="text-slate-500">Email credits left</dt>
+            <dd className="text-right font-medium text-slate-900">
+              {overviewQuery.data?.credits.email ?? '—'}
+            </dd>
+          </dl>
+          {overviewQuery.data &&
+          (smsCreditsNeeded > overviewQuery.data.credits.sms ||
+            emailCreditsNeeded > overviewQuery.data.credits.email) ? (
+            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950">
+              Credits will not cover every selected message. The ones that fit are sent, and the
+              rest stay skipped.
+            </p>
+          ) : null}
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="!w-auto"
+              disabled={bulkRetryMutation.isPending}
+              onClick={() => setBulkOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="!w-auto"
+              loading={bulkRetryMutation.isPending}
+              loadingText="Resending"
+              onClick={() => bulkRetryMutation.mutate(selectedIds)}
+            >
+              Resend
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         open={resendTarget != null}

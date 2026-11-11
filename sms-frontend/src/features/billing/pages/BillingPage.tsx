@@ -9,6 +9,7 @@ import StatsCard from '@/components/shared/StatsCard'
 import { Button } from '@/components/ui'
 import { Capability } from '@/features/auth/capabilities'
 import { useCan } from '@/features/auth/hooks/useCan'
+import { BILLING_PAGE_SIZE } from '../services'
 import {
   getBillingInvoices,
   getBillingPaymentStats,
@@ -23,6 +24,7 @@ import {
   schedulePlanChange,
   verifySaasPayment,
 } from '../services'
+import { openPaystackCheckout } from '../openPaystackCheckout'
 
 const PAGE_TABS = [
   { key: 'overview', label: 'Overview' },
@@ -30,6 +32,51 @@ const PAGE_TABS = [
 ] as const
 
 type PageTab = (typeof PAGE_TABS)[number]['key']
+
+function BillingPager({
+  count,
+  page,
+  onPage,
+}: {
+  count: number
+  page: number
+  onPage: (page: number) => void
+}) {
+  if (count <= BILLING_PAGE_SIZE) return null
+  const pages = Math.max(1, Math.ceil(count / BILLING_PAGE_SIZE))
+  const from = (page - 1) * BILLING_PAGE_SIZE + 1
+  const to = Math.min(count, page * BILLING_PAGE_SIZE)
+  return (
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+      <p>
+        {from}–{to} of {count}
+      </p>
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          className="!w-auto px-3 py-1.5"
+          disabled={page <= 1}
+          onClick={() => onPage(page - 1)}
+        >
+          Previous
+        </Button>
+        <span className="text-xs">
+          Page {page} of {pages}
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          className="!w-auto px-3 py-1.5"
+          disabled={page >= pages}
+          onClick={() => onPage(page + 1)}
+        >
+          Next
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 function errorMessage(error: unknown) {
   if (isAxiosError(error)) {
@@ -53,10 +100,6 @@ function formatDate(value: string | null | undefined) {
     month: 'short',
     year: 'numeric',
   })
-}
-
-function redirectToPaystack(authorizationUrl: string) {
-  window.location.assign(authorizationUrl)
 }
 
 type BillingPageProps = {
@@ -99,6 +142,8 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
   const [searchParams, setSearchParams] = useSearchParams()
   const [confirm, setConfirm] = useState<BillingConfirm>(null)
   const [pageTab, setPageTab] = useState<PageTab>('overview')
+  const [invoicePage, setInvoicePage] = useState(1)
+  const [paymentPage, setPaymentPage] = useState(1)
 
   const subscriptionQuery = useQuery({
     queryKey: ['billing-subscription'],
@@ -109,16 +154,16 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
     queryFn: getBillingPlans,
   })
   const invoicesQuery = useQuery({
-    queryKey: ['billing-invoices'],
-    queryFn: getBillingInvoices,
+    queryKey: ['billing-invoices', invoicePage],
+    queryFn: () => getBillingInvoices(invoicePage),
   })
   const upcomingQuery = useQuery({
     queryKey: ['billing-upcoming'],
     queryFn: getUpcomingBill,
   })
   const paymentsQuery = useQuery({
-    queryKey: ['billing-payments'],
-    queryFn: getBillingPayments,
+    queryKey: ['billing-payments', paymentPage],
+    queryFn: () => getBillingPayments(paymentPage),
     enabled: pageTab === 'payments',
   })
   const paymentStatsQuery = useQuery({
@@ -184,6 +229,16 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
     onError: (error) => toast.error(errorMessage(error)),
   })
 
+  const confirmPayment = async (reference: string) => {
+    try {
+      await verifySaasPayment(reference)
+      toast.success('Payment confirmed')
+      invalidateBilling()
+    } catch (error) {
+      toast.error(errorMessage(error))
+    }
+  }
+
   const checkoutOpenInvoice = async (invoice: {
     id: string
     status: string
@@ -191,8 +246,11 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
   }) => {
     if (invoice.status === 'open' && Number(invoice.total_ghs) > 0) {
       const payment = await payInvoice(invoice.id)
-      toast.success('Redirecting to Paystack…')
-      redirectToPaystack(payment.authorization_url)
+      openPaystackCheckout(payment, {
+        onSuccess: confirmPayment,
+        onCancel: () => toast('Checkout closed'),
+        onError: (message) => toast.error(message),
+      })
       return true
     }
     return false
@@ -231,8 +289,20 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
   const payMutation = useMutation({
     mutationFn: payInvoice,
     onSuccess: (payment) => {
-      toast.success('Redirecting to Paystack…')
-      redirectToPaystack(payment.authorization_url)
+      openPaystackCheckout(payment, {
+        onSuccess: confirmPayment,
+        onCancel: () => toast('Checkout closed'),
+        onError: (message) => toast.error(message),
+      })
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+
+  const verifyMutation = useMutation({
+    mutationFn: verifySaasPayment,
+    onSuccess: () => {
+      toast.success('Payment confirmed')
+      invalidateBilling()
     },
     onError: (error) => toast.error(errorMessage(error)),
   })
@@ -477,8 +547,8 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
               <section className="rounded-2xl border border-slate-200 bg-white p-5">
                 <h2 className="mb-1 text-base font-semibold text-slate-900">Payment history</h2>
                 <p className="mb-4 text-sm text-slate-500">
-                  Paystack checkouts only (subscription invoices and messaging top-ups). Open
-                  invoices on Overview are bills — they appear here after checkout starts.
+                  Each row is a Paystack charge. Confirm a pending charge after the money has
+                  been taken. A credit top-up is not paid again from an open invoice.
                 </p>
                 {paymentsQuery.isLoading && (
                   <p className="text-sm text-slate-500">Loading payments…</p>
@@ -535,11 +605,32 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
                           <p className="text-slate-500">
                             {formatDate(payment.paid_at || payment.created_at)}
                           </p>
+                          {canManage && payment.status === 'pending' && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="mt-2 !w-auto px-3 py-1.5"
+                              loading={
+                                verifyMutation.isPending &&
+                                verifyMutation.variables === payment.reference
+                              }
+                              loadingText="Confirming"
+                              disabled={verifyMutation.isPending}
+                              onClick={() => verifyMutation.mutate(payment.reference)}
+                            >
+                              Confirm payment
+                            </Button>
+                          )}
                         </div>
                       </li>
                     )
                   })}
                 </ul>
+                <BillingPager
+                  count={paymentsQuery.data?.count ?? 0}
+                  page={paymentPage}
+                  onPage={setPaymentPage}
+                />
               </section>
             </div>
           )}
@@ -972,6 +1063,11 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
                 </li>
               ))}
             </ul>
+            <BillingPager
+              count={invoicesQuery.data?.count ?? 0}
+              page={invoicePage}
+              onPage={setInvoicePage}
+            />
           </section>
             </>
           )}

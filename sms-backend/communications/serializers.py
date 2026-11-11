@@ -127,6 +127,7 @@ class CreditBalancesSerializer(serializers.Serializer):
     sms = serializers.IntegerField()
     email = serializers.IntegerField()
     billing_active = serializers.BooleanField()
+    usage = serializers.DictField()
 
 
 class CreditLedgerEntrySerializer(serializers.ModelSerializer):

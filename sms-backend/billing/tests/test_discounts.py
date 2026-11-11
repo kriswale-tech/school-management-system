@@ -295,3 +295,87 @@ class DiscountApiTests(APITestCase):
         self.assertIsNone(restored.data['revoked_at'])
         _subscription, invoice = open_renewal_period(subscription=subscription)
         self.assertEqual(invoice.discount_ghs, Decimal('16.00'))
+
+    def test_assign_discount_switches_the_school_and_finance_is_issued_invoices(self):
+        from billing.models import Plan
+
+        first = PromotionCampaign.objects.create(
+            code='current-offer',
+            name='Current offer',
+            discount_percent=Decimal('20.00'),
+            schedule=PromotionCampaign.Schedule.INTRODUCTORY,
+            audience=PromotionCampaign.Audience.ALL,
+            duration_months=6,
+            applies_to=PromotionCampaign.AppliesTo.APPLICATION,
+            is_active=True,
+        )
+        other = PromotionCampaign.objects.create(
+            code='switch-to',
+            name='Switch to',
+            discount_percent=Decimal('10.00'),
+            schedule=PromotionCampaign.Schedule.RECURRING,
+            audience=PromotionCampaign.Audience.ALL,
+            applies_to=PromotionCampaign.AppliesTo.APPLICATION,
+            is_active=True,
+        )
+        start_subscription(
+            school=self.school,
+            plan=Plan.objects.get(code='starter'),
+            interval='monthly',
+            apply_first_year_free=False,
+        )
+        assigned = self.client.post(
+            reverse('platform-school-discount-assign', kwargs={'pk': self.school.pk}),
+            {'campaign_id': str(other.pk)},
+            format='json',
+        )
+        self.assertEqual(assigned.status_code, status.HTTP_200_OK, assigned.data)
+        self.assertEqual([row['code'] for row in assigned.data['discounts']], ['switch-to'])
+        replaced = PromotionRedemption.objects.get(school=self.school, campaign=first)
+        self.assertIsNotNone(replaced.revoked_at)
+
+        finance = self.client.get(
+            reverse('platform-school-finance', kwargs={'pk': self.school.pk}),
+        )
+        self.assertEqual(finance.status_code, status.HTTP_200_OK)
+        self.assertEqual(finance.data['billed_ghs'], '64.00')
+        self.assertEqual(finance.data['discount_ghs'], '16.00')
+        self.assertEqual(finance.data['outstanding_ghs'], '64.00')
+        self.assertEqual(finance.data['open_invoices'], 1)
+        self.assertEqual(finance.data['paid_invoices'], 0)
+
+        credits = self.client.get(
+            reverse('platform-school-credits', kwargs={'pk': self.school.pk}),
+        )
+        self.assertEqual(credits.status_code, status.HTTP_200_OK)
+        self.assertEqual(credits.data['usage']['sms']['used'], 0)
+        self.assertEqual(credits.data['usage']['sms']['allowance'], 0)
+        self.assertIsNone(credits.data['usage']['sms']['exhaustion_ratio'])
+
+    def test_finance_totals_skip_void_invoices(self):
+        from billing.models import Invoice, Plan
+
+        subscription = start_subscription(
+            school=self.school,
+            plan=Plan.objects.get(code='starter'),
+            interval='monthly',
+            apply_first_year_free=False,
+        )
+        opening = subscription.invoices.get()
+        Invoice.objects.create(
+            school=self.school,
+            subscription=subscription,
+            status=Invoice.Status.VOID,
+            period_start=opening.period_start,
+            period_end=opening.period_end,
+            total_ghs=Decimal('2150.00'),
+            discount_ghs=Decimal('100.00'),
+            due_at=timezone.now(),
+        )
+        finance = self.client.get(
+            reverse('platform-school-finance', kwargs={'pk': self.school.pk}),
+        )
+        self.assertEqual(finance.status_code, status.HTTP_200_OK)
+        self.assertEqual(finance.data['billed_ghs'], '80.00')
+        self.assertEqual(finance.data['discount_ghs'], '0.00')
+        self.assertEqual(finance.data['invoice_count'], 1)

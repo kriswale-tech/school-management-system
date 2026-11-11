@@ -14,6 +14,7 @@ from accounts.permissions import HasActiveSchool, HasCapability
 from billing.models import Invoice, TopUpPackage
 from billing.serializers import (
     InvoiceSerializer,
+    PaymentCheckoutSerializer,
     PaymentSerializer,
     PaymentVerifySerializer,
     TopUpPackageSerializer,
@@ -46,7 +47,7 @@ class SchoolInvoicePayView(SchoolScopedAPIView):
     permission_classes = [HasActiveSchool, HasCapability]
     required_capability = Capability.BILLING_MANAGE
 
-    @extend_schema(responses={200: PaymentSerializer})
+    @extend_schema(responses={200: PaymentCheckoutSerializer})
     def post(self, request, pk):
         invoice = Invoice.objects.filter(pk=pk, school=self.school).first()
         if invoice is None:
@@ -56,14 +57,14 @@ class SchoolInvoicePayView(SchoolScopedAPIView):
             invoice=invoice,
             actor_user=request.user,
         )
-        return Response(PaymentSerializer(payment).data)
+        return Response(PaymentCheckoutSerializer(payment).data)
 
 
 class SchoolTopUpPurchaseView(SchoolScopedAPIView):
     permission_classes = [HasActiveSchool, HasCapability]
     required_capability = Capability.BILLING_MANAGE
 
-    @extend_schema(request=TopUpPurchaseSerializer, responses={200: PaymentSerializer})
+    @extend_schema(request=TopUpPurchaseSerializer, responses={200: PaymentCheckoutSerializer})
     def post(self, request):
         serializer = TopUpPurchaseSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -78,7 +79,7 @@ class SchoolTopUpPurchaseView(SchoolScopedAPIView):
             package=package,
             actor_user=request.user,
         )
-        return Response(PaymentSerializer(payment).data)
+        return Response(PaymentCheckoutSerializer(payment).data)
 
 
 class SchoolPaymentVerifyView(SchoolScopedAPIView):

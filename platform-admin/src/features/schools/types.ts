@@ -81,15 +81,26 @@ export type PlatformSchoolDetail = {
   updated_at: string
   staff_count?: number
   student_count?: number
+  status_reason?: string
   admins: Array<{
     membership_id: string
     user_id: string
     phone_number: string
     email: string
     full_name: string
+    role: string
     is_active: boolean
   }>
   invites: SchoolAdminInvite[]
+}
+
+export type PlatformSchoolAuditEntry = {
+  id: string
+  action: string
+  actor_name: string
+  actor_email: string
+  detail: Record<string, unknown>
+  created_at: string
 }
 
 export type Paginated<T> = {

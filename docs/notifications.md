@@ -74,6 +74,8 @@ Requires an active school-scoped session (`HasActiveSchool`). There is no public
 
 The actor is never notified about their own action.
 
+A messaging credit shortfall is separate from the activity bridge. When a guardian send skips messages because the balance ran out, active admins and staff receive `messaging_credits`, including the person who sent. The link opens Messaging history filtered to those skipped messages.
+
 Fee payments and subject-group placement stay on the **activity** feed only for now (Tier 2).
 
 ### Alerts note

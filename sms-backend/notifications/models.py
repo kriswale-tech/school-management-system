@@ -31,6 +31,7 @@ class Notification(BaseModel):
         MEMBER_PHONE_CHANGED = 'member_phone_changed', 'Member phone changed'
         MEMBER_ROLE_CHANGED = 'member_role_changed', 'Member role changed'
         TERM_OPENED = 'term_opened', 'Term opened'
+        MESSAGING_CREDITS = 'messaging_credits', 'Messaging credits'
 
     class EmailStatus(models.TextChoices):
         SKIPPED = 'skipped', 'Skipped'

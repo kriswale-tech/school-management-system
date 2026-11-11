@@ -263,6 +263,10 @@ class CapacityUpgradeSerializer(serializers.Serializer):
     mark_paid = serializers.BooleanField(required=False)
 
 
+class RecordTopUpSerializer(serializers.Serializer):
+    package_code = serializers.SlugField()
+
+
 class TopUpPackageSerializer(serializers.ModelSerializer):
     unit_price_ghs = serializers.SerializerMethodField()
     list_price_ghs = serializers.SerializerMethodField()
@@ -377,6 +381,7 @@ class PaymentSerializer(serializers.ModelSerializer):
             'amount_ghs',
             'currency',
             'reference',
+            'provider_transaction_id',
             'authorization_url',
             'paid_at',
             'created_at',
@@ -432,6 +437,14 @@ class PaymentSerializer(serializers.ModelSerializer):
         return getattr(package, 'name', None)
 
 
+class PaymentCheckoutSerializer(PaymentSerializer):
+    """Checkout responses include the Paystack access code used to resume the modal."""
+
+    class Meta(PaymentSerializer.Meta):
+        fields = (*PaymentSerializer.Meta.fields, 'access_code')
+        read_only_fields = fields
+
+
 class PaymentVerifySerializer(serializers.Serializer):
     reference = serializers.CharField(max_length=100)
 
@@ -470,6 +483,34 @@ class PaymentStatsSerializer(serializers.Serializer):
     open_invoices = serializers.IntegerField()
     paid_invoices = serializers.IntegerField()
     by_purpose = serializers.DictField(child=serializers.CharField())
+
+
+class SchoolFinanceSerializer(serializers.Serializer):
+    total_paid_ghs = serializers.CharField()
+    outstanding_ghs = serializers.CharField()
+    billed_ghs = serializers.CharField()
+    discount_ghs = serializers.CharField()
+    successful_payments = serializers.IntegerField()
+    open_invoices = serializers.IntegerField()
+    paid_invoices = serializers.IntegerField()
+    invoice_count = serializers.IntegerField()
+    payment_overdue = serializers.BooleanField()
+    by_purpose = serializers.DictField(child=serializers.CharField())
+
+
+class ExtendGraceSerializer(serializers.Serializer):
+    until = serializers.DateField()
+
+    def validate_until(self, value):
+        from django.utils import timezone
+
+        if value <= timezone.localdate():
+            raise serializers.ValidationError('Choose a date after today.')
+        return value
+
+
+class AssignSchoolDiscountSerializer(serializers.Serializer):
+    campaign_id = serializers.UUIDField()
 
 
 class DiscountSchoolSerializer(serializers.Serializer):

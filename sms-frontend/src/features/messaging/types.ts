@@ -1,22 +1,51 @@
 import type { PaginatedResponse } from '@/types/generalTypes'
 
+export type MessagingUsageEvent = {
+  channel: 'sms' | 'email'
+  event_type: string
+  sent: number
+  failed: number
+  skipped: number
+  credits_used: number
+}
+
+export type MessagingUsage = {
+  sms_sent: number
+  sms_failed: number
+  sms_skipped: number
+  email_sent: number
+  email_failed: number
+  email_skipped: number
+  sms_credits_used: number
+  email_credits_used: number
+  by_event?: MessagingUsageEvent[]
+}
+
 export type MessagingOverview = {
+  period?: '7d' | '30d' | 'custom'
+  period_start?: string
+  period_end?: string
   credits: {
     sms: number
     email: number
     billing_active: boolean
   }
-  usage_7d: {
-    sms_sent: number
-    sms_failed: number
-    sms_skipped: number
-    email_sent: number
-    email_failed: number
-    email_skipped: number
-    sms_credits_used: number
-    email_credits_used: number
-  }
+  usage?: MessagingUsage
+  usage_7d: MessagingUsage
   open_failures: number
+}
+
+export type ChannelCreditCoverage = {
+  balance: number
+  per_message: number
+  needed: number
+  shortfall_messages: number
+  sufficient: boolean
+}
+
+export type CreditCoverage = {
+  sms: ChannelCreditCoverage
+  email: ChannelCreditCoverage
 }
 
 export type DeliveryStatus =
@@ -57,6 +86,22 @@ export type GuardianDelivery = {
 }
 
 export type PaginatedDeliveries = PaginatedResponse<GuardianDelivery>
+
+export type EligibleDeliveryItem = {
+  id: string
+  channel: 'sms' | 'email'
+  segments: number
+}
+
+export type EligibleResendSelection = {
+  total: number
+  limit: number
+  capped: boolean
+  ids: string[]
+  items: EligibleDeliveryItem[]
+  sms_credits: number
+  email_credits: number
+}
 
 export type MessageTemplatePlaceholder = {
   key: string

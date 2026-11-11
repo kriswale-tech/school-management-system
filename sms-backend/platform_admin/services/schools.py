@@ -299,10 +299,14 @@ def set_school_status(
     actor: PlatformUser,
     school: School,
     status: str,
+    reason: str,
     ip_address: str | None = None,
 ) -> School:
     if status not in School.Status.values:
         raise ValidationError({'status': 'Invalid school status.'})
+    cleaned_reason = (reason or '').strip()
+    if not cleaned_reason:
+        raise ValidationError({'reason': 'Enter a reason for this status change.'})
     if school.status == status:
         return school
 
@@ -327,10 +331,41 @@ def set_school_status(
         action='platform.school.status_changed',
         target_type='school',
         target_id=str(school.pk),
-        detail={'from': previous, 'to': status},
+        detail={'from': previous, 'to': status, 'reason': cleaned_reason},
         ip_address=ip_address,
     )
     return school
+
+
+def latest_status_reason(school: School) -> str:
+    from platform_admin.models import PlatformAuditLog
+
+    entry = (
+        PlatformAuditLog.objects.filter(
+            target_type='school',
+            target_id=str(school.pk),
+            action='platform.school.status_changed',
+        )
+        .order_by('-created_at')
+        .first()
+    )
+    if entry is None:
+        return ''
+    reason = (entry.detail or {}).get('reason') or ''
+    return str(reason)
+
+
+def school_audit_logs(school: School):
+    from platform_admin.models import PlatformAuditLog
+
+    return (
+        PlatformAuditLog.objects.filter(
+            target_type='school',
+            target_id=str(school.pk),
+        )
+        .select_related('actor')
+        .order_by('-created_at')
+    )
 
 
 def school_admin_memberships(school: School) -> QuerySet[SchoolMembership]:

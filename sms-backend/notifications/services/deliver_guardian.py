@@ -196,13 +196,25 @@ def deliver_guardian_sms_batch(items: list[dict]) -> dict:
             channel=GuardianDelivery.Channel.SMS,
             school_items=school_items,
         )
+        credit_skipped = 0
         for item in skipped_items:
+            reason = item.get('skip_reason') or 'insufficient_credits'
+            if reason == 'insufficient_credits':
+                credit_skipped += 1
             _skip_item(
                 item,
                 channel=GuardianDelivery.Channel.SMS,
-                reason=item.get('skip_reason') or 'insufficient_credits',
+                reason=reason,
             )
             skipped_pre += 1
+        if credit_skipped:
+            from notifications.services.credit_notices import notify_messaging_credit_shortfall
+
+            notify_messaging_credit_shortfall(
+                school=school,
+                channel=GuardianDelivery.Channel.SMS,
+                skipped=credit_skipped,
+            )
         sendable.extend(ok_items)
 
     if not sendable:
@@ -340,13 +352,25 @@ def deliver_guardian_email_batch(items: list[dict]) -> dict:
             channel=GuardianDelivery.Channel.EMAIL,
             school_items=school_items,
         )
+        credit_skipped = 0
         for item in skipped_items:
+            reason = item.get('skip_reason') or 'insufficient_credits'
+            if reason == 'insufficient_credits':
+                credit_skipped += 1
             _skip_item(
                 item,
                 channel=GuardianDelivery.Channel.EMAIL,
-                reason=item.get('skip_reason') or 'insufficient_credits',
+                reason=reason,
             )
             skipped_pre += 1
+        if credit_skipped:
+            from notifications.services.credit_notices import notify_messaging_credit_shortfall
+
+            notify_messaging_credit_shortfall(
+                school=school,
+                channel=GuardianDelivery.Channel.EMAIL,
+                skipped=credit_skipped,
+            )
         sendable.extend(ok_items)
 
     if not sendable:
