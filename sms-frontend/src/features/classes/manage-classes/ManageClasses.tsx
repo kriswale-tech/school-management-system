@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import ActionBar from '@/components/shared/ActionBar'
 import { CurriculumLevels } from '@/components/curriculum'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import CurriculumUpdateBanner from './CurriculumUpdateBanner'
 import { getApiErrorMessage } from '@/utils'
 import type { CurriculumHandlers } from './types'
 import {
@@ -224,6 +225,7 @@ const ManageClasses = ({ embedded = false }: ManageClassesProps) => {
   return (
     <div className="space-y-6">
       {embedded ? null : <ActionBar title="Manage Classes" back />}
+      <CurriculumUpdateBanner />
 
       {isLoading ? (
         <LoadingSpinner className="mx-auto" />

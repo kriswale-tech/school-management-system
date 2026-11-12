@@ -41,6 +41,9 @@ def _skip_item(item: dict, *, channel: str, reason: str) -> None:
         'school_missing': 'School could not be found for this message.',
         'school_inaccessible': 'School is not currently able to send messages.',
         'allowance_exhausted': 'Free messaging allowance is exhausted.',
+        'provider_wallet_unavailable': (
+            'SMS is temporarily unavailable. Your credits were not used.'
+        ),
     }.get(reason, reason.replace('_', ' ').capitalize())
     body = item.get('body') or item.get('text_body') or item.get('subject') or ''
     classification = item.get('billing_classification') or GuardianDelivery.BillingClassification.PAID
@@ -217,6 +220,39 @@ def deliver_guardian_sms_batch(items: list[dict]) -> dict:
             )
         sendable.extend(ok_items)
 
+    from communications.services.providers.sms_float import (
+        notify_sends_held,
+        reserve_school_sms,
+        settle_school_sms,
+    )
+
+    reservation = reserve_school_sms(sendable)
+    if reservation.held:
+        held_by_school: dict[str, int] = {}
+        for item in reservation.held:
+            _skip_item(
+                item,
+                channel=GuardianDelivery.Channel.SMS,
+                reason='provider_wallet_unavailable',
+            )
+            held_by_school[str(item['school_id'])] = (
+                held_by_school.get(str(item['school_id']), 0) + 1
+            )
+            skipped_pre += 1
+        from notifications.services.credit_notices import notify_sms_provider_unavailable
+
+        for school_id, count in held_by_school.items():
+            school = schools.get(school_id)
+            if school is None:
+                continue
+            notify_sms_provider_unavailable(school=school, skipped=count)
+        notify_sends_held(
+            held=len(reservation.held),
+            reason=reservation.reason,
+            available=reservation.available,
+        )
+    sendable = reservation.sendable
+
     if not sendable:
         return {
             'sent': 0,
@@ -236,88 +272,109 @@ def deliver_guardian_sms_batch(items: list[dict]) -> dict:
         }
         for item in sendable
     ]
-    results = send_personalized_sms_batch(payload)
-    by_key = {row['key']: row for row in results}
+    reserved_units = sum(int(item.get('units') or 1) for item in sendable)
+    results = None
+    tally = None
+    try:
+        results = send_personalized_sms_batch(payload)
+        by_key = {row['key']: row for row in results}
 
-    sent = 0
-    failed = 0
-    unknown = 0
-    for item in sendable:
-        key = item['idempotency_key']
-        result = by_key.get(key) or {}
-        school = schools[str(item['school_id'])]
-        outcome = result.get('outcome') or ('submitted' if result.get('ok') else 'failed')
-        units = int(item.get('units') or sms_segment_count(item.get('body') or ''))
+        sent = 0
+        failed = 0
+        unknown = 0
+        submitted_units = 0
+        failed_units = 0
+        unknown_units = 0
+        for item in sendable:
+            key = item['idempotency_key']
+            result = by_key.get(key) or {}
+            school = schools[str(item['school_id'])]
+            outcome = result.get('outcome') or ('submitted' if result.get('ok') else 'failed')
+            units = int(item.get('units') or sms_segment_count(item.get('body') or ''))
 
-        if outcome == 'submitted' or result.get('ok'):
-            delivery = update_sms_attempt(
-                idempotency_key=key,
-                status=GuardianDelivery.Status.SUBMITTED,
-                provider_message_id=result.get('provider_message_id', ''),
-                provider_status='SUBMITTED',
-                user_error_message='',
-                error_message='',
-            )
-            _apply_snapshots(
-                delivery,
-                channel=GuardianDelivery.Channel.SMS,
-                body=item.get('body') or '',
-                units=units,
-                item=item,
-            )
-            charged = 0
-            if delivery is not None:
-                charged = _debit_after_send(
-                    school=school,
+            if outcome == 'submitted' or result.get('ok'):
+                delivery = update_sms_attempt(
+                    idempotency_key=key,
+                    status=GuardianDelivery.Status.SUBMITTED,
+                    provider_message_id=result.get('provider_message_id', ''),
+                    provider_status='SUBMITTED',
+                    user_error_message='',
+                    error_message='',
+                )
+                _apply_snapshots(
+                    delivery,
                     channel=GuardianDelivery.Channel.SMS,
-                    item={**item, 'units': units},
-                    delivery=delivery,
+                    body=item.get('body') or '',
+                    units=units,
+                    item=item,
                 )
-                if charged and delivery.credits_charged != charged:
-                    delivery.credits_charged = charged
-                    delivery.segments = units
-                    delivery.save(update_fields=['credits_charged', 'segments', 'updated_at'])
-            sent += 1
-            if settings.DEBUG:
-                print(
-                    f'Guardian SMS SUBMITTED for {item["recipient_address"]} | '
-                    f'{item["event_type"]} | id={result.get("provider_message_id")} '
-                    f'| student={item.get("student_id")}'
+                charged = 0
+                if delivery is not None:
+                    charged = _debit_after_send(
+                        school=school,
+                        channel=GuardianDelivery.Channel.SMS,
+                        item={**item, 'units': units},
+                        delivery=delivery,
+                    )
+                    if charged and delivery.credits_charged != charged:
+                        delivery.credits_charged = charged
+                        delivery.segments = units
+                        delivery.save(update_fields=['credits_charged', 'segments', 'updated_at'])
+                sent += 1
+                submitted_units += units
+                if settings.DEBUG:
+                    print(
+                        f'Guardian SMS SUBMITTED for {item["recipient_address"]} | '
+                        f'{item["event_type"]} | id={result.get("provider_message_id")} '
+                        f'| student={item.get("student_id")}'
+                    )
+            elif outcome == 'unknown':
+                user_msg = result.get('user_message') or (
+                    'SMS submission could not be confirmed.'
                 )
-        elif outcome == 'unknown':
-            user_msg = result.get('user_message') or (
-                'SMS submission could not be confirmed.'
-            )
-            logger.error(
-                'Guardian SMS UNKNOWN for key=%s phone=%s technical=%s',
-                key,
-                item.get('recipient_address'),
-                result.get('error'),
-            )
-            update_sms_attempt(
-                idempotency_key=key,
-                status=GuardianDelivery.Status.UNKNOWN,
-                user_error_message=user_msg,
-                error_message=user_msg,
-            )
-            unknown += 1
-        else:
-            user_msg = result.get('user_message') or 'The SMS could not be sent.'
-            logger.error(
-                'Guardian SMS FAILED for key=%s phone=%s technical=%s',
-                key,
-                item.get('recipient_address'),
-                result.get('error'),
-            )
-            update_sms_attempt(
-                idempotency_key=key,
-                status=GuardianDelivery.Status.FAILED,
-                user_error_message=user_msg,
-                error_message=user_msg,
-            )
-            failed += 1
-            if settings.DEBUG:
-                print(f'Guardian SMS FAILED for {item["recipient_address"]}: {user_msg}')
+                logger.error(
+                    'Guardian SMS UNKNOWN for key=%s phone=%s technical=%s',
+                    key,
+                    item.get('recipient_address'),
+                    result.get('error'),
+                )
+                update_sms_attempt(
+                    idempotency_key=key,
+                    status=GuardianDelivery.Status.UNKNOWN,
+                    user_error_message=user_msg,
+                    error_message=user_msg,
+                )
+                unknown += 1
+                unknown_units += units
+            else:
+                user_msg = result.get('user_message') or 'The SMS could not be sent.'
+                logger.error(
+                    'Guardian SMS FAILED for key=%s phone=%s technical=%s',
+                    key,
+                    item.get('recipient_address'),
+                    result.get('error'),
+                )
+                update_sms_attempt(
+                    idempotency_key=key,
+                    status=GuardianDelivery.Status.FAILED,
+                    user_error_message=user_msg,
+                    error_message=user_msg,
+                )
+                failed += 1
+                failed_units += units
+                if settings.DEBUG:
+                    print(f'Guardian SMS FAILED for {item["recipient_address"]}: {user_msg}')
+        tally = (submitted_units, failed_units, unknown_units)
+    finally:
+        if reservation.tracked and reserved_units:
+            if tally is None:
+                settle_school_sms(submitted=0, failed=reserved_units, unknown=0)
+            else:
+                settle_school_sms(
+                    submitted=tally[0],
+                    failed=tally[1],
+                    unknown=tally[2],
+                )
 
     return {
         'sent': sent,

@@ -1,4 +1,24 @@
+from contextlib import contextmanager
+from contextvars import ContextVar
+
 from django.core.exceptions import ValidationError
+
+_allow_system_record_writes = ContextVar('allow_system_record_writes', default=False)
+
+
+def system_record_writes_allowed():
+    return _allow_system_record_writes.get()
+
+
+@contextmanager
+def allow_system_record_writes():
+    """Curriculum adoption may update provisioned rows. School users cannot."""
+    token = _allow_system_record_writes.set(True)
+    try:
+        yield
+    finally:
+        _allow_system_record_writes.reset(token)
+
 
 SYSTEM_GENERATED_MUTABLE_FIELDS = frozenset({
     'is_active',
@@ -11,6 +31,8 @@ class SystemGeneratedRecordMixin:
     """Prevent schools from editing or deleting provisioned curriculum records."""
 
     def _assert_system_record_is_mutable(self):
+        if system_record_writes_allowed():
+            return
         if not self.pk or not self.is_system_generated:
             return
 

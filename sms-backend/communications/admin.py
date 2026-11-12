@@ -106,7 +106,15 @@ class EmailPricingConfigAdmin(admin.ModelAdmin):
 
 @admin.register(ProviderAccount)
 class ProviderAccountAdmin(admin.ModelAdmin):
-    list_display = ('provider', 'channel', 'display_name', 'api_status', 'last_synced_at')
+    list_display = (
+        'provider',
+        'channel',
+        'display_name',
+        'api_status',
+        'last_synced_at',
+        'sms_float_units',
+        'sms_float_synced_at',
+    )
     list_filter = ('provider', 'channel', 'api_status')
 
 

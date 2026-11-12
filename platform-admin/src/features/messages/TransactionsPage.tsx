@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { FilterBar, rangeLabel, useMessagesFilters } from './components/filters'
 import {
+  activityTone,
   Badge,
   GhostButton,
   Pagination,
@@ -164,7 +165,9 @@ export default function TransactionsPage() {
             <tr key={row.id} className="border-b border-[var(--color-line)] last:border-0">
               <Td>{formatDateTime(row.occurred_at)}</Td>
               <Td>
-                <Badge>{titleCase(row.transaction_type)}</Badge>
+                <Badge tone={activityTone(row.transaction_type)}>
+                  {titleCase(row.transaction_type)}
+                </Badge>
                 {row.channel && (
                   <span className="mt-1 block text-xs text-[var(--color-ink)]/50 uppercase">
                     {row.channel}
@@ -212,7 +215,14 @@ export default function TransactionsPage() {
             >
               <div className="grid grid-cols-2 gap-4">
                 <Stat label="Date" value={formatDateTime(selected.occurred_at)} />
-                <Stat label="Type" value={titleCase(selected.transaction_type)} />
+                <Stat
+                  label="Type"
+                  value={
+                    <Badge tone={activityTone(selected.transaction_type)}>
+                      {titleCase(selected.transaction_type)}
+                    </Badge>
+                  }
+                />
                 <Stat
                   label="Amount"
                   value={selected.amount_ghs ? formatGhs(selected.amount_ghs) : '—'}

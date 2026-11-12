@@ -1,9 +1,12 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from drf_spectacular.utils import extend_schema
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
+from academics.services import curriculum_versions
 from accounts.permissions import HasActiveSchool, IsAdmin
+from platform_admin.services.audit import record_audit
 from schools.models import AcademicYear
 from schools.serializers import (
     AcademicYearCalendarSerializer,
@@ -262,3 +265,27 @@ class SchoolAlertListView(SchoolScopedAPIView):
     def get(self, request):
         alerts = list_school_alerts(school=self.school, membership=self.membership)
         return Response(SchoolAlertSerializer(alerts, many=True).data)
+
+
+class SchoolCurriculumAdoptionView(SchoolScopedAPIView):
+    permission_classes = [HasActiveSchool, IsAdmin]
+
+    @extend_schema(responses={200: dict})
+    def get(self, request):
+        return Response(curriculum_versions.plan_adoption(self.school))
+
+    @extend_schema(responses={200: dict})
+    def post(self, request):
+        try:
+            result = curriculum_versions.adopt(self.school)
+        except DjangoValidationError as exc:
+            messages = getattr(exc, 'messages', None) or [str(exc)]
+            raise ValidationError(messages[0] if len(messages) == 1 else messages)
+        record_audit(
+            actor=None,
+            action='platform.curriculum.adopted',
+            target_type='school',
+            target_id=str(self.school.pk),
+            detail={'to_version': result['to_version'], 'source': 'school'},
+        )
+        return Response(result)

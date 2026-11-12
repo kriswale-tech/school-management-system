@@ -1,14 +1,19 @@
 import api from '@/lib/api'
+import {
+  adaptFreeUsage,
+  adaptOverview,
+  adaptProfitability,
+  adaptSchoolReport,
+  adaptSchoolUsage,
+  adaptTransactions,
+  transactionQueryType,
+} from './adapt'
 import type {
   AllowancePolicy,
   AllowancePolicyInput,
   EmailPricingConfig,
   EmailPricingConfigInput,
-  FreeUsageStats,
-  MessagesOverview,
-  MessagingTransaction,
   Paginated,
-  Profitability,
   ProfitabilityView,
   Provider,
   ProviderAccount,
@@ -21,8 +26,6 @@ import type {
   ReconciliationItem,
   ReconciliationRun,
   SesUsageSnapshot,
-  SchoolMessagingReport,
-  SchoolUsageRow,
   SmsCalculatorResult,
   SmsEncodingConfig,
   SmsEncodingConfigInput,
@@ -34,8 +37,8 @@ const BASE = '/platform/messages'
 /* Overview --------------------------------------------------------- */
 
 export async function getOverview(params: RangeParams) {
-  const { data } = await api.get<MessagesOverview>(`${BASE}/overview/`, { params })
-  return data
+  const { data } = await api.get(`${BASE}/overview/`, { params })
+  return adaptOverview(data)
 }
 
 /* SMS pricing ------------------------------------------------------- */
@@ -156,16 +159,15 @@ export async function createExpense(payload: ProviderExpenseInput) {
 /* School usage ------------------------------------------------------ */
 
 export async function listSchoolUsage(params: RangeParams & { q?: string; page?: number }) {
-  const { data } = await api.get<Paginated<SchoolUsageRow>>(`${BASE}/schools/usage/`, { params })
-  return data
+  const { data } = await api.get<Paginated<Record<string, unknown>>>(`${BASE}/schools/usage/`, {
+    params,
+  })
+  return adaptSchoolUsage(data)
 }
 
 export async function getSchoolReport(schoolId: string, params: RangeParams) {
-  const { data } = await api.get<SchoolMessagingReport>(
-    `${BASE}/schools/${schoolId}/report/`,
-    { params },
-  )
-  return data
+  const { data } = await api.get(`${BASE}/schools/${schoolId}/report/`, { params })
+  return adaptSchoolReport(data)
 }
 
 /* Free & sponsored --------------------------------------------------- */
@@ -186,15 +188,17 @@ export async function patchAllowance(id: string, payload: Partial<AllowancePolic
 }
 
 export async function getFreeUsage(params: RangeParams) {
-  const { data } = await api.get<FreeUsageStats>(`${BASE}/free-usage/`, { params })
-  return data
+  const { data } = await api.get(`${BASE}/free-usage/`, { params })
+  return adaptFreeUsage(data)
 }
 
 /* Profitability ------------------------------------------------------ */
 
-export async function getProfitability(params: RangeParams & { view: ProfitabilityView }) {
-  const { data } = await api.get<Profitability>(`${BASE}/profitability/`, { params })
-  return data
+export async function getProfitability(params: RangeParams & { view?: ProfitabilityView }) {
+  const { data } = await api.get(`${BASE}/profitability/`, {
+    params: { ...params, view: 'both' },
+  })
+  return adaptProfitability(data)
 }
 
 /* Transactions ------------------------------------------------------- */
@@ -202,10 +206,17 @@ export async function getProfitability(params: RangeParams & { view: Profitabili
 export async function listTransactions(
   params: RangeParams & { type?: TransactionType | ''; provider?: Provider | ''; page?: number },
 ) {
-  const { data } = await api.get<Paginated<MessagingTransaction>>(`${BASE}/transactions/`, {
-    params,
+  const channel =
+    params.channel ||
+    (params.type === 'sms_deduction' ? 'sms' : params.type === 'email_deduction' ? 'email' : undefined)
+  const { data } = await api.get<Paginated<Record<string, unknown>>>(`${BASE}/transactions/`, {
+    params: {
+      ...params,
+      channel,
+      type: transactionQueryType(params.type || undefined),
+    },
   })
-  return data
+  return adaptTransactions(data)
 }
 
 /* Exports ------------------------------------------------------------ */

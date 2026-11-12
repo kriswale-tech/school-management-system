@@ -412,6 +412,13 @@ MESSAGING_AUTO_REFUND_FAILED_EMAIL = os.getenv(
     'MESSAGING_AUTO_REFUND_FAILED_EMAIL', 'true',
 ).lower() in ('1', 'true', 'yes')
 
+# Arkesel is prepaid. School SMS is held when this platform float is missing,
+# stale, or too small to cover the batch. School credits are not debited.
+ARKESEL_FLOAT_MAX_AGE_MINUTES = int(os.getenv('ARKESEL_FLOAT_MAX_AGE_MINUTES', '90'))
+ARKESEL_LOW_BALANCE_DAYS = int(os.getenv('ARKESEL_LOW_BALANCE_DAYS', '3'))
+ARKESEL_USAGE_LOOKBACK_DAYS = int(os.getenv('ARKESEL_USAGE_LOOKBACK_DAYS', '7'))
+ARKESEL_ALERT_COOLDOWN_HOURS = int(os.getenv('ARKESEL_ALERT_COOLDOWN_HOURS', '24'))
+
 ANYMAIL = {
     # Kept for transitional installs; primary path is SES / console.
     'RESEND_API_KEY': RESEND_API_KEY,
@@ -476,3 +483,5 @@ if 'test' in sys.argv:
     CELERY_TASK_EAGER_PROPAGATES = True
     EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
     EMAIL_ENABLED = True
+    # A missing float must not block fixture SMS. Production leaves this unset.
+    ARKESEL_FLOAT_ASSUME_UNITS = 100_000

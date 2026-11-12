@@ -63,6 +63,14 @@ class School(BaseModel):
         blank=True,
         related_name='schools',
     )
+    accepted_curriculum = models.ForeignKey(
+        'academics.Curriculum',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='schools_accepting',
+        help_text='Version the school has accepted. It is applied when the next term starts.',
+    )
 
     @property
     def is_accessible(self) -> bool:
@@ -210,6 +218,10 @@ class SchoolSettings(BaseModel):
     transition_popup_enabled = models.BooleanField(
         default=True,
         help_text='Show a popup on the dashboard while opening the next term still needs action.',
+    )
+    curriculum_alert_enabled = models.BooleanField(
+        default=True,
+        help_text='Show the curriculum update on the bell and the admin dashboard.',
     )
     report_show_logo = models.BooleanField(default=True)
     report_show_address = models.BooleanField(default=True)

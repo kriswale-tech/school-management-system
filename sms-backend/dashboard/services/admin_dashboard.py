@@ -93,6 +93,7 @@ def get_admin_dashboard(*, school) -> dict:
         'setup_health': _setup_health(school=school, term=term, class_stats=class_stats),
         'academic_progress': _academic_progress(school=school, assessment=assessment),
         'levels': _levels_for_progress(school=school, assessment=assessment),
+        'curriculum_update': _curriculum_update(school),
     }
 
 
@@ -164,6 +165,28 @@ def _empty_dashboard(*, school) -> dict:
         },
         'academic_progress': [],
         'levels': [],
+        'curriculum_update': _curriculum_update(school),
+    }
+
+
+def _curriculum_update(school) -> dict | None:
+    from academics.services.curriculum_versions import _has_open_term, _timing_copy, pending_update
+    from schools.services.settings import get_school_settings
+
+    if not get_school_settings(school).curriculum_alert_enabled:
+        return None
+    active = pending_update(school)
+    if active is None:
+        return None
+    current = school.provisioned_curriculum
+    has_term = _has_open_term(school)
+    from_version = current.version if current is not None else None
+    return {
+        'name': active.name,
+        'version': active.version,
+        'from_version': from_version,
+        'href': '/classes/manage',
+        'summary': _timing_copy(has_term=has_term),
     }
 
 

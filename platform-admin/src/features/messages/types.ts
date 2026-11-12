@@ -1,8 +1,9 @@
 /**
- * Contract types for `/api/v1/platform/messages/*` (architecture v4.1 §2.16).
+ * View models for `/api/v1/platform/messages/*`.
  *
- * The backend module is not built yet, so every nested block is optional: a
- * partially implemented endpoint must degrade to "—" rather than crash a page.
+ * The API nests figures by money layer (`channels`, `providers`, `layer_3_*`).
+ * `adapt.ts` flattens that payload into these types. A missing figure stays
+ * null so the UI can render "—" instead of crashing.
  */
 
 export type Paginated<T> = {
@@ -87,8 +88,8 @@ export type ProviderLayer = {
 
 /** Layer 2 — school credit wallets (units). */
 export type SchoolCreditLayer = {
-  sms_outstanding_units: number
-  email_outstanding_units: number
+  sms_outstanding_units: number | null
+  email_outstanding_units: number | null
   allocated_units: number
   consumed_units: number
 }

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { statusToneName, type StatusTone } from '@/features/billing/statusTone'
 import { isEndpointMissing } from '../lib'
 
 /* ------------------------------------------------------------------ */
@@ -160,37 +161,94 @@ export function EstimatedTag() {
   )
 }
 
+const VALUE_TONE: Record<StatusTone, string> = {
+  success: 'text-emerald-800',
+  warning: 'text-amber-800',
+  danger: 'text-red-800',
+  info: 'text-sky-800',
+  quiet: 'text-slate-500',
+}
+
 export function Stat({
   label,
   value,
   hint,
+  tone,
 }: {
   label: string
   value: ReactNode
   hint?: ReactNode
+  tone?: string
 }) {
   return (
     <div>
       <p className="text-xs font-medium text-[var(--color-ink)]/55">{label}</p>
-      <p className="mt-0.5 text-sm font-semibold">{value}</p>
+      <p className={`mt-0.5 text-sm font-semibold ${tone ? VALUE_TONE[statusToneName(tone)] : ''}`}>
+        {value}
+      </p>
       {hint && <p className="text-xs text-[var(--color-ink)]/55">{hint}</p>}
     </div>
   )
+}
+
+export type BadgeTone = 'neutral' | 'accent' | 'warn' | 'danger' | 'success' | 'info'
+
+const BADGE_FROM_STATUS: Record<StatusTone, BadgeTone> = {
+  success: 'success',
+  warning: 'warn',
+  danger: 'danger',
+  info: 'info',
+  quiet: 'neutral',
+}
+
+export function badgeToneFor(status: string): BadgeTone {
+  return BADGE_FROM_STATUS[statusToneName(status)]
+}
+
+const ACTIVITY_TONE: Record<string, BadgeTone> = {
+  provider_purchase: 'info',
+  provider_expense: 'warn',
+  school_topup: 'success',
+  addon_allocation: 'success',
+  allocation_recurring: 'success',
+  topup: 'success',
+  sms_deduction: 'info',
+  email_deduction: 'info',
+  usage_debit: 'info',
+  free_message: 'info',
+  sponsored_message: 'info',
+  reversal: 'warn',
+  promo_grant: 'success',
+  manual_adjust: 'warn',
+  pricing_change: 'info',
+  reconciliation: 'info',
+  subscription: 'info',
+  overage: 'warn',
+  other: 'neutral',
+  api: 'info',
+  manual: 'neutral',
+  import: 'info',
+}
+
+export function activityTone(kind: string): BadgeTone {
+  return ACTIVITY_TONE[kind.trim().toLowerCase()] ?? 'info'
 }
 
 export function Badge({
   tone = 'neutral',
   children,
 }: {
-  tone?: 'neutral' | 'accent' | 'warn' | 'danger'
+  tone?: BadgeTone
   children: ReactNode
 }) {
-  const tones = {
-    neutral: 'border-[var(--color-line)] bg-[var(--color-panel)] text-[var(--color-ink)]/70',
+  const tones: Record<BadgeTone, string> = {
+    neutral: 'border-slate-200 bg-slate-100 text-slate-600',
     accent:
       'border-[var(--color-accent)]/25 bg-[var(--color-accent-soft)] text-[var(--color-accent)]',
     warn: 'border-amber-200 bg-amber-50 text-amber-800',
-    danger: 'border-red-200 bg-red-50 text-red-700',
+    danger: 'border-red-200 bg-red-50 text-red-800',
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    info: 'border-sky-200 bg-sky-50 text-sky-800',
   }
   return (
     <span

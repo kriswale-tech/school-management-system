@@ -381,5 +381,8 @@ def activate_term(school, term_id, *, acknowledge_warnings, today=None):
         target.is_active = True
         target.save(update_fields=['is_active', 'updated_at'])
         copy_forward_assessment_configs(school=school, target_term=target)
+        from academics.services.curriculum_versions import apply_accepted_curriculum
+
+        apply_accepted_curriculum(school)
 
     return list_academic_calendar(school, today=today)

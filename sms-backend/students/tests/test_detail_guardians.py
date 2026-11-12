@@ -108,7 +108,7 @@ class StudentDetailGuardianViewTests(APITestCase):
             {
                 'address': 'Kumasi',
                 'other_names': 'Serwaa',
-                'student_id': 'HACKED',
+                'student_id': 'TA-0099',
                 'is_new_student': False,
             },
             format='json',
@@ -118,11 +118,11 @@ class StudentDetailGuardianViewTests(APITestCase):
         self.assertEqual(response.data['address'], 'Kumasi')
         self.assertEqual(response.data['other_names'], 'Serwaa')
         self.assertEqual(response.data['full_name'], 'Ama Serwaa Mensah')
-        self.assertEqual(response.data['student_id'], 'TA-0001')
+        self.assertEqual(response.data['student_id'], 'TA-0099')
         self.assertTrue(response.data['is_new_student'])
 
         self.student.refresh_from_db()
-        self.assertEqual(self.student.student_id, 'TA-0001')
+        self.assertEqual(self.student.student_id, 'TA-0099')
 
     def test_update_guardian_phone_and_relationship(self):
         url = reverse(

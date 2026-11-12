@@ -70,6 +70,10 @@ The API rejects a plan without an interval, an interval without a plan, an unkno
 
 `/schools/:id`. `GET /platform/schools/<id>/` adds `staff_count`, `student_count`, `status_reason` (the latest status-change reason, or an empty string), `admins`, and `invites`.
 
+**Messaging report**, for roles that can open Messages, sits next to Back to schools and opens `/messages/schools/:id`. The report links back to this page.
+
+The directory status filter follows `?status=` (`pending`, `active`, `suspended`, or `archived`). Needs attention on the platform home uses `?status=pending`.
+
 Status, setup, staff, and students sit in chips under the school name. Active and complete are green, pending and incomplete are amber, suspended is red, and archived is slate. Staff and student counts are large numerals.
 
 Status buttons use the same reason dialog as the directory. The latest reason is shown under the chips.

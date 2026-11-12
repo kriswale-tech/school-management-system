@@ -34,6 +34,7 @@ from communications.services.aggregates import (
     school_balances,
     unpaid_comms_invoice_total,
 )
+from communications.services.analytics import consumption_trend
 from communications.services.pricing import get_active_email_config, get_active_sms_configs
 from communications.services.ranges import DateRange
 
@@ -321,6 +322,11 @@ def messaging_overview(
         'providers': _provider_block(date_range=date_range),
         'pricing': _pricing_block(),
         'operations': _operations_block(),
+        'trend': consumption_trend(
+            school=school,
+            date_range=date_range,
+            channel=channel if channel in (SMS, EMAIL) else None,
+        ),
         'layer_warning': (
             'Provider balance, school credits, cash, and usage value are '
             'different layers. Never sum across them.'

@@ -25,6 +25,7 @@ import {
   startSchoolSubscription,
 } from '@/features/billing/services'
 import { ListPager } from '@/features/billing/ListPager'
+import { StatusBadge } from '@/features/billing/StatusBadge'
 import {
   paymentForLabel,
   paymentKindLabel,
@@ -70,14 +71,6 @@ function planFits(plan: Plan, subscription: Subscription) {
 
 function planLimit(max: number | null) {
   return max == null ? 'no limit' : max.toLocaleString()
-}
-
-function invoiceLabel(status: string) {
-  if (status === 'paid') return { label: 'Paid', className: 'bg-emerald-50 text-emerald-900' }
-  if (status === 'open') return { label: 'Pending', className: 'bg-amber-50 text-amber-950' }
-  if (status === 'uncollectible') return { label: 'Uncollectible', className: 'bg-red-50 text-red-900' }
-  if (status === 'void') return { label: 'Void', className: 'bg-slate-100 text-slate-600' }
-  return { label: status, className: 'bg-slate-100 text-slate-700' }
 }
 
 function scheduleLabel(schedule: string) {
@@ -472,9 +465,7 @@ export default function SchoolBillingPanel({ schoolId }: { schoolId: string }) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold">Finance</h2>
           {financeQuery.data?.payment_overdue && (
-            <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-800">
-              Overdue
-            </span>
+            <StatusBadge status="overdue" />
           )}
         </div>
         <p className="mt-1 text-sm text-[var(--color-ink)]/70">
@@ -586,7 +577,7 @@ export default function SchoolBillingPanel({ schoolId }: { schoolId: string }) {
                     </td>
                     <td className="px-3 py-3">{paymentProviderLabel(payment.provider)}</td>
                     <td className="px-3 py-3">
-                      <StatusPill status={payment.status} />
+                      <StatusBadge status={payment.status} />
                     </td>
                     <td className="px-3 py-3 font-mono text-xs">{payment.reference}</td>
                     <td className="px-3 py-3 font-mono text-xs">
@@ -822,9 +813,7 @@ function PlanCard({
             {subscription.interval} · {formatGhs(price)}
           </p>
         </div>
-        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold capitalize">
-          {subscription.status.replaceAll('_', ' ')}
-        </span>
+        <StatusBadge status={subscription.status} />
       </div>
       <p className="mt-3 text-sm text-[var(--color-ink)]/70">
         Renews {formatDate(subscription.current_period_end)}
@@ -838,7 +827,7 @@ function PlanCard({
           : 'Grace starts when a renewal goes unpaid'}
       </p>
       {(subscription.pending_plan || pendingInterval) && (
-        <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-950">
+        <p className="mt-2 rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-900">
           Scheduled
           {subscription.pending_plan ? ` ${subscription.pending_plan.name}` : ''}
           {pendingInterval ? ` ${pendingInterval}` : ''} on{' '}
@@ -1132,7 +1121,6 @@ function InvoiceRow({
   busy: boolean
   onMarkPaid: () => void
 }) {
-  const state = invoiceLabel(invoice.status)
   const payable = invoice.status === 'open' && Number(invoice.total_ghs) > 0
   return (
     <tr className="border-t border-[var(--color-line)]">
@@ -1144,9 +1132,7 @@ function InvoiceRow({
       </td>
       <td className="px-3 py-3 font-medium">{formatGhs(invoice.total_ghs)}</td>
       <td className="px-3 py-3">
-        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${state.className}`}>
-          {state.label}
-        </span>
+        <StatusBadge status={invoice.status} />
       </td>
       <td className="px-3 py-3 text-[var(--color-ink)]/70">{formatDate(invoice.created_at)}</td>
       <td className="px-3 py-3 text-right">
@@ -1157,19 +1143,6 @@ function InvoiceRow({
         )}
       </td>
     </tr>
-  )
-}
-
-function StatusPill({ status }: { status: string }) {
-  const paid = status === 'success' || status === 'paid'
-  return (
-    <span
-      className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${
-        paid ? 'bg-emerald-50 text-emerald-900' : 'bg-amber-50 text-amber-950'
-      }`}
-    >
-      {status.replaceAll('_', ' ')}
-    </span>
   )
 }
 

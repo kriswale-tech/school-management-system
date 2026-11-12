@@ -19,6 +19,7 @@ class SchoolSettingsAdmin(admin.ModelAdmin):
         'enrollments_alert_enabled',
         'guardians_alert_enabled',
         'transition_popup_enabled',
+        'curriculum_alert_enabled',
         'guardian_ward_enrolled_enabled',
         'guardian_audience',
     ]

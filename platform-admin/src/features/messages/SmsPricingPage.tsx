@@ -50,7 +50,7 @@ function ActiveConfigCard({
         <h4 className="font-[family-name:var(--font-display)] text-base font-semibold">
           {ENCODING_LABEL[encoding]}
         </h4>
-        {config ? <Badge tone="accent">Active</Badge> : <Badge tone="warn">Not configured</Badge>}
+        {config ? <Badge tone="success">Active</Badge> : <Badge tone="warn">Not configured</Badge>}
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3">
         <Stat
@@ -374,7 +374,7 @@ export default function SmsPricingPage() {
                 </Td>
                 <Td>
                   {row.is_active ? (
-                    <Badge tone="accent">Active</Badge>
+                    <Badge tone="success">Active</Badge>
                   ) : (
                     <Badge>Superseded</Badge>
                   )}

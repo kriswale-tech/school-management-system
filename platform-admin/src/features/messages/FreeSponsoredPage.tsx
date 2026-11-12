@@ -442,7 +442,7 @@ export default function FreeSponsoredPage() {
                 </span>
               </Td>
               <Td>
-                {policy.is_active ? <Badge tone="accent">Active</Badge> : <Badge>Inactive</Badge>}
+                {policy.is_active ? <Badge tone="success">Active</Badge> : <Badge>Inactive</Badge>}
               </Td>
               {canWrite && (
                 <Td>
@@ -483,8 +483,15 @@ export default function FreeSponsoredPage() {
               isLoading={freeUsageQuery.isLoading}
               isError={freeUsageQuery.isError}
               error={freeUsageQuery.error}
-              isEmpty={(usage?.by_school?.length ?? 0) === 0}
-              emptyMessage="No free or sponsored traffic in this range."
+            isEmpty={(usage?.by_school?.length ?? 0) === 0}
+            emptyMessage={
+              usage?.free_sms_segments ||
+              usage?.sponsored_sms_segments ||
+              usage?.free_email_credits ||
+              usage?.sponsored_email_credits
+                ? 'Totals are above. This response does not include a per-school breakdown.'
+                : 'No free or sponsored traffic in this range.'
+            }
             />
             {(usage?.by_school ?? []).map((row) => (
               <tr key={row.school} className="border-b border-[var(--color-line)] last:border-0">

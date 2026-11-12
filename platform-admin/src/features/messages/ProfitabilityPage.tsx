@@ -161,9 +161,13 @@ export default function ProfitabilityPage() {
             layer="cash"
             label="Received from schools"
             value={formatGhs(data?.cash?.received_from_schools_ghs)}
-            hint={`Top-ups ${formatGhs(data?.cash?.topup_cash_ghs)} · add-ons ${formatGhs(
-              data?.cash?.addon_cash_ghs,
-            )}`}
+            hint={
+              data?.cash?.topup_cash_ghs || data?.cash?.addon_cash_ghs
+                ? `Top-ups ${formatGhs(data?.cash?.topup_cash_ghs)} · add-ons ${formatGhs(
+                    data?.cash?.addon_cash_ghs,
+                  )}`
+                : 'Top-ups and add-on payments, combined'
+            }
           />
           <LayerTile
             layer="cash"

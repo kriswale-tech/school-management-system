@@ -490,7 +490,9 @@ def build_student_detail(*, school, student, term=None):
 
 
 @transaction.atomic
-def update_student(*, school, student_id, actor=None, **fields):
+def update_student(*, school, student_id, actor=None, display_student_id=None, **fields):
+    if display_student_id is not None:
+        fields['student_id'] = display_student_id
     student = get_student(school=school, student_id=student_id)
     allowed = {
         'first_name',

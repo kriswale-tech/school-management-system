@@ -2,7 +2,9 @@ import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { FilterBar, rangeLabel, useMessagesFilters } from './components/filters'
 import {
+  activityTone,
   Badge,
+  badgeToneFor,
   LayerTile,
   PageHeader,
   Panel,
@@ -24,12 +26,12 @@ import type { DeliveryStats } from './types'
 function DeliveryStatsRow({ label, stats }: { label: string; stats?: DeliveryStats }) {
   return (
     <div className="grid grid-cols-3 gap-4 border-t border-[var(--color-line)] py-3 first:border-t-0 sm:grid-cols-6">
-      <Stat label={label} value={formatPct(stats?.success_rate_pct)} hint="Success rate" />
-      <Stat label="Submitted" value={formatUnits(stats?.submitted)} />
-      <Stat label="Delivered" value={formatUnits(stats?.delivered)} />
-      <Stat label="Failed" value={formatUnits(stats?.failed)} />
-      <Stat label="Skipped" value={formatUnits(stats?.skipped)} />
-      <Stat label="Unknown" value={formatUnits(stats?.unknown)} />
+      <Stat label={label} tone="success" value={formatPct(stats?.success_rate_pct)} hint="Success rate" />
+      <Stat label="Submitted" tone="submitted" value={formatUnits(stats?.submitted)} />
+      <Stat label="Delivered" tone="delivered" value={formatUnits(stats?.delivered)} />
+      <Stat label="Failed" tone="failed" value={formatUnits(stats?.failed)} />
+      <Stat label="Skipped" tone="skipped" value={formatUnits(stats?.skipped)} />
+      <Stat label="Unknown" tone="unknown" value={formatUnits(stats?.unknown)} />
     </div>
   )
 }
@@ -74,7 +76,9 @@ export default function SchoolReportPage() {
         title={report?.school?.name || 'School messaging report'}
         description={`Messaging consumption and economics for ${rangeLabel(filters)}.`}
         actions={
-          report?.school?.status && <Badge tone="neutral">{report.school.status}</Badge>
+          report?.school?.status && (
+            <Badge tone={badgeToneFor(report.school.status)}>{report.school.status}</Badge>
+          )
         }
       />
 
@@ -236,9 +240,16 @@ export default function SchoolReportPage() {
               {(report?.ledger ?? []).map((entry) => (
                 <tr key={entry.id} className="border-b border-[var(--color-line)] last:border-0">
                   <Td>{formatDateTime(entry.occurred_at)}</Td>
-                  <Td>{titleCase(entry.entry_type)}</Td>
+                  <Td>
+                    <Badge tone={activityTone(entry.entry_type)}>{titleCase(entry.entry_type)}</Badge>
+                  </Td>
                   <Td className="uppercase">{entry.channel}</Td>
-                  <Td align="right" className={entry.delta < 0 ? 'text-red-700' : ''}>
+                  <Td
+                    align="right"
+                    className={
+                      entry.delta < 0 ? 'text-red-700' : entry.delta > 0 ? 'text-emerald-800' : ''
+                    }
+                  >
                     {entry.delta > 0 ? '+' : ''}
                     {formatUnits(entry.delta)}
                   </Td>
@@ -284,9 +295,7 @@ export default function SchoolReportPage() {
                   <Td align="right">{formatUnits(topup.credits)}</Td>
                   <Td align="right">{formatGhs(topup.amount_ghs)}</Td>
                   <Td>
-                    <Badge tone={topup.status === 'success' ? 'accent' : 'neutral'}>
-                      {titleCase(topup.status)}
-                    </Badge>
+                    <Badge tone={badgeToneFor(topup.status)}>{titleCase(topup.status)}</Badge>
                   </Td>
                 </tr>
               ))}

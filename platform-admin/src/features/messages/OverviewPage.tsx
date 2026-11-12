@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { FilterBar, rangeLabel, useMessagesFilters } from './components/filters'
 import {
+  Badge,
+  badgeToneFor,
   LayerTile,
   PageHeader,
   Panel,
@@ -83,13 +85,29 @@ export default function OverviewPage() {
         <LayerTile
           layer="provider"
           label="Arkesel API status"
-          value={provider?.arkesel_api_status ?? '—'}
+          value={
+            provider?.arkesel_api_status ? (
+              <Badge tone={badgeToneFor(provider.arkesel_api_status)}>
+                {provider.arkesel_api_status.replaceAll('_', ' ')}
+              </Badge>
+            ) : (
+              '—'
+            )
+          }
           hint="From the last sync attempt"
         />
         <LayerTile
           layer="provider"
           label="SES API status"
-          value={provider?.ses_api_status ?? provider?.resend_api_status ?? '—'}
+          value={
+            (provider?.ses_api_status ?? provider?.resend_api_status) ? (
+              <Badge tone={badgeToneFor(provider?.ses_api_status ?? provider?.resend_api_status ?? '')}>
+                {(provider?.ses_api_status ?? provider?.resend_api_status ?? '').replaceAll('_', ' ')}
+              </Badge>
+            ) : (
+              '—'
+            )
+          }
           hint={`Synced ${formatDateTime(provider?.ses_captured_at ?? provider?.resend_captured_at)}`}
         />
       </SummaryStrip>
@@ -199,11 +217,11 @@ export default function OverviewPage() {
             <Stat label="Recipients" value={formatUnits(sms?.recipients_total)} />
           </div>
           <div className="mt-4 grid grid-cols-2 gap-4 border-t border-[var(--color-line)] pt-4 sm:grid-cols-5">
-            <Stat label="Submitted" value={formatUnits(sms?.submitted)} />
-            <Stat label="Delivered" value={formatUnits(sms?.delivered)} />
-            <Stat label="Failed" value={formatUnits(sms?.failed)} />
-            <Stat label="Skipped" value={formatUnits(sms?.skipped)} />
-            <Stat label="Unknown" value={formatUnits(sms?.unknown)} />
+            <Stat label="Submitted" tone="submitted" value={formatUnits(sms?.submitted)} />
+            <Stat label="Delivered" tone="delivered" value={formatUnits(sms?.delivered)} />
+            <Stat label="Failed" tone="failed" value={formatUnits(sms?.failed)} />
+            <Stat label="Skipped" tone="skipped" value={formatUnits(sms?.skipped)} />
+            <Stat label="Unknown" tone="unknown" value={formatUnits(sms?.unknown)} />
           </div>
         </Panel>
 
@@ -217,14 +235,14 @@ export default function OverviewPage() {
             <Stat label="Paid credits" value={formatUnits(email?.credits_paid)} />
             <Stat label="Free credits" value={formatUnits(email?.credits_free)} />
             <Stat label="Sponsored credits" value={formatUnits(email?.credits_sponsored)} />
-            <Stat label="Accepted" value={formatUnits(email?.accepted)} />
-            <Stat label="Submitted" value={formatUnits(email?.submitted)} />
+            <Stat label="Accepted" tone="accepted" value={formatUnits(email?.accepted)} />
+            <Stat label="Submitted" tone="submitted" value={formatUnits(email?.submitted)} />
           </div>
           <div className="mt-4 grid grid-cols-2 gap-4 border-t border-[var(--color-line)] pt-4 sm:grid-cols-5">
-            <Stat label="Delivered" value={formatUnits(email?.delivered)} />
-            <Stat label="Failed" value={formatUnits(email?.failed)} />
-            <Stat label="Skipped" value={formatUnits(email?.skipped)} />
-            <Stat label="Unknown" value={formatUnits(email?.unknown)} />
+            <Stat label="Delivered" tone="delivered" value={formatUnits(email?.delivered)} />
+            <Stat label="Failed" tone="failed" value={formatUnits(email?.failed)} />
+            <Stat label="Skipped" tone="skipped" value={formatUnits(email?.skipped)} />
+            <Stat label="Unknown" tone="unknown" value={formatUnits(email?.unknown)} />
           </div>
         </Panel>
       </div>

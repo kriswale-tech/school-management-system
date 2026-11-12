@@ -3,7 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import ReconciliationPanel from './components/ReconciliationPanel'
 import {
+  activityTone,
   Badge,
+  badgeToneFor,
   Field,
   GhostButton,
   LayerTile,
@@ -193,9 +195,16 @@ export default function ProvidersPage() {
       <Panel
         title="Arkesel — prepaid SMS wallet"
         description={
-          arkeselAccount
-            ? `${arkeselAccount.display_name} · API ${arkeselAccount.api_status || 'unknown'}`
-            : 'Prepaid SMS provider.'
+          arkeselAccount ? (
+            <span className="inline-flex flex-wrap items-center gap-2">
+              {arkeselAccount.display_name}
+              <Badge tone={badgeToneFor(arkeselAccount.api_status || 'unknown')}>
+                {(arkeselAccount.api_status || 'unknown').replaceAll('_', ' ')}
+              </Badge>
+            </span>
+          ) : (
+            'Prepaid SMS provider.'
+          )
         }
         actions={
           canSync && (
@@ -232,7 +241,11 @@ export default function ProvidersPage() {
             layer="provider"
             label="Last sync"
             value={formatDateTime(arkeselAccount?.last_synced_at ?? latestSnapshot?.captured_at)}
-            hint={arkeselAccount?.api_status || 'API status unknown'}
+            hint={
+              <Badge tone={badgeToneFor(arkeselAccount?.api_status || 'unknown')}>
+                {(arkeselAccount?.api_status || 'unknown').replaceAll('_', ' ')}
+              </Badge>
+            }
           />
         </SummaryStrip>
 
@@ -261,7 +274,7 @@ export default function ProvidersPage() {
                 <Td align="right">{formatUnits(snapshot.sms_balance)}</Td>
                 <Td>{snapshot.main_balance_text || '—'}</Td>
                 <Td>
-                  <Badge>{snapshot.source}</Badge>
+                  <Badge tone={activityTone(snapshot.source)}>{snapshot.source}</Badge>
                 </Td>
               </tr>
             ))}
@@ -450,9 +463,16 @@ export default function ProvidersPage() {
         <Panel
           title="Amazon SES — pay-per-send"
           description={
-            sesAccount
-              ? `${sesAccount.display_name} · API ${sesAccount.api_status || 'unknown'}`
-              : 'Transactional email via Amazon SES.'
+            sesAccount ? (
+              <span className="inline-flex flex-wrap items-center gap-2">
+                {sesAccount.display_name}
+                <Badge tone={badgeToneFor(sesAccount.api_status || 'unknown')}>
+                  {(sesAccount.api_status || 'unknown').replaceAll('_', ' ')}
+                </Badge>
+              </span>
+            ) : (
+              'Transactional email via Amazon SES.'
+            )
           }
           actions={
             canSync && (
@@ -503,7 +523,11 @@ export default function ProvidersPage() {
               layer="provider"
               label="Last sync"
               value={formatDateTime(sesAccount?.last_synced_at ?? latestUsage?.captured_at)}
-              hint={sesAccount?.api_status || 'API status unknown'}
+              hint={
+                <Badge tone={badgeToneFor(sesAccount?.api_status || 'unknown')}>
+                  {(sesAccount?.api_status || 'unknown').replaceAll('_', ' ')}
+                </Badge>
+              }
             />
           </SummaryStrip>
 
@@ -537,7 +561,7 @@ export default function ProvidersPage() {
                   <Td align="right">{formatUnits(snapshot.monthly_limit)}</Td>
                   <Td align="right">{formatUnits(snapshot.daily_used)}</Td>
                   <Td>
-                    <Badge>{snapshot.source}</Badge>
+                    <Badge tone={activityTone(snapshot.source)}>{snapshot.source}</Badge>
                   </Td>
                 </tr>
               ))}
@@ -684,7 +708,7 @@ export default function ProvidersPage() {
                     </Td>
                     <Td className="capitalize">{expense.provider}</Td>
                     <Td>
-                      <Badge tone={expense.expense_kind === 'overage' ? 'warn' : 'neutral'}>
+                      <Badge tone={activityTone(expense.expense_kind)}>
                         {titleCase(expense.expense_kind)}
                       </Badge>
                     </Td>
@@ -692,8 +716,8 @@ export default function ProvidersPage() {
                     <Td align="right">{formatUnits(expense.units)}</Td>
                     <Td>
                       <span>{expense.recorded_by_name || '—'}</span>
-                      <span className="block text-xs text-[var(--color-ink)]/50">
-                        {titleCase(expense.source)}
+                      <span className="mt-1 block">
+                        <Badge tone={activityTone(expense.source)}>{titleCase(expense.source)}</Badge>
                       </span>
                       {expense.notes && (
                         <span className="block text-xs text-[var(--color-ink)]/55">
@@ -733,8 +757,8 @@ export default function ProvidersPage() {
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="font-medium capitalize">{account.provider}</span>
-                <Badge tone={account.api_status === 'ok' ? 'accent' : 'warn'}>
-                  {account.api_status || 'unknown'}
+                <Badge tone={badgeToneFor(account.api_status || 'unknown')}>
+                  {(account.api_status || 'unknown').replaceAll('_', ' ')}
                 </Badge>
               </div>
               <div className="mt-2 grid grid-cols-2 gap-3">

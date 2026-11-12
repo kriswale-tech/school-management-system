@@ -110,7 +110,7 @@ const CHANNEL_ICON: Record<GuardianDelivery['channel'], string> = {
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'history', label: 'History' },
-  { key: 'messages', label: 'Messages' },
+  { key: 'messages', label: 'Messages config' },
 ] as const
 
 type TabKey = (typeof TABS)[number]['key']
@@ -166,7 +166,7 @@ const MessagingPage = ({ embedded = false }: MessagingPageProps) => {
   const patchParams = (updates: Record<string, string | null>, replace = false) => {
     const next = new URLSearchParams(searchParams)
     for (const [key, value] of Object.entries(updates)) {
-      if (value == null || value === '') next.delete(key)
+      if (value === null || value === '') next.delete(key)
       else next.set(key, value)
     }
     setSearchParams(next, { replace })
@@ -789,7 +789,7 @@ const MessagingPage = ({ embedded = false }: MessagingPageProps) => {
       </Modal>
 
       <Modal
-        open={resendTarget != null}
+        open={resendTarget !== null}
         title="Confirm resend"
         onClose={() => {
           if (!retryMutation.isPending) setResendTarget(null)

@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { isAxiosError } from 'axios'
 import CreateSchoolModal from './CreateSchoolModal'
 import StatusChangeDialog, { statusActionLabel } from './StatusChangeDialog'
 import { createSchool, fetchSchoolSummary, listSchools, updateSchoolStatus } from './services'
+import { StatusBadge } from '@/features/billing/StatusBadge'
 import { formatDate } from '@/lib/dates'
 import type { PlatformSchoolListItem, SchoolStatus } from './types'
 
@@ -31,6 +32,10 @@ const STATUS_OPTIONS: Array<SchoolStatus | ''> = [
 
 const STATUS_ACTIONS: SchoolStatus[] = ['active', 'pending', 'suspended', 'archived']
 
+function isSchoolStatus(value: string | null): value is SchoolStatus {
+  return value === 'pending' || value === 'active' || value === 'suspended' || value === 'archived'
+}
+
 
 function formatCount(value: number | undefined) {
   if (value === undefined) return '—'
@@ -40,9 +45,24 @@ function formatCount(value: number | undefined) {
 export default function SchoolsPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [status, setStatus] = useState<SchoolStatus | ''>('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const statusParam = searchParams.get('status')
+  const status: SchoolStatus | '' = isSchoolStatus(statusParam) ? statusParam : ''
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+
+  function setStatus(next: SchoolStatus | '') {
+    setPage(1)
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev)
+        if (next) params.set('status', next)
+        else params.delete('status')
+        return params
+      },
+      { replace: true },
+    )
+  }
   const [showCreate, setShowCreate] = useState(false)
   const [pendingStatus, setPendingStatus] = useState<{
     school: PlatformSchoolListItem
@@ -157,7 +177,6 @@ export default function SchoolsPage() {
           value={status}
           onChange={(e) => {
             setStatus(e.target.value as SchoolStatus | '')
-            setPage(1)
           }}
           className="rounded-xl border border-[var(--color-line)] bg-white px-3 py-2 text-sm"
         >
@@ -247,14 +266,16 @@ export default function SchoolsPage() {
                   <td className="px-4 py-3 whitespace-nowrap">
                     {formatDate(school.next_renewal_at)}
                   </td>
-                  <td className="px-4 py-3 capitalize">{school.status}</td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={school.status} />
+                  </td>
                   <td className="px-4 py-3">
                     {school.payment_overdue ? (
-                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">
-                        Overdue
-                      </span>
+                      <StatusBadge status="overdue" />
                     ) : school.subscription_status === 'active' ? (
-                      <span className="text-[var(--color-ink)]/70">Current</span>
+                      <StatusBadge status="current" />
+                    ) : school.subscription_status ? (
+                      <StatusBadge status={school.subscription_status} />
                     ) : (
                       <span className="text-[var(--color-ink)]/50">—</span>
                     )}

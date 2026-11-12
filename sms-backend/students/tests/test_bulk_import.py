@@ -14,6 +14,7 @@ from academics.models import ClassLevel, ClassStream, Level
 from accounts.tests.factories import create_user, set_client_auth_cookies, user_school
 from notifications.models import GuardianDelivery
 from schools.models import AcademicYear, Term
+from communications.tests.helpers import seed_test_credits
 from schools.services.settings import get_school_settings
 from shared.services.spreadsheets import build_csv_bytes
 from students.bulk_import import _parse_date
@@ -196,6 +197,7 @@ class StudentBulkImportTests(APITestCase):
     @patch(SEND_SMS_PATH, return_value={'status': 'success', 'data': [{'id': 'bulk-1'}]})
     def test_commit_notifies_guardians_for_imported_students(self, mock_sms):
         get_school_settings(self.school)
+        seed_test_credits(self.school)
         csv_bytes = build_csv_bytes(
             headers=IMPORT_HEADERS,
             rows=[
@@ -251,7 +253,10 @@ class StudentBulkImportTests(APITestCase):
         self.assertEqual(
             GuardianDelivery.objects.filter(
                 event_type=GuardianDelivery.EventType.WARD_ENROLLED,
-                status=GuardianDelivery.Status.SENT,
+                status__in=(
+                    GuardianDelivery.Status.SUBMITTED,
+                    GuardianDelivery.Status.SENT,
+                ),
             ).count(),
             2,
         )

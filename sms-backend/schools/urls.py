@@ -41,6 +41,7 @@ from schools.views import (
     AcademicYearDetailView,
     AcademicYearListCreateView,
     SchoolAlertListView,
+    SchoolCurriculumAdoptionView,
     TermActivateView,
     TermSwitchPreviewView,
     TermTransitionConfirmView,
@@ -251,4 +252,9 @@ urlpatterns = [
     ),
     path('settings/', SchoolSettingsView.as_view(), name='school-settings'),
     path('alerts/', SchoolAlertListView.as_view(), name='school-alerts'),
+    path(
+        'curriculum-adoption/',
+        SchoolCurriculumAdoptionView.as_view(),
+        name='school-curriculum-adoption',
+    ),
 ]

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {
   Badge,
+  badgeToneFor,
   Field,
   GhostButton,
   Pagination,
@@ -26,10 +27,10 @@ import {
 import { useMessagesAccess } from '../permissions'
 import type { Provider, ReconciliationResolution } from '../types'
 
-const RESOLUTION_TONE: Record<ReconciliationResolution, 'warn' | 'accent' | 'neutral'> = {
+const RESOLUTION_TONE: Record<ReconciliationResolution, 'warn' | 'success' | 'info' | 'neutral'> = {
   open: 'warn',
-  accepted: 'accent',
-  adjusted: 'accent',
+  accepted: 'success',
+  adjusted: 'info',
   ignored: 'neutral',
 }
 
@@ -167,7 +168,7 @@ export default function ReconciliationPanel() {
                 </span>
               </Td>
               <Td>
-                <Badge tone={run.error_detail ? 'danger' : 'neutral'}>
+                <Badge tone={run.error_detail ? 'danger' : badgeToneFor(run.status)}>
                   {titleCase(run.status)}
                 </Badge>
               </Td>

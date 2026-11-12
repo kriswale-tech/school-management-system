@@ -216,8 +216,8 @@ class StudentDetailView(SchoolScopedAPIView):
         tags=['Students'],
         summary='Update student profile',
         description=(
-            'Partially updates editable student profile fields. '
-            'student_id, age, is_new_student, and class assignment are not editable here.'
+            'Partially updates editable student profile fields, including the '
+            'school student ID. Age, is_new_student, and class assignment are not editable here.'
         ),
         request=StudentUpdateSerializer,
         responses={200: StudentDetailSerializer},
@@ -225,11 +225,15 @@ class StudentDetailView(SchoolScopedAPIView):
     def patch(self, request, student_id):
         serializer = StudentUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        payload = dict(serializer.validated_data)
+        # The URL id is the record. The body student_id is the school-facing ID.
+        display_student_id = payload.pop('student_id', None)
         detail = update_student(
             school=self.school,
             student_id=student_id,
             actor=request.user,
-            **serializer.validated_data,
+            display_student_id=display_student_id,
+            **payload,
         )
         return Response(StudentDetailSerializer(detail).data)
 

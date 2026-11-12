@@ -94,6 +94,13 @@ def _send_login_otp_sms(phone_number: str, otp: str) -> dict | None:
     try:
         result = send_sms(phone_number, message)
         try:
+            from communications.services.providers.sms_float import consume_unreserved_sms_units
+            from communications.services.segments import sms_segment_count
+
+            consume_unreserved_sms_units(sms_segment_count(message))
+        except Exception:
+            logger.exception('Failed to record Arkesel float use for login OTP')
+        try:
             from notifications.services.platform_outbound import record_otp_sms
 
             record_otp_sms(phone_number=phone_number, body=message, provider_payload=result, ok=True)

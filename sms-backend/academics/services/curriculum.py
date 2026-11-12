@@ -78,8 +78,12 @@ def get_active_curriculum(curriculum_code=GHANA_CURRICULUM_CODE):
     from academics.models import Curriculum
 
     curriculum = (
-        Curriculum.objects.filter(code=curriculum_code, is_active=True)
-        .order_by('-version')
+        Curriculum.objects.filter(
+            code=curriculum_code,
+            is_active=True,
+            status=Curriculum.Status.PUBLISHED,
+        )
+        .order_by('-published_at', '-version')
         .first()
     )
     if curriculum:
@@ -143,13 +147,14 @@ def _provision_level_content(school, school_level, level_template, subject_cache
             )
 
 
-def provision_school_curriculum(school, curriculum_code=GHANA_CURRICULUM_CODE):
+def provision_school_curriculum(school, curriculum_code=GHANA_CURRICULUM_CODE, curriculum=None):
     from academics.models import CurriculumLevel, Level
 
     if Level.objects.filter(school=school).exists():
         return
 
-    curriculum = get_active_curriculum(curriculum_code)
+    if curriculum is None:
+        curriculum = get_active_curriculum(curriculum_code)
 
     level_templates = (
         CurriculumLevel.objects.filter(curriculum=curriculum)

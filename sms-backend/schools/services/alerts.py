@@ -64,12 +64,20 @@ def list_school_alerts(*, school, membership) -> list[dict]:
 
     preferences = get_school_settings(school)
 
+    alerts = []
+    curriculum_alert = _curriculum_alert(
+        school=school,
+        membership=membership,
+        preferences=preferences,
+    )
+    if curriculum_alert:
+        alerts.append(curriculum_alert)
+
     term = Term.objects.filter(school=school, is_active=True).first()
     if term is None:
-        return []
+        return alerts
 
     role = membership.role
-    alerts = []
 
     if preferences.fees_alert_enabled and role in (
         User.RoleChoices.ADMIN,
@@ -146,6 +154,36 @@ def list_school_alerts(*, school, membership) -> list[dict]:
             })
 
     return alerts
+
+
+def _curriculum_alert(*, school, membership, preferences) -> dict | None:
+    from accounts.models import User
+    from academics.services.curriculum_versions import _has_open_term, pending_update
+
+    if not preferences.curriculum_alert_enabled:
+        return None
+    if membership.role != User.RoleChoices.ADMIN:
+        return None
+    active = pending_update(school)
+    if active is None:
+        return None
+    if _has_open_term(school):
+        summary = (
+            f'{active.name} {active.version} is ready. This term stays as it is. '
+            'Review the changes and adopt them for the next term.'
+        )
+    else:
+        summary = (
+            f'{active.name} {active.version} is ready. No term is open, '
+            'so adopting applies it now.'
+        )
+    return {
+        'kind': 'curriculum',
+        'title': 'Curriculum update',
+        'summary': summary,
+        'count': 1,
+        'href': '/classes/manage',
+    }
 
 
 def _can_see_results(membership) -> bool:

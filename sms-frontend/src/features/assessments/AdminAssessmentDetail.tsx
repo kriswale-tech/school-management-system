@@ -110,7 +110,6 @@ const AdminAssessmentDetail = () => {
     queryClient.invalidateQueries({
       queryKey: DETAIL_QUERY_KEY(streamId ?? '', termId ?? ''),
     })
-    setGenerateJobId(null)
   }, [generateJob, generateJobId, queryClient, streamId, termId])
 
   const filteredStudents = useMemo(() => {

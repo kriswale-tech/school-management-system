@@ -46,6 +46,24 @@ class ProviderAccount(BaseModel):
     webhook_signature_failures = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
     metadata = models.JSONField(default=dict, blank=True)
+    # Local Arkesel SMS float. Refreshed from balance sync, then reduced as
+    # sends are accepted so concurrent schools cannot all pass one stale reading.
+    sms_float_units = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text='Units still safe to promise. Null until a balance is recorded.',
+    )
+    sms_float_reserved = models.PositiveIntegerField(
+        default=0,
+        help_text='Units promised to an in-flight Arkesel request.',
+    )
+    sms_float_synced_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When sms_float_units was last set from an Arkesel balance.',
+    )
+    sms_low_balance_alerted_at = models.DateTimeField(null=True, blank=True)
+    sms_hold_alerted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['provider', 'channel']

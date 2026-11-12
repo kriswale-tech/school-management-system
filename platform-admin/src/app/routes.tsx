@@ -8,6 +8,7 @@ import SettingsPage from '@/features/settings/SettingsPage'
 import PlansPage from '@/features/billing/PlansPage'
 import DiscountsPage from '@/features/billing/DiscountsPage'
 import PaymentsPage from '@/features/billing/PaymentsPage'
+import CurriculumPage from '@/features/curriculum/CurriculumPage'
 import MessagesLayout from '@/features/messages/MessagesLayout'
 import MessagesOverviewPage from '@/features/messages/OverviewPage'
 import SmsPricingPage from '@/features/messages/SmsPricingPage'
@@ -64,6 +65,7 @@ export default function AppRoutes() {
           <Route path="/plans" element={<PlansPage />} />
           <Route path="/discounts" element={<DiscountsPage />} />
           <Route path="/payments" element={<PaymentsPage />} />
+          <Route path="/curriculum" element={<CurriculumPage />} />
           <Route path="/messages" element={<MessagesLayout />}>
             <Route index element={<MessagesOverviewPage />} />
             <Route path="sms-pricing" element={<SmsPricingPage />} />

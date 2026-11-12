@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 
 from academics.curriculum_guard import ImmutableCurriculumMixin
@@ -7,13 +9,23 @@ from shared.models import BaseModel
 class Curriculum(ImmutableCurriculumMixin, BaseModel):
     """Standard curriculum template (source of truth for school provisioning)."""
 
+    class Status(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        PUBLISHED = 'published', 'Published'
+
     name = models.CharField(max_length=255)
     code = models.SlugField(max_length=50)
     version = models.CharField(max_length=20, default='2024')
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.PUBLISHED,
+    )
     is_active = models.BooleanField(
         default=True,
-        help_text='When true, this version is used for new school provisioning.',
+        help_text='When true, this published version is used for new school provisioning.',
     )
+    published_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['code', '-version']
@@ -38,6 +50,7 @@ class CurriculumLevel(ImmutableCurriculumMixin, BaseModel):
         on_delete=models.CASCADE,
         related_name='levels',
     )
+    lineage_id = models.UUIDField(default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
     subject_scope = models.CharField(
@@ -70,6 +83,7 @@ class CurriculumClassLevel(ImmutableCurriculumMixin, BaseModel):
         on_delete=models.CASCADE,
         related_name='class_levels',
     )
+    lineage_id = models.UUIDField(default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     order = models.PositiveSmallIntegerField(default=1)
 
@@ -100,6 +114,7 @@ class CurriculumSubject(ImmutableCurriculumMixin, BaseModel):
         related_name='subjects',
         help_text='When set, this subject applies only to the linked template class.',
     )
+    lineage_id = models.UUIDField(default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
 
     class Meta:

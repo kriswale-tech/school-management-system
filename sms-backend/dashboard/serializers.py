@@ -135,6 +135,14 @@ class TeacherDashboardSerializer(serializers.Serializer):
     activities = ActivitySerializer(many=True)
 
 
+class CurriculumUpdateSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    version = serializers.CharField()
+    from_version = serializers.CharField(allow_null=True)
+    href = serializers.CharField()
+    summary = serializers.CharField()
+
+
 class AdminDashboardSerializer(serializers.Serializer):
     term_id = serializers.UUIDField(allow_null=True)
     term_label = serializers.CharField(allow_null=True)
@@ -148,6 +156,7 @@ class AdminDashboardSerializer(serializers.Serializer):
     setup_health = SetupHealthSerializer()
     academic_progress = AcademicProgressRowSerializer(many=True)
     levels = LevelOptionSerializer(many=True)
+    curriculum_update = CurriculumUpdateSerializer(allow_null=True)
 
 
 class StaffSchoolOverviewSerializer(serializers.Serializer):

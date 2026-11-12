@@ -30,7 +30,8 @@ const StudentReportViewer = ({
   const queryKeyValue = queryKey.join(':')
   const shouldAutoLoad = autoLoad ?? variant === 'page'
   const autoGenerateStarted = useRef(false)
-  const [requested, setRequested] = useState(false)
+  const [requestedKey, setRequestedKey] = useState<string | null>(null)
+  const requested = requestedKey === queryKeyValue
   const loadEnabled = enabled && (shouldAutoLoad || requested)
 
   const reportQuery = useQuery({
@@ -65,7 +66,6 @@ const StudentReportViewer = ({
 
   useEffect(() => {
     autoGenerateStarted.current = false
-    setRequested(false)
     resetGenerate()
   }, [queryKeyValue, resetGenerate])
 
@@ -75,7 +75,7 @@ const StudentReportViewer = ({
     if (autoGenerateStarted.current) return
     if (isGeneratePending) return
     autoGenerateStarted.current = true
-    runGenerate()
+    runGenerate(undefined)
   }, [loadEnabled, missingReport, isGeneratePending, runGenerate])
 
   const report = reportQuery.data ?? generatedReport
@@ -127,7 +127,7 @@ const StudentReportViewer = ({
           loadingText="Generating"
           disabled={!enabled || isGeneratePending}
           onClick={() => {
-            setRequested(true)
+            setRequestedKey(queryKeyValue)
             if (missingReport || generateFailed) {
               runGenerate({ force: Boolean(generateFailed) })
             }

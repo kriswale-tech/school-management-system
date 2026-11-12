@@ -22,12 +22,11 @@ const ToggleField = forwardRef<HTMLInputElement, ToggleFieldProps>(function Togg
       <label
         htmlFor={id}
         className={mergeClasses(
-          'inline-flex w-full items-center justify-between gap-3 text-slate-700',
+          'inline-flex w-fit items-center gap-3 text-slate-700',
           disabled && 'cursor-not-allowed text-slate-400',
           labelClassName,
         )}
       >
-        {children ? <span className="min-w-0 flex-1 leading-5">{children}</span> : null}
         <span className="relative inline-flex h-6 w-11 shrink-0 items-center">
           <input
             ref={ref}
@@ -64,6 +63,7 @@ const ToggleField = forwardRef<HTMLInputElement, ToggleFieldProps>(function Togg
             )}
           />
         </span>
+        {children ? <span className="leading-5">{children}</span> : null}
       </label>
 
       {error ? (

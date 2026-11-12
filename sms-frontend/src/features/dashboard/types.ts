@@ -79,6 +79,13 @@ export type AdminDashboard = {
   setup_health: AdminDashboardSetupHealth
   academic_progress: AdminDashboardAcademicProgress[]
   levels: AdminDashboardLevel[]
+  curriculum_update: {
+    name: string
+    version: string
+    from_version: string | null
+    href: string
+    summary: string
+  } | null
 }
 
 export type OverviewMetric = {

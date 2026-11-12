@@ -222,7 +222,7 @@ export default function EmailPricingPage() {
                   </span>
                 </Td>
                 <Td>
-                  {row.is_active ? <Badge tone="accent">Active</Badge> : <Badge>Superseded</Badge>}
+                  {row.is_active ? <Badge tone="success">Active</Badge> : <Badge>Superseded</Badge>}
                 </Td>
               </tr>
             ))}

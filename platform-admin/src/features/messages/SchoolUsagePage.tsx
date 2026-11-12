@@ -168,10 +168,10 @@ export default function SchoolUsagePage() {
                         </>
                       )}
                       <div className="flex items-end gap-2">
-                        <Badge tone={row.sms_addon_enabled ? 'accent' : 'neutral'}>
+                        <Badge tone={row.sms_addon_enabled ? 'success' : 'neutral'}>
                           SMS add-on {row.sms_addon_enabled ? 'on' : 'off'}
                         </Badge>
-                        <Badge tone={row.email_addon_enabled ? 'accent' : 'neutral'}>
+                        <Badge tone={row.email_addon_enabled ? 'success' : 'neutral'}>
                           Email add-on {row.email_addon_enabled ? 'on' : 'off'}
                         </Badge>
                       </div>

@@ -153,7 +153,7 @@ Alerts are in-app only: outstanding fees (admin and accountant), unreleased resu
 | Activity feed | Yes (`activities` app, `GET /activities/`, across terms by default) | Recent Activities card | Done |
 | In-app alerts | Yes (`GET /schools/alerts/`) | Navbar bell → Alerts | Done |
 | Personal notifications | Yes (`notifications` app) | Navbar inbox icon | Done (in-app Tier 1 + email when enabled) |
-| Parent messages (guardians) | Ward enrolled, receipts, debt reminders (manual + auto), report ready (Send to guardians + auto per generation), next-term fees | Settings → Parent messages + Fees / Assessment desks | Partial — see [guardian-communications.md](./guardian-communications.md) |
+| Parent messages (guardians) | Ward enrolled, receipts, debt reminders (manual + auto), report ready (Send to guardians + auto per generation), next-term fees | Settings → Messaging → Messages config + Fees / Assessment desks | Partial — see [guardian-communications.md](./guardian-communications.md) |
 
 ## Platform admin — schools
 
@@ -163,7 +163,10 @@ Operator app (`platform-admin`), not the school app.
 | --- | --- | --- | --- |
 | School directory | `GET /platform/schools/` and `/platform/schools/summary/` | `/schools` | Done — plan, renewal, admin, overdue, status actions. See [platform-admin-schools.md](./platform-admin-schools.md) |
 | Create school with starting plan | `POST /platform/schools/` (`plan_code`, `interval`, optional add-on SKUs) | Create school modal | Done |
-| School detail | `GET /platform/schools/<id>/`, status with reason, `GET .../audit/` | `/schools/:id` — chips, admins table, invite modal, collapsed audit log, subscription, invoices, and payments | Done |
+| School detail | `GET /platform/schools/<id>/`, status with reason, `GET .../audit/` | `/schools/:id` — chips, admins table, invite modal, collapsed audit log, subscription, invoices, payments, and a messaging report link | Done |
+| Platform overview | Schools summary, curriculum overview, messages overview | `/` — schools, messaging, curriculum, and Needs attention | Done — see [2026-11-12.md](./2026-11-12.md) |
+| Curriculum versions | `GET/POST /platform/curriculum/` | `/curriculum` — publish, draft, and per-school adoption | Done — see [2026-11-12.md](./2026-11-12.md) |
+| Free and sponsored usage | `GET /platform/messages/free-usage/` | `/messages/free-sponsored` — budget cap, budget used, by school | Done — see [2026-11-12.md](./2026-11-12.md) |
 | Complimentary first year when no plan is sent | `ensure_complimentary_subscription` | Not offered in the modal | Done |
 
 ## Cross-cutting
@@ -193,6 +196,7 @@ Operator app (`platform-admin`), not the school app.
 ## Existing deep-dive notes
 
 - Platform admin school directory and create modal: [platform-admin-schools.md](./platform-admin-schools.md)
+- 12 Nov 2026 curriculum adoption, platform overview, and free and sponsored usage: [2026-11-12.md](./2026-11-12.md)
 - 11 Nov 2026 school Paystack checkout, messaging usage, and platform billing controls: [2026-11-11.md](./2026-11-11.md)
 - Teacher bulk import (frontend contract): [`sms-backend/docs/frontend-teacher-bulk-import.md`](../sms-backend/docs/frontend-teacher-bulk-import.md)
 - Student bulk import (dates + guardians): [`sms-backend/docs/student-bulk-import.md`](../sms-backend/docs/student-bulk-import.md)

@@ -381,3 +381,118 @@ def consumption_trend(*, school=None, date_range: DateRange, channel: str | None
         else:
             bucket['emails'] += int(row['messages'] or 0)
     return list(out.values())
+
+
+def free_usage_report(*, date_range: DateRange, school=None) -> dict:
+    """Platform free/sponsored totals, the live budget cap, and a per-school split.
+
+    The cap is the sum of budgets on platform-scope allowances that are active
+    right now. School-scope budgets stay on their own policy rows. Usage against
+    the cap is provider cost of sends stamped with those allowances inside the
+    selected range.
+    """
+    from django.utils import timezone
+
+    from communications.models import MessagingAllowancePolicy
+    from notifications.models import GuardianDelivery
+
+    start, end = date_range.start, date_range.end
+    now = timezone.now()
+    policies = MessagingAllowancePolicy.objects.filter(
+        is_active=True,
+        scope=MessagingAllowancePolicy.Scope.PLATFORM,
+        budget_ghs__isnull=False,
+        starts_at__lte=now,
+    ).filter(Q(ends_at__isnull=True) | Q(ends_at__gte=now))
+    cap = policies.aggregate(total=Sum('budget_ghs'))['total']
+
+    used_pct = None
+    if cap is not None and Decimal(cap) > 0:
+        spent_qs = GuardianDelivery.objects.filter(
+            allowance__in=policies,
+            created_at__gte=start,
+            created_at__lte=end,
+            status__in=provider_accepted_statuses(),
+            billing_classification__in=(
+                GuardianDelivery.BillingClassification.FREE,
+                GuardianDelivery.BillingClassification.SPONSORED,
+            ),
+        )
+        if school is not None:
+            spent_qs = spent_qs.filter(school=school)
+        spent = spent_qs.aggregate(
+            cost=Coalesce(Sum('provider_cost_snapshot_ghs'), Value(_ZERO, _MONEY)),
+        )['cost']
+        used_pct = float(
+            ((Decimal(spent) / Decimal(cap)) * Decimal('100')).quantize(Decimal('0.1')),
+        )
+
+    return {
+        'range': date_range.as_dict(),
+        'sms': classification_breakdown(start=start, end=end, channel=SMS, school=school),
+        'email': classification_breakdown(start=start, end=end, channel=EMAIL, school=school),
+        'budget_ghs': None if cap is None else _money(cap),
+        'budget_used_pct': used_pct,
+        'by_school': _free_usage_by_school(start=start, end=end, school=school),
+    }
+
+
+def _free_usage_by_school(*, start, end, school=None) -> list[dict]:
+    from notifications.models import GuardianDelivery
+
+    free = GuardianDelivery.BillingClassification.FREE
+    sponsored = GuardianDelivery.BillingClassification.SPONSORED
+    qs = GuardianDelivery.objects.filter(
+        created_at__gte=start,
+        created_at__lte=end,
+        status__in=provider_accepted_statuses(),
+        billing_classification__in=(free, sponsored),
+    )
+    if school is not None:
+        qs = qs.filter(school=school)
+
+    rows = (
+        qs.values('school_id', 'school__name')
+        .annotate(
+            free_sms_segments=Coalesce(
+                Sum('segments', filter=Q(channel=SMS, billing_classification=free)),
+                Value(0),
+            ),
+            sponsored_sms_segments=Coalesce(
+                Sum('segments', filter=Q(channel=SMS, billing_classification=sponsored)),
+                Value(0),
+            ),
+            free_email_credits=Coalesce(
+                Count('id', filter=Q(channel=EMAIL, billing_classification=free)),
+                Value(0),
+            ),
+            sponsored_email_credits=Coalesce(
+                Count('id', filter=Q(channel=EMAIL, billing_classification=sponsored)),
+                Value(0),
+            ),
+            expense_ghs=Coalesce(
+                Sum('provider_cost_snapshot_ghs'),
+                Value(_ZERO, _MONEY),
+            ),
+        )
+        .order_by('school__name', 'school_id')
+    )
+    out = []
+    for row in rows:
+        free_sms = int(row['free_sms_segments'] or 0)
+        sponsored_sms = int(row['sponsored_sms_segments'] or 0)
+        free_email = int(row['free_email_credits'] or 0)
+        sponsored_email = int(row['sponsored_email_credits'] or 0)
+        expense = Decimal(row['expense_ghs'] or 0)
+        if not any((free_sms, sponsored_sms, free_email, sponsored_email)) and expense == 0:
+            continue
+        out.append({
+            'school': str(row['school_id']),
+            'school_name': row['school__name'] or '',
+            'free_sms_segments': free_sms,
+            'sponsored_sms_segments': sponsored_sms,
+            'free_email_credits': free_email,
+            'sponsored_email_credits': sponsored_email,
+            'expense_ghs': _money(expense),
+        })
+    return out

@@ -43,8 +43,7 @@ from communications.serializers_messages import (
     SmsEncodingConfigCreateSerializer,
     SmsEncodingConfigSerializer,
 )
-from communications.services.aggregates import classification_breakdown
-from communications.services.analytics import school_report, school_usage_matrix
+from communications.services.analytics import free_usage_report, school_report, school_usage_matrix
 from communications.services.exports import build_export
 from communications.services.overview import messaging_overview
 from communications.services.pricing import (
@@ -575,19 +574,12 @@ class AllowanceDetailView(MessagesAPIView):
 
 class FreeUsageView(MessagesAPIView):
     def get(self, request):
-        date_range = _range(request)
-        school = _school_or_none(request)
-        sms = classification_breakdown(
-            start=date_range.start, end=date_range.end, channel='sms', school=school,
+        return Response(
+            free_usage_report(
+                date_range=_range(request),
+                school=_school_or_none(request),
+            ),
         )
-        email = classification_breakdown(
-            start=date_range.start, end=date_range.end, channel='email', school=school,
-        )
-        return Response({
-            'range': date_range.as_dict(),
-            'sms': sms,
-            'email': email,
-        })
 
 
 # ---------------------------------------------------------------------------

@@ -1,6 +1,9 @@
 from django.urls import path
 
 from platform_admin.views import (
+    CurriculumDraftCreateView,
+    CurriculumDraftView,
+    CurriculumOverviewView,
     PlatformHelloView,
     PlatformLoginView,
     PlatformLogoutView,
@@ -19,6 +22,7 @@ from platform_admin.views import (
     PlatformSchoolStatusView,
     PlatformSchoolSummaryView,
     PlatformSettingsView,
+    SchoolCurriculumAdoptionView,
 )
 
 urlpatterns = [
@@ -37,6 +41,22 @@ urlpatterns = [
     ),
     path('auth/mfa/disable/', PlatformMfaDisableView.as_view(), name='platform-mfa-disable'),
     path('settings/', PlatformSettingsView.as_view(), name='platform-settings'),
+    path('curriculum/', CurriculumOverviewView.as_view(), name='platform-curriculum'),
+    path(
+        'curriculum/draft/',
+        CurriculumDraftCreateView.as_view(),
+        name='platform-curriculum-draft',
+    ),
+    path(
+        'curriculum/<uuid:pk>/',
+        CurriculumDraftView.as_view(),
+        name='platform-curriculum-detail',
+    ),
+    path(
+        'schools/<uuid:pk>/curriculum-adoption/',
+        SchoolCurriculumAdoptionView.as_view(),
+        name='platform-school-curriculum-adoption',
+    ),
     path('schools/', PlatformSchoolListCreateView.as_view(), name='platform-school-list'),
     path(
         'schools/summary/',

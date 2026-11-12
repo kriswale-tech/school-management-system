@@ -104,11 +104,14 @@ def sync_arkesel_balance(*, actor=None) -> dict:
         payload = fetch_arkesel_balance()
     except RuntimeError as exc:
         mark_sync_failure(account, error=str(exc), not_configured=True)
+        _notify_float_sync_problem(str(exc))
         return {'ok': False, 'error': str(exc), 'snapshot': None}
     except Exception as exc:
         logger.exception('Arkesel balance sync failed')
-        mark_sync_failure(account, error=f'{type(exc).__name__}: {exc}')
-        return {'ok': False, 'error': f'{type(exc).__name__}: {exc}'[:500], 'snapshot': None}
+        error = f'{type(exc).__name__}: {exc}'[:500]
+        mark_sync_failure(account, error=error)
+        _notify_float_sync_problem(error)
+        return {'ok': False, 'error': error, 'snapshot': None}
 
     parsed = parse_balance_payload(payload)
     snapshot = ProviderBalanceSnapshot.objects.create(
@@ -121,6 +124,7 @@ def sync_arkesel_balance(*, actor=None) -> dict:
         captured_by=platform_actor(actor),
     )
     mark_sync_success(account, metadata={'last_sms_balance': parsed['sms_balance']})
+    _apply_float_reading(account, parsed['sms_balance'], notify_if_missing=True)
     return {'ok': True, 'error': '', 'snapshot': snapshot}
 
 
@@ -133,7 +137,7 @@ def record_manual_arkesel_balance(
 ) -> ProviderBalanceSnapshot:
     """Human-entered balance capture when the API is unavailable."""
     account = _arkesel_account()
-    return ProviderBalanceSnapshot.objects.create(
+    snapshot = ProviderBalanceSnapshot.objects.create(
         provider_account=account,
         sms_balance=sms_balance,
         main_balance_text=(main_balance_text or '')[:120],
@@ -142,6 +146,29 @@ def record_manual_arkesel_balance(
         source=ProviderBalanceSnapshot.Source.MANUAL,
         captured_by=platform_actor(actor),
     )
+    _apply_float_reading(account, sms_balance)
+    return snapshot
+
+
+def _apply_float_reading(account, sms_balance, *, notify_if_missing: bool = False) -> None:
+    if sms_balance is None:
+        if notify_if_missing:
+            _notify_float_sync_problem(
+                'Arkesel balance response did not include an SMS balance.',
+            )
+        return
+    from communications.services.providers.sms_float import apply_synced_balance
+
+    apply_synced_balance(account, int(sms_balance))
+
+
+def _notify_float_sync_problem(error: str) -> None:
+    from communications.services.providers.sms_float import notify_sync_problem
+
+    try:
+        notify_sync_problem(error)
+    except Exception:
+        logger.exception('Could not email platform admins about the Arkesel balance')
 
 
 def latest_arkesel_snapshot() -> ProviderBalanceSnapshot | None:

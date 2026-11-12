@@ -10,6 +10,7 @@ import { isSetupHealthIncomplete } from '../utils/setupHealth'
 import TopDebtorsCard from '../components/TopDebtorsCard'
 import RecentActivitiesCard from '../components/RecentActivitiesCard'
 import TransitionNotice from '../components/TransitionNotice'
+import CurriculumUpdateNotice from '../components/CurriculumUpdateNotice'
 import WelcomeBanner from '../components/WelcomeBanner'
 import { getAdminDashboard, getRecentActivities } from '../services'
 import type { OverviewMetric } from '../types'
@@ -149,6 +150,12 @@ const AdminDashboard = () => {
           <OverviewCard title={thirdCard.title} metrics={thirdCard.metrics} />
         </div>
       </WelcomeBanner>
+
+      {data?.curriculum_update ? (
+        <div className="mt-6">
+          <CurriculumUpdateNotice notice={data.curriculum_update} />
+        </div>
+      ) : null}
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">

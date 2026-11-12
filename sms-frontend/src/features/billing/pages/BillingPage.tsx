@@ -9,6 +9,7 @@ import StatsCard from '@/components/shared/StatsCard'
 import { Button } from '@/components/ui'
 import { Capability } from '@/features/auth/capabilities'
 import { useCan } from '@/features/auth/hooks/useCan'
+import { StatusBadge } from '../StatusBadge'
 import { BILLING_PAGE_SIZE } from '../services'
 import {
   getBillingInvoices,
@@ -313,7 +314,7 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
       const pending =
         variables.channel === 'sms' ? data.pending_sms_enabled : data.pending_email_enabled
       toast.success(
-        pending == null
+        pending === null
           ? 'Scheduled add-on change cancelled'
           : 'Add-on change scheduled for next renewal',
       )
@@ -385,20 +386,19 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
   const subscription = subscriptionQuery.data
   const capacity = subscription?.capacity
   const upcoming = upcomingQuery.data
-  const usagePct =
-    capacity?.usage_ratio != null ? Math.min(100, Math.round(capacity.usage_ratio * 100)) : null
+  const usageRatio = capacity?.usage_ratio ?? null
+  const staffUsageRatio = capacity?.staff_usage_ratio ?? null
+  const usagePct = usageRatio === null ? null : Math.min(100, Math.round(usageRatio * 100))
   const staffUsagePct =
-    capacity?.staff_usage_ratio != null
-      ? Math.min(100, Math.round(capacity.staff_usage_ratio * 100))
-      : null
+    staffUsageRatio === null ? null : Math.min(100, Math.round(staffUsageRatio * 100))
   const nextHigher = (plansQuery.data ?? []).find(
     (plan) =>
       subscription &&
       plan.sort_order > subscription.plan.sort_order &&
       plan.is_active &&
-      (plan.student_max == null ||
+      (plan.student_max === null ||
         (capacity?.active_students ?? 0) <= plan.student_max) &&
-      (plan.staff_max == null || (capacity?.active_staff ?? 0) <= plan.staff_max),
+      (plan.staff_max === null || (capacity?.active_staff ?? 0) <= plan.staff_max),
   )
   const smsSku = (skusQuery.data ?? []).find((sku) => sku.channel === 'sms')
   const emailSku = (skusQuery.data ?? []).find((sku) => sku.channel === 'email')
@@ -568,14 +568,6 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
                       payment.purpose === 'topup'
                         ? 'bg-violet-50 text-violet-800 ring-violet-200'
                         : 'bg-sky-50 text-sky-800 ring-sky-200'
-                    const statusClass =
-                      payment.status === 'success'
-                        ? 'text-emerald-700'
-                        : payment.status === 'failed'
-                          ? 'text-red-700'
-                          : payment.status === 'pending'
-                            ? 'text-amber-700'
-                            : 'text-slate-600'
                     return (
                       <li
                         key={payment.id}
@@ -588,9 +580,7 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
                             >
                               {tag}
                             </span>
-                            <span className={`text-xs font-medium capitalize ${statusClass}`}>
-                              {payment.status}
-                            </span>
+                            <StatusBadge status={payment.status} />
                           </div>
                           <p className="font-medium text-slate-900">
                             {payment.label ||
@@ -748,9 +738,9 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
               <div>
                 <p className="text-sm text-slate-500">
                   Students {capacity.active_students}
-                  {capacity.capacity_max != null ? ` / ${capacity.capacity_max}` : ' (open)'}
+                  {capacity.capacity_max !== null ? ` / ${capacity.capacity_max}` : ' (open)'}
                 </p>
-                {usagePct != null && (
+                {usagePct !== null && (
                   <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
                     <div
                       className={`h-full rounded-full ${
@@ -768,11 +758,11 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
               <div>
                 <p className="text-sm text-slate-500">
                   Staff {capacity.active_staff}
-                  {capacity.staff_capacity_max != null
+                  {capacity.staff_capacity_max !== null
                     ? ` / ${capacity.staff_capacity_max}`
                     : ' (open)'}
                 </p>
-                {staffUsagePct != null && (
+                {staffUsagePct !== null && (
                   <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
                     <div
                       className={`h-full rounded-full ${
@@ -855,7 +845,7 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
                         ? ` · ${priceSku.credits_per_period.toLocaleString()} credits / ${intervalLabel}`
                         : ''}
                     </p>
-                    {item.pendingEnabled != null && (
+                    {item.pendingEnabled !== null && (
                       <p className="mt-1 text-amber-700">
                         Pending: {item.pendingEnabled ? 'enable' : 'disable'} on{' '}
                         {formatDate(subscription.pending_change_effective_at)}
@@ -863,7 +853,7 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
                     )}
                     {canManage && (
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {item.pendingEnabled != null ? (
+                        {item.pendingEnabled !== null ? (
                           <Button
                             type="button"
                             variant="outline"
@@ -874,7 +864,7 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
                                 type: 'addon-cancel',
                                 channel: item.channel,
                                 currentEnabled: item.enabled,
-                                pendingEnabled: item.pendingEnabled,
+                                pendingEnabled: item.pendingEnabled === true,
                               })
                             }
                           >
@@ -930,11 +920,11 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
                       <div className="flex items-baseline justify-between gap-2">
                         <h3 className="font-medium text-slate-900">{plan.name}</h3>
                         <span className="text-sm text-slate-500">
-                          {plan.student_max != null
+                          {plan.student_max !== null
                             ? `${plan.student_min}–${plan.student_max} students`
                             : `${plan.student_min}+ students`}
                           {' · '}
-                          {plan.staff_max != null
+                          {plan.staff_max !== null
                             ? `≤${plan.staff_max} staff`
                             : 'open staff'}
                         </span>
@@ -1007,10 +997,11 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
                 <li key={invoice.id} className="py-3 text-sm">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="font-medium text-slate-900">
-                        {formatGhs(invoice.total_ghs)} · {invoice.status}
+                      <p className="flex flex-wrap items-center gap-2 font-medium text-slate-900">
+                        {formatGhs(invoice.total_ghs)}
+                        <StatusBadge status={invoice.status} />
                         {Number(invoice.discount_ghs) > 0
-                          ? ` · discount −${formatGhs(invoice.discount_ghs)}`
+                          ? `discount −${formatGhs(invoice.discount_ghs)}`
                           : ''}
                       </p>
                       <p className="text-slate-500">
@@ -1075,7 +1066,7 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
       )}
 
       <ConfirmDialog
-        open={confirm != null}
+        open={confirm !== null}
         title={confirmCopy.title}
         message={confirmCopy.message}
         confirmLabel={confirmCopy.confirmLabel}

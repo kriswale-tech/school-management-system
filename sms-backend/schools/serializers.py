@@ -40,6 +40,7 @@ class SchoolSettingsSerializer(serializers.ModelSerializer):
             'enrollments_alert_enabled',
             'guardians_alert_enabled',
             'transition_popup_enabled',
+            'curriculum_alert_enabled',
             'report_show_logo',
             'report_show_address',
             'report_show_phones',

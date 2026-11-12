@@ -21,9 +21,18 @@ from platform_admin.views.schools import (
     PlatformSchoolStatusView,
     PlatformSchoolSummaryView,
 )
+from platform_admin.views.curriculum import (
+    CurriculumDraftCreateView,
+    CurriculumDraftView,
+    CurriculumOverviewView,
+    SchoolCurriculumAdoptionView,
+)
 from platform_admin.views.settings import PlatformSettingsView
 
 __all__ = [
+    'CurriculumDraftCreateView',
+    'CurriculumDraftView',
+    'CurriculumOverviewView',
     'PlatformHelloView',
     'PlatformLoginView',
     'PlatformLogoutView',
@@ -42,4 +51,5 @@ __all__ = [
     'PlatformSchoolStatusView',
     'PlatformSchoolSummaryView',
     'PlatformSettingsView',
+    'SchoolCurriculumAdoptionView',
 ]

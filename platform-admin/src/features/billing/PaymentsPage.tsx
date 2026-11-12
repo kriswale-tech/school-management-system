@@ -5,6 +5,7 @@ import { isAxiosError } from 'axios'
 import toast from 'react-hot-toast'
 import { formatDateTime } from '@/lib/dates'
 import { ListPager } from './ListPager'
+import { StatusBadge } from './StatusBadge'
 import { paymentForLabel, paymentKindLabel, paymentProviderLabel } from './paymentDisplay'
 import { listPayments, verifyPayment } from './services'
 import type { SaasPayment } from './types'
@@ -106,7 +107,9 @@ export default function PaymentsPage() {
                   <p className="max-w-xs text-[var(--color-ink)]/65">{paymentForLabel(payment)}</p>
                 </td>
                 <td className="px-4 py-3">{paymentProviderLabel(payment.provider)}</td>
-                <td className="px-4 py-3 capitalize">{payment.status}</td>
+                <td className="px-4 py-3">
+                  <StatusBadge status={payment.status} />
+                </td>
                 <td className="px-4 py-3 font-mono text-xs">{payment.reference}</td>
                 <td className="px-4 py-3 font-mono text-xs">
                   {payment.provider_transaction_id || '—'}

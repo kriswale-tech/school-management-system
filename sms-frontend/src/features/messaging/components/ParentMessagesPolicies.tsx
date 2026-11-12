@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, FormLabel, SelectField, ToggleField } from '@/components/ui'
@@ -109,22 +109,29 @@ function EventTemplateEditor({ template }: { template: MessageTemplate }) {
   const [open, setOpen] = useState(false)
   const [channelTab, setChannelTab] = useState<'sms' | 'email'>('sms')
   const [allTime, setAllTime] = useState(false)
-  const [draft, setDraft] = useState<TemplateDraft>({
+  const serverDraft: TemplateDraft = {
     sms_body: template.sms_body,
     sms_body_all_time: template.sms_body_all_time,
     email_subject: template.email_subject,
     email_text: template.email_text,
-  })
-  const [preview, setPreview] = useState<MessageTemplatePreview | null>(null)
-
-  useEffect(() => {
-    setDraft({
-      sms_body: template.sms_body,
-      sms_body_all_time: template.sms_body_all_time,
-      email_subject: template.email_subject,
-      email_text: template.email_text,
+  }
+  const serverKey = [
+    template.event_type,
+    template.updated_at ?? '',
+    serverDraft.sms_body,
+    serverDraft.sms_body_all_time,
+    serverDraft.email_subject,
+    serverDraft.email_text,
+  ].join('\u0000')
+  const [override, setOverride] = useState<{ key: string; draft: TemplateDraft } | null>(null)
+  const draft = override?.key === serverKey ? override.draft : serverDraft
+  const setDraft = (next: TemplateDraft | ((prev: TemplateDraft) => TemplateDraft)) => {
+    setOverride((current) => {
+      const prev = current?.key === serverKey ? current.draft : serverDraft
+      return { key: serverKey, draft: typeof next === 'function' ? next(prev) : next }
     })
-  }, [template])
+  }
+  const [preview, setPreview] = useState<MessageTemplatePreview | null>(null)
 
   const { mutate: saveTemplate, isPending: saving } = useMutation({
     mutationFn: updateMessageTemplate,
@@ -368,7 +375,7 @@ const ParentMessagesSection = () => {
   const { mutate: saveSettings, isPending } = useMutation({
     mutationFn: updateSchoolSettings,
     onSuccess: (saved) => {
-      toast.success('Parent message settings saved')
+      toast.success('Messages config saved')
       setDraftOverride(null)
       queryClient.setQueryData([SCHOOL_SETTINGS_QUERY_KEY], saved)
     },
@@ -379,7 +386,7 @@ const ParentMessagesSection = () => {
 
   return (
     <SettingsSection
-      title="Parent messages"
+      title="Messages config"
       description="Choose which events notify guardians by SMS or email, and edit the copy sent for each event. Messages only go out on channels the school allows, the parent prefers, and for which a phone number or email is on file."
     >
       {isLoading || templatesLoading || !draft ? (
@@ -543,7 +550,7 @@ const ParentMessagesSection = () => {
           </div>
 
           <Button type="submit" loading={isPending} loadingText="Saving...">
-            Save parent messages
+            Save messages config
           </Button>
         </form>
       )}

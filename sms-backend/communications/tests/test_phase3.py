@@ -168,7 +168,7 @@ class CommunicationsPhase3Tests(APITestCase):
         self.assertEqual(get_balances(self.school)['sms'], 0)
         self.assertEqual(
             GuardianDelivery.objects.filter(
-                status=GuardianDelivery.Status.SENT,
+                status=GuardianDelivery.Status.SUBMITTED,
             ).count(),
             1,
         )

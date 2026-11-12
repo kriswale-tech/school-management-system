@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { isAxiosError } from 'axios'
 import InviteAdminModal, { type InviteAdminPayload } from './InviteAdminModal'
 import SchoolBillingPanel from './SchoolBillingPanel'
+import CurriculumAdoptionPanel from './CurriculumAdoptionPanel'
 import StatusChangeDialog from './StatusChangeDialog'
 import {
   getSchool,
@@ -13,6 +14,9 @@ import {
   resendSchoolAdminInvite,
   updateSchoolStatus,
 } from './services'
+import { StatusBadge } from '@/features/billing/StatusBadge'
+import { statusSurfaceClass } from '@/features/billing/statusTone'
+import { useMessagesAccess } from '@/features/messages/permissions'
 import { formatDateTime } from '@/lib/dates'
 import type { PlatformSchoolAuditEntry, SchoolStatus } from './types'
 
@@ -81,17 +85,6 @@ function auditSummary(entry: PlatformSchoolAuditEntry) {
   return ''
 }
 
-function factTone(kind: 'active' | 'pending' | 'suspended' | 'archived' | 'complete' | 'incomplete') {
-  if (kind === 'active' || kind === 'complete') {
-    return 'border-emerald-200 bg-emerald-50 text-emerald-900'
-  }
-  if (kind === 'pending' || kind === 'incomplete') {
-    return 'border-amber-200 bg-amber-50 text-amber-950'
-  }
-  if (kind === 'suspended') return 'border-red-200 bg-red-50 text-red-900'
-  return 'border-slate-200 bg-slate-100 text-slate-700'
-}
-
 function errorMessage(error: unknown) {
   if (isAxiosError(error)) {
     const data = error.response?.data as { detail?: string } | undefined
@@ -103,6 +96,8 @@ function errorMessage(error: unknown) {
 export default function SchoolDetailPage() {
   const { id = '' } = useParams()
   const queryClient = useQueryClient()
+  const { can } = useMessagesAccess()
+  const showMessaging = can('messages.view') && Boolean(id)
   const [showInvite, setShowInvite] = useState(false)
   const [pendingStatus, setPendingStatus] = useState<SchoolStatus | null>(null)
   const [auditOpen, setAuditOpen] = useState(false)
@@ -165,9 +160,19 @@ export default function SchoolDetailPage() {
 
   return (
     <div>
-      <Link to="/schools" className="text-sm text-[var(--color-accent)] hover:underline">
-        ← Back to schools
-      </Link>
+      <div className="flex flex-wrap items-center gap-4">
+        <Link to="/schools" className="text-sm text-[var(--color-accent)] hover:underline">
+          ← Back to schools
+        </Link>
+        {showMessaging ? (
+          <Link
+            to={`/messages/schools/${id}`}
+            className="text-sm font-medium text-[var(--color-accent)] hover:underline"
+          >
+            Messaging report
+          </Link>
+        ) : null}
+      </div>
 
       {schoolQuery.isLoading && <p className="mt-6 text-sm text-[var(--color-ink)]/60">Loading…</p>}
       {schoolQuery.isError && (
@@ -203,12 +208,12 @@ export default function SchoolDetailPage() {
           </header>
 
           <div className="mb-8 flex flex-wrap gap-3">
-            <div className={`min-w-36 rounded-2xl border px-4 py-3 ${factTone(school.status)}`}>
+            <div className={`min-w-36 rounded-2xl border px-4 py-3 ${statusSurfaceClass(school.status)}`}>
               <p className="text-xs font-semibold tracking-wide uppercase opacity-70">Status</p>
               <p className="mt-1 text-xl font-semibold capitalize">{school.status}</p>
             </div>
             <div
-              className={`min-w-36 rounded-2xl border px-4 py-3 ${factTone(
+              className={`min-w-36 rounded-2xl border px-4 py-3 ${statusSurfaceClass(
                 school.setup_completed ? 'complete' : 'incomplete',
               )}`}
             >
@@ -239,6 +244,8 @@ export default function SchoolDetailPage() {
               Last status change: {displayReason(school.status_reason)}
             </p>
           ) : null}
+
+          <CurriculumAdoptionPanel schoolId={school.id} />
 
           <section className="rounded-2xl border border-[var(--color-line)] bg-white/90 p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -301,7 +308,7 @@ export default function SchoolDetailPage() {
                         {invite.first_name} {invite.last_name} · {invite.phone_number}
                       </p>
                       <p className="text-[var(--color-ink)]/60">
-                        {invite.email} · <span className="capitalize">{invite.status}</span>
+                        {invite.email} · <StatusBadge status={invite.status} />
                       </p>
                     </div>
                     {(invite.status === 'pending' || invite.status === 'expired') && (

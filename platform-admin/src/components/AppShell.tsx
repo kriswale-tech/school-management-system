@@ -42,6 +42,11 @@ export default function AppShell() {
               <NavLink to="/payments" className={navClass}>
                 Payments
               </NavLink>
+              {(user?.role === 'super_admin' || user?.role === 'curriculum') && (
+                <NavLink to="/curriculum" className={navClass}>
+                  Curriculum
+                </NavLink>
+              )}
               {can('messages.view') && (
                 <NavLink to="/messages" className={navClass}>
                   Messages
