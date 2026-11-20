@@ -13,6 +13,7 @@ import { staffRoutes } from '@/features/staff/routes'
 import { reportsRoutes } from '@/features/reports/routes'
 import { profileRoutes } from '@/features/profile/routes'
 import { settingsRoutes } from '@/features/settings/routes'
+import { migrationRoutes } from '@/features/migration/routes'
 
 const AppRoutes = () => {
   return (
@@ -29,6 +30,7 @@ const AppRoutes = () => {
           {staffRoutes}
           {reportsRoutes}
           {settingsRoutes}
+          {migrationRoutes}
           {profileRoutes}
         </Route>
         {authRoutes}

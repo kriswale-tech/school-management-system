@@ -8,6 +8,7 @@ import { mapStaffToFormData } from '../utils'
 const ghanaPhoneSchema = z.string().regex(/^(\+233|0)[0-9]{9}$/, 'Invalid Ghana phone number')
 
 const schema = z.object({
+  staff_id: z.string().optional(),
   first_name: z.string().min(1, { message: 'First name is required' }),
   last_name: z.string().min(1, { message: 'Last name is required' }),
   gender: z.enum(['male', 'female']).optional(),
@@ -42,6 +43,7 @@ type StaffUserFormProps = {
 }
 
 const defaultValues: StaffFormData = {
+  staff_id: '',
   first_name: '',
   last_name: '',
   gender: undefined,
@@ -74,6 +76,18 @@ const StaffUserForm = ({
       onSubmit={handleSubmit((data) => onSubmit({ data, dirtyFields }))}
       className="space-y-6"
     >
+      <div className="space-y-2">
+        <FormLabel label="Staff ID" className="font-normal text-base" />
+        <InputField
+          placeholder="Leave blank to auto-generate"
+          error={errors.staff_id?.message}
+          {...register('staff_id')}
+        />
+        <p className="text-sm text-slate-500">
+          Optional. Use your school&apos;s staff number, or leave blank for an automatic ID.
+        </p>
+      </div>
+
       <div className="flex gap-4 items-start justify-between">
         <div className="w-1/2 space-y-2">
           <FormLabel label="First Name" className="font-normal text-base" required />

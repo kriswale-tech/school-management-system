@@ -14,7 +14,7 @@ import { useCan } from '@/features/auth/hooks/useCan'
 import StudentsTable from '../components/StudentsTable'
 import StudentOnboarding from '../components/student-onboarding/StudentOnboarding'
 import { getStudentStats, getStudents } from '../services'
-import type { StudentQueryParams } from '../types'
+import type { StudentQueryParams, StudentRosterStatus } from '../types'
 
 const GUARDIAN_FILTER_OPTIONS = [
   { value: true, label: 'Missing guardian' },
@@ -25,6 +25,16 @@ const NEW_STUDENT_FILTER_OPTIONS = [
   { value: true, label: 'New students' },
   { value: false, label: 'Continuing students' },
 ] as const
+
+const STATUS_FILTER_OPTIONS = [
+  { value: 'graduated', label: 'Graduated' },
+  { value: 'left', label: 'Left' },
+] as const
+
+const rosterStatusFromParam = (value: string | null): StudentRosterStatus | '' => {
+  if (value === 'graduated' || value === 'left') return value
+  return ''
+}
 
 const booleanFromParam = (value: string | null): FilterSelection => {
   if (value === 'true') return true
@@ -43,6 +53,7 @@ const Students = () => {
 
   const missingGuardian = booleanFromParam(searchParams.get('missing_guardian'))
   const isNewStudent = booleanFromParam(searchParams.get('is_new_student'))
+  const rosterStatus = rosterStatusFromParam(searchParams.get('status'))
 
   const setBooleanSearchParam = (key: string, value: FilterSelection) => {
     const next = new URLSearchParams(searchParams)
@@ -60,8 +71,9 @@ const Students = () => {
       class_level: classLevel === '' ? undefined : String(classLevel),
       missing_guardian: typeof missingGuardian === 'boolean' ? missingGuardian : undefined,
       is_new_student: typeof isNewStudent === 'boolean' ? isNewStudent : undefined,
+      status: rosterStatus || undefined,
     }),
-    [page, search, classLevel, missingGuardian, isNewStudent],
+    [page, search, classLevel, missingGuardian, isNewStudent, rosterStatus],
   )
 
   const { data, isLoading } = useQuery({
@@ -113,6 +125,20 @@ const Students = () => {
           onChange={(value) => setBooleanSearchParam('missing_guardian', value)}
         />
         <FilterComponent
+          filterName="Status"
+          filterKey="status"
+          options={[...STATUS_FILTER_OPTIONS]}
+          value={rosterStatus}
+          placeholder="Active students"
+          onChange={(value) => {
+            const next = new URLSearchParams(searchParams)
+            if (value === 'graduated' || value === 'left') next.set('status', value)
+            else next.delete('status')
+            setSearchParams(next, { replace: true })
+            setPage(1)
+          }}
+        />
+        <FilterComponent
           filterName="Enrollment"
           filterKey="is_new_student"
           options={[...NEW_STUDENT_FILTER_OPTIONS]}
@@ -146,6 +172,7 @@ const Students = () => {
         onViewStudent={(student) => {
           navigate(`/students/${student.id}`)
         }}
+        rosterStatus={rosterStatus}
       />
 
       {canCreateStudent ? (

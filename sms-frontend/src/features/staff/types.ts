@@ -21,6 +21,7 @@ export type StaffDeskQueryParams = {
 }
 
 export type StaffFormData = {
+  staff_id?: string
   first_name: string
   last_name: string
   gender?: StaffGender
@@ -83,6 +84,7 @@ export interface Staff {
   first_name: string
   last_name: string
   phone_number: string
+  staff_id: string
   email: string | null
   role: string
   is_active: boolean
@@ -101,6 +103,7 @@ export interface StaffDeskRow {
   last_name: string
   email: string | null
   phone_number: string
+  staff_id: string
   role: string
   is_active: boolean
   date_added: string
@@ -174,6 +177,7 @@ export type EditableStaffUser = {
   first_name: string
   last_name: string
   phone_number: string
+  staff_id: string
   email: string | null
   profile: StaffProfile
 }

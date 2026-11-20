@@ -46,6 +46,7 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:5174',
 ]
 CORS_ALLOW_CREDENTIALS = True
+CORS_EXPOSE_HEADERS = ['Content-Disposition']
 
 # Used for notification email CTAs and the app-logo fallback image URL.
 FRONTEND_URL = os.getenv(
@@ -121,6 +122,7 @@ INSTALLED_APPS = [
     'billing',
     'communications',
     'messaging',
+    'migration',
 ]
 
 MIDDLEWARE = [
@@ -292,6 +294,15 @@ STUDENT_BULK_IMPORT_FAILURE_TTL = timedelta(hours=24)
 STUDENT_BULK_IMPORT_MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
 STUDENT_BULK_IMPORT_MAX_ROWS = 1000
 
+# Private staging files for the data-migration wizard. Not the reports bucket
+# and not the student bulk-import folder.
+MIGRATION_PRIVATE_ROOT = BASE_DIR / 'media' / 'migration-private'
+MIGRATION_FILE_STORAGE = os.getenv('MIGRATION_FILE_STORAGE', 'local')
+MIGRATION_MAX_FILE_SIZE = 20 * 1024 * 1024
+MIGRATION_MAX_ROWS = 10_000
+MIGRATION_SAMPLE_ROWS = 8
+MIGRATION_FAILED_FILE_TTL = timedelta(days=30)
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
@@ -370,6 +381,26 @@ STORAGES = {
                 'CacheControl': 'private, max-age=3600',
                 'ContentType': 'application/pdf',
                 'ContentDisposition': 'inline',
+            },
+        },
+    },
+    'migration': {
+        'BACKEND': 'storages.backends.s3.S3Storage',
+        'OPTIONS': {
+            'access_key': R2_ACCESS_KEY_ID,
+            'secret_key': R2_SECRET_ACCESS_KEY,
+            'bucket_name': R2_BUCKET_NAME,
+            'endpoint_url': R2_ENDPOINT_URL,
+            'region_name': 'auto',
+            'default_acl': None,
+            'querystring_auth': True,
+            'querystring_expire': R2_SIGNED_URL_EXPIRE_SECONDS,
+            'file_overwrite': False,
+            'signature_version': 's3v4',
+            'addressing_style': 'path',
+            'location': 'migration',
+            'object_parameters': {
+                'CacheControl': 'private, no-store',
             },
         },
     },

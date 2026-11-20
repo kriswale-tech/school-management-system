@@ -26,6 +26,10 @@ class Level(SystemGeneratedRecordMixin, BaseModel):
     description = models.TextField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_system_generated = models.BooleanField(default=False)
+    is_migration_snapshot = models.BooleanField(
+        default=False,
+        help_text='Inactive historical class kept only for migrated enrollment history.',
+    )
     subject_scope = models.CharField(
         max_length=10,
         choices=SubjectScope.choices,
@@ -86,6 +90,10 @@ class ClassLevel(SystemGeneratedRecordMixin, BaseModel):
     description = models.TextField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_system_generated = models.BooleanField(default=False)
+    is_migration_snapshot = models.BooleanField(
+        default=False,
+        help_text='Inactive historical class kept only for migrated enrollment history.',
+    )
     order = models.PositiveSmallIntegerField(
         default=1,
         help_text='Display order within the level.',
@@ -137,6 +145,10 @@ class ClassStream(BaseModel):
     description = models.TextField(null=True, blank=True)
     is_default = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
+    is_migration_snapshot = models.BooleanField(
+        default=False,
+        help_text='Inactive historical stream kept only for migrated enrollment history.',
+    )
     capacity = models.PositiveSmallIntegerField(null=True, blank=True)
 
     class Meta:

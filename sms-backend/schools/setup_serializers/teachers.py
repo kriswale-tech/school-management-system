@@ -37,6 +37,7 @@ class SetupTeacherSerializer(serializers.Serializer):
     first_name = serializers.CharField()
     last_name = serializers.CharField()
     phone_number = serializers.CharField()
+    staff_id = serializers.CharField()
     email = serializers.EmailField()
     role = serializers.CharField()
     is_active = serializers.BooleanField()

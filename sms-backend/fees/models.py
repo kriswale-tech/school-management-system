@@ -109,13 +109,25 @@ class FeeItem(BaseModel):
         choices=StudentType.choices,
         default=StudentType.ALL_STUDENTS,
     )
-
+    is_migration_opening_balance = models.BooleanField(
+        default=False,
+        help_text='Imported opening balance. Not part of the fee catalog.',
+    )
+    is_migration_historical = models.BooleanField(
+        default=False,
+        help_text='Imported historical charge. Not part of the fee catalog.',
+    )
 
     def clean(self):
         super().clean()
         errors = {}
 
-        if self.fee_structure_id and self.fee_structure.is_locked:
+        if (
+            self.fee_structure_id
+            and self.fee_structure.is_locked
+            and not self.is_migration_opening_balance
+            and not self.is_migration_historical
+        ):
             raise ValidationError('Fee items cannot be changed after the structure is applied.')
 
         if self.amount is not None and self.amount < 0:
@@ -144,7 +156,8 @@ class FeeItem(BaseModel):
             if not Level.objects.filter(id=self.applies_to_id, school=school).exists():
                 errors['applies_to_id'] = 'Level not found for this school.'
         elif self.applies_to_type == self.AppliesToType.CLASS:
-            if not ClassLevel.objects.filter(id=self.applies_to_id, school=school).exists():
+            class_level = ClassLevel.objects.filter(id=self.applies_to_id, school=school).first()
+            if class_level is None or class_level.is_migration_snapshot:
                 errors['applies_to_id'] = 'Class not found for this school.'
 
     def save(self, *args, **kwargs):
@@ -230,6 +243,7 @@ class Payment(BaseModel):
     payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices)
     paid_at = models.DateTimeField(default=timezone.now)
     payment_reference = models.CharField(max_length=255, blank=True, default='')
+    legacy_receipt_number = models.CharField(max_length=255, blank=True, default='')
     payment_notes = models.TextField(blank=True, default='')
     recorded_by = models.ForeignKey(
         'accounts.User',
@@ -367,6 +381,10 @@ class StudentFeeCredit(BaseModel):
         related_name='created_credits',
         null=True,
         blank=True,
+    )
+    is_migration_hold = models.BooleanField(
+        default=False,
+        help_text='Imported historical advance. Not applied automatically.',
     )
     notes = models.TextField(blank=True, default='')
 

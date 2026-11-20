@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from fees.models import FeeItem, FeeStructure, Payment, StudentFee
@@ -19,7 +20,16 @@ def _previous_term(term):
     )
 
 
+def _catalog_items(items):
+    return [
+        item for item in items
+        if not item.is_migration_opening_balance and not item.is_migration_historical
+    ]
+
+
 def _student_matches_fee_item(enrollment, fee_item):
+    if fee_item.is_migration_opening_balance or fee_item.is_migration_historical:
+        return False
     if fee_item.student_type == FeeItem.StudentType.NEW_STUDENT and not enrollment.is_new_student:
         return False
     if fee_item.student_type == FeeItem.StudentType.CONTINUING_STUDENT and enrollment.is_new_student:
@@ -73,7 +83,10 @@ def carry_forward_fee_structure(*, school, term, created_by):
             applies_to_id=item.applies_to_id,
             student_type=item.student_type,
         )
-        for item in source.fee_items.all()
+        for item in source.fee_items.filter(
+            is_migration_opening_balance=False,
+            is_migration_historical=False,
+        )
     ])
     return structure
 
@@ -104,7 +117,10 @@ def publish_fee_structure(fee_structure, *, actor=None):
         raise ValidationError('Applied fee structures cannot be published again.')
     if fee_structure.status == FeeStructure.Status.PUBLISHED:
         return fee_structure
-    if not fee_structure.fee_items.exists():
+    if not fee_structure.fee_items.filter(
+        is_migration_opening_balance=False,
+        is_migration_historical=False,
+    ).exists():
         raise ValidationError('Add at least one fee item before publishing.')
 
     fee_structure.status = FeeStructure.Status.PUBLISHED
@@ -149,7 +165,10 @@ def copy_fee_items_from_previous(*, school, term, created_by):
         .prefetch_related('fee_items')
         .first()
     )
-    if source is None or not source.fee_items.exists():
+    if source is None or not source.fee_items.filter(
+            is_migration_opening_balance=False,
+            is_migration_historical=False,
+        ).exists():
         raise ValidationError({
             'term': 'Previous term has no fee items to copy.',
         })
@@ -165,7 +184,10 @@ def copy_fee_items_from_previous(*, school, term, created_by):
     else:
         if structure.is_locked:
             raise ValidationError('Fee items cannot be changed after the structure is applied.')
-        if structure.fee_items.exists():
+        if structure.fee_items.filter(
+            is_migration_opening_balance=False,
+            is_migration_historical=False,
+        ).exists():
             raise ValidationError({
                 'term': 'This term already has fee items. Remove them before copying.',
             })
@@ -182,7 +204,10 @@ def copy_fee_items_from_previous(*, school, term, created_by):
             applies_to_id=item.applies_to_id,
             student_type=item.student_type,
         )
-        for item in source.fee_items.all()
+        for item in source.fee_items.filter(
+            is_migration_opening_balance=False,
+            is_migration_historical=False,
+        )
     ])
     return structure
 
@@ -216,7 +241,10 @@ def apply_fee_structure(fee_structure):
     }:
         raise ValidationError('Publish the fee structure before applying.')
 
-    if not fee_structure.fee_items.exists():
+    if not fee_structure.fee_items.filter(
+        is_migration_opening_balance=False,
+        is_migration_historical=False,
+    ).exists():
         raise ValidationError('Add at least one fee item before applying.')
 
     from students.models import ClassEnrollment
@@ -226,7 +254,7 @@ def apply_fee_structure(fee_structure):
         student__school=fee_structure.school,
     ).select_related('student', 'class_level', 'class_level__level')
 
-    fee_items = list(fee_structure.fee_items.all())
+    fee_items = _catalog_items(fee_structure.fee_items.all())
     student_fees = []
     for enrollment in enrollments:
         student_fees.extend(
@@ -297,7 +325,7 @@ def ensure_enrollment_fees(enrollment):
     if fee_structure is None:
         return []
 
-    fee_items = list(fee_structure.fee_items.all())
+    fee_items = _catalog_items(fee_structure.fee_items.all())
     rows = _student_fee_rows_for_enrollment(enrollment, fee_structure, fee_items)
     if not rows:
         return []
@@ -379,7 +407,10 @@ def get_student_term_balance(*, student, term):
 
 def validate_fee_structure_ready(fee_structure):
     fee_structure.full_clean()
-    if not fee_structure.fee_items.exists():
+    if not fee_structure.fee_items.filter(
+        is_migration_opening_balance=False,
+        is_migration_historical=False,
+    ).exists():
         raise ValidationError('Fee structure must contain at least one fee item.')
 
 
@@ -545,22 +576,30 @@ def list_student_payments(
             'receipt',
             'recorded_by',
         )
-        .prefetch_related('allocations__term__academic_year')
+        .prefetch_related('allocations__term__academic_year', 'created_credits')
         .order_by('-paid_at')
         .distinct()
     )
 
     if term_id:
-        queryset = queryset.filter(allocations__term_id=term_id)
+        queryset = queryset.filter(
+            Q(allocations__term_id=term_id) | Q(term_id=term_id, allocations__isnull=True),
+        )
     elif academic_year_id:
         academic_year = AcademicYear.objects.filter(school=school, id=academic_year_id).first()
         if academic_year is None:
             raise ValidationError({'academic_year': 'Academic year not found in this school.'})
-        queryset = queryset.filter(allocations__term__academic_year=academic_year)
+        queryset = queryset.filter(
+            Q(allocations__term__academic_year=academic_year)
+            | Q(term__academic_year=academic_year, allocations__isnull=True),
+        )
 
     needle = str(search or '').strip()
     if needle:
-        queryset = queryset.filter(receipt__receipt_number__icontains=needle)
+        queryset = queryset.filter(
+            Q(receipt__receipt_number__icontains=needle)
+            | Q(legacy_receipt_number__icontains=needle),
+        )
 
     rows = []
     for payment in queryset:
@@ -591,6 +630,8 @@ def list_student_payments(
             'payment_method_display': payment.get_payment_method_display(),
             'paid_at': payment.paid_at,
             'payment_reference': payment.payment_reference,
+            'legacy_receipt_number': payment.legacy_receipt_number,
+            'is_advance': any(credit.is_migration_hold for credit in payment.created_credits.all()),
             'received_by': _payment_received_by_name(payment),
             'allocations': allocation_rows,
             'receipt': (
@@ -660,8 +701,12 @@ def build_student_payment_history_xlsx(
             f"{row['term_label']}: GHS {row['amount']:.2f}"
             for row in payment.get('allocations') or []
         ) or (
-            f"{payment['academic_year']} · {payment['term_name']}: "
-            f"GHS {payment['amount']:.2f}"
+            'Advance'
+            if payment.get('is_advance')
+            else (
+                f"{payment['academic_year']} · {payment['term_name']}: "
+                f"GHS {payment['amount']:.2f}"
+            )
         )
         rows.append({
             'Paid at': paid_at_display,
@@ -669,7 +714,7 @@ def build_student_payment_history_xlsx(
             'Method': payment['payment_method_display'],
             'Applied to': applied_to,
             'Reference': payment.get('payment_reference') or '',
-            'Receipt number': receipt.get('receipt_number') or '',
+            'Receipt number': receipt.get('receipt_number') or payment.get('legacy_receipt_number') or '',
             'Received by': payment.get('received_by') or '',
         })
 

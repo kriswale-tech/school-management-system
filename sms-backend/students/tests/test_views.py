@@ -170,6 +170,20 @@ class StudentViewTests(APITestCase):
         self.assertEqual(response.data['count'], 1)
         self.assertEqual(response.data['results'][0]['student_id'], 'STU-001')
 
+        self.student_a.other_names = 'Serwaa'
+        self.student_a.save(update_fields=['other_names'])
+
+        response = self.client.get(self.list_url, {'search': 'Ama Serwaa Mensah'})
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['student_id'], 'STU-001')
+
+        response = self.client.get(self.list_url, {'search': 'Mensah Ama'})
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['student_id'], 'STU-001')
+
+        response = self.client.get(self.list_url, {'search': 'Ama Boateng'})
+        self.assertEqual(response.data['count'], 0)
+
     def test_list_filter_by_class_level_and_stream(self):
         response = self.client.get(
             self.list_url,
@@ -229,6 +243,88 @@ class StudentViewTests(APITestCase):
         self.assertEqual(response.data['girls'], 1)
         self.assertEqual(response.data['fully_paid'], 1)
         self.assertEqual(response.data['owing'], 1)
+
+    def test_list_graduated_and_left_students_are_searchable(self):
+        past_term = Term.objects.create(
+            school=self.school,
+            academic_year=self.academic_year,
+            term=Term.TermChoices.SECOND_TERM,
+            start_date=date(2026, 1, 6),
+            end_date=date(2026, 4, 10),
+            is_active=False,
+        )
+        graduate = create_student(
+            school=self.school,
+            student_id='STU-GRAD',
+            first_name='Abena',
+            last_name='Owusu',
+        )
+        enroll_student(
+            student=graduate,
+            term=past_term,
+            stream=self.default_stream_a,
+        )
+        graduate.is_graduated = True
+        graduate.save(update_fields=['is_graduated'])
+
+        leaver = create_student(
+            school=self.school,
+            student_id='STU-LEFT',
+            first_name='Yaw',
+            last_name='Darko',
+            gender=Student.GenderChoices.MALE,
+        )
+        enroll_student(
+            student=leaver,
+            term=self.term,
+            stream=self.default_stream_b,
+        )
+        leaver.is_active = False
+        leaver.leave_reason = Student.LeaveReason.TRANSFER
+        leaver.save(update_fields=['is_active', 'leave_reason'])
+
+        current = self.client.get(self.list_url)
+        current_ids = {item['student_id'] for item in current.data['results']}
+        self.assertNotIn('STU-LEFT', current_ids)
+        self.assertNotIn('STU-GRAD', current_ids)
+        self.assertIn('STU-001', current_ids)
+
+        found_left = self.client.get(self.list_url, {'search': 'Darko'})
+        self.assertEqual(found_left.data['count'], 1)
+        self.assertEqual(found_left.data['results'][0]['student_id'], 'STU-LEFT')
+        self.assertEqual(found_left.data['results'][0]['leave_reason'], 'transfer')
+
+        found_graduate = self.client.get(self.list_url, {'search': 'Abena Owusu'})
+        self.assertEqual(found_graduate.data['count'], 1)
+        self.assertEqual(found_graduate.data['results'][0]['student_id'], 'STU-GRAD')
+        self.assertTrue(found_graduate.data['results'][0]['is_graduated'])
+
+        graduated = self.client.get(self.list_url, {'status': 'graduated', 'search': 'Owusu'})
+        self.assertEqual(graduated.status_code, status.HTTP_200_OK)
+        self.assertEqual(graduated.data['count'], 1)
+        row = graduated.data['results'][0]
+        self.assertEqual(row['student_id'], 'STU-GRAD')
+        self.assertTrue(row['is_graduated'])
+        self.assertEqual(row['class_level']['name'], 'JHS 1')
+        self.assertEqual(row['stream']['full_name'], 'JHS 1')
+
+        missed = self.client.get(self.list_url, {'status': 'graduated', 'search': 'Darko'})
+        self.assertEqual(missed.data['count'], 0)
+
+        by_class = self.client.get(
+            self.list_url,
+            {'status': 'graduated', 'class_level': str(self.class_level_b.id)},
+        )
+        self.assertEqual(by_class.data['count'], 0)
+
+        left = self.client.get(self.list_url, {'status': 'left', 'search': 'STU-LEFT'})
+        self.assertEqual(left.status_code, status.HTTP_200_OK)
+        self.assertEqual(left.data['count'], 1)
+        self.assertEqual(left.data['results'][0]['leave_reason'], 'transfer')
+        self.assertFalse(left.data['results'][0]['is_graduated'])
+
+        rejected = self.client.get(self.list_url, {'status': 'alumni'})
+        self.assertEqual(rejected.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_list_requires_active_term(self):
         self.term.is_active = False

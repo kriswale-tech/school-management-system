@@ -74,7 +74,7 @@ class FeeDeskListView(SchoolScopedAPIView):
             OpenApiParameter(
                 name='search',
                 type=str,
-                description='Search student ID, first name, last name, or other names.',
+                description='Search student ID or full name.',
             ),
             OpenApiParameter(
                 name='class_level',

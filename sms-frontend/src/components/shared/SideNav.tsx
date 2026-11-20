@@ -116,6 +116,37 @@ const SideNav = () => {
             </NavLink>
           )
         })}
+        {user?.role === 'admin' || user?.role === 'staff' ? (
+          <NavLink to="/migration" className="group shrink-0">
+            <div className="flex flex-col items-center m-auto gap-y-1 ">
+              <div
+                className={`rounded-xl size-9 flex items-center justify-center transition-colors duration-150 ${
+                  isNavItemActive('/migration', location.pathname)
+                    ? 'bg-sky-100'
+                    : 'bg-slate-100 group-hover:bg-sky-50'
+                }`}
+              >
+                <Icon
+                  icon="hugeicons:database-import"
+                  className={`text-xl transition-colors duration-150 ${
+                    isNavItemActive('/migration', location.pathname)
+                      ? 'text-sky-700'
+                      : 'group-hover:text-sky-700'
+                  }`}
+                />
+              </div>
+              <span
+                className={`text-sm transition-colors duration-150 ${
+                  isNavItemActive('/migration', location.pathname)
+                    ? 'text-sky-700'
+                    : 'text-slate-700 group-hover:text-sky-700'
+                }`}
+              >
+                Migration
+              </span>
+            </div>
+          </NavLink>
+        ) : null}
         {user?.role === 'admin' ? (
           <NavLink to="/settings" className="group shrink-0">
             <div className="flex flex-col items-center m-auto gap-y-1 ">

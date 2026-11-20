@@ -47,7 +47,8 @@ def _stream_label(stream):
 
 def _ordered_classes(school):
     return list(
-        ClassLevel.objects.filter(school=school)
+        ClassLevel.objects.filter(school=school, is_migration_snapshot=False)
+        .exclude(level__is_migration_snapshot=True)
         .select_related('level')
         .order_by('level__order', 'order', 'name')
     )
@@ -60,7 +61,12 @@ def _next_active_class(ordered, source_id):
             if class_level.id == source_id:
                 seen = True
             continue
-        if class_level.is_active and class_level.level.is_active:
+        if (
+            class_level.is_active
+            and not class_level.is_migration_snapshot
+            and class_level.level.is_active
+            and not class_level.level.is_migration_snapshot
+        ):
             return class_level
     return None
 
@@ -76,7 +82,7 @@ def _active_term(school):
 def _matching_stream(source, dest_streams):
     key = _stream_key(source)
     for stream in dest_streams:
-        if stream.is_active and _stream_key(stream) == key:
+        if stream.is_active and not stream.is_migration_snapshot and _stream_key(stream) == key:
             return stream
     return None
 

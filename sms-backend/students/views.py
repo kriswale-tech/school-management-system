@@ -48,6 +48,7 @@ from students.services import (
     get_student,
     get_student_stats,
     list_enrollments_for_term,
+    list_former_students,
     list_parents_for_school,
     list_student_guardians,
     mark_student_left,
@@ -55,9 +56,13 @@ from students.services import (
     reactivate_student,
     remove_student_guardian,
     resolve_term,
+    roster_rows_for_students,
+    students_matching_default_search,
     update_student,
     update_student_guardian,
 )
+
+ROSTER_STATUSES = {'enrolled', 'graduated', 'left'}
 
 class StudentListView(SchoolScopedAPIView):
     pagination_class = StandardResultsSetPagination
@@ -66,15 +71,23 @@ class StudentListView(SchoolScopedAPIView):
         tags=['Students'],
         summary='List students',
         description=(
-            'Returns paginated students enrolled in the active term for the '
-            'selected school. Supports search, class-level, stream, and '
+            'Returns paginated students for the selected school. The default '
+            'list is active students enrolled in the term. A search also '
+            'returns a left or graduated student whose name or ID matches. '
+            'status=graduated and status=left list those students, using their '
+            'last class. Supports search, class-level, stream, and '
             'missing-guardian filtering.'
         ),
         parameters=[
             OpenApiParameter(
+                name='status',
+                type=str,
+                description='enrolled (default), graduated, or left.',
+            ),
+            OpenApiParameter(
                 name='search',
                 type=str,
-                description='Search student ID, first name, last name, or other names.',
+                description='Search student ID or full name.',
             ),
             OpenApiParameter(
                 name='class_level',
@@ -104,15 +117,46 @@ class StudentListView(SchoolScopedAPIView):
         },
     )
     def get(self, request):
-        term = resolve_term(self.school, request.query_params.get('term'))
-        queryset = list_enrollments_for_term(school=self.school, term=term)
-        filterset = StudentEnrollmentFilter(request.query_params, queryset=queryset)
-        if not filterset.is_valid():
-            raise ValidationError(filterset.errors)
+        roster = (request.query_params.get('status') or 'enrolled').strip().lower()
+        if roster not in ROSTER_STATUSES:
+            raise ValidationError({'status': 'Choose enrolled, graduated, or left.'})
 
+        if roster == 'enrolled':
+            term = resolve_term(self.school, request.query_params.get('term'))
+            queryset = list_enrollments_for_term(school=self.school, term=term)
+            enrolled_params = request.query_params.copy()
+            enrolled_params.pop('status', None)
+            filterset = StudentEnrollmentFilter(enrolled_params, queryset=queryset)
+            if not filterset.is_valid():
+                raise ValidationError(filterset.errors)
+            search = (request.query_params.get('search') or '').strip()
+            paginator = self.pagination_class()
+            if not search:
+                active = filterset.qs.filter(
+                    student__is_active=True,
+                    student__is_graduated=False,
+                )
+                page = paginator.paginate_queryset(active, request)
+                serializer = StudentListSerializer(page, many=True)
+                return paginator.get_paginated_response(serializer.data)
+
+            matches = students_matching_default_search(
+                school=self.school,
+                enrolled_ids=filterset.qs.values('student_id'),
+                params=request.query_params,
+            )
+            page = paginator.paginate_queryset(matches, request)
+            serializer = StudentListSerializer(roster_rows_for_students(page), many=True)
+            return paginator.get_paginated_response(serializer.data)
+
+        queryset = list_former_students(
+            school=self.school,
+            status=roster,
+            params=request.query_params,
+        )
         paginator = self.pagination_class()
-        page = paginator.paginate_queryset(filterset.qs, request)
-        serializer = StudentListSerializer(page, many=True)
+        page = paginator.paginate_queryset(queryset, request)
+        serializer = StudentListSerializer(roster_rows_for_students(page), many=True)
         return paginator.get_paginated_response(serializer.data)
 
 
@@ -193,7 +237,7 @@ class StudentStatsView(SchoolScopedAPIView):
     )
     def get(self, request):
         term = resolve_term(self.school, request.query_params.get('term'))
-        stats = get_student_stats(school=self.school, term=term)
+        stats = get_student_stats(school=self.school, term=term, active_only=True)
         return Response(StudentStatsSerializer(stats).data)
 
 

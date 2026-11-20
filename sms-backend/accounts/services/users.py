@@ -7,6 +7,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 
 from accounts.models import PhoneOtp, Profile, SchoolMembership, User
 from accounts.services.memberships import link_user_to_school
+from accounts.services.staff_ids import assert_staff_id_available, normalize_staff_id
 
 logger = logging.getLogger(__name__)
 
@@ -99,13 +100,14 @@ def add_school_member(school, validated_data: dict, *, actor=None) -> SchoolMemb
     }
     phone_number = validated_data['phone_number']
     role = validated_data['role']
+    staff_id = validated_data.get('staff_id', '')
 
     user = User.objects.filter(phone_number=phone_number).first()
 
     if user is not None:
         # The person already exists elsewhere in the system; their own name and
         # profile stay authoritative, this school just gains access to them.
-        membership, _ = link_user_to_school(user, school, role)
+        membership, _ = link_user_to_school(user, school, role, staff_id=staff_id)
     else:
         user = User.objects.create(
             phone_number=phone_number,
@@ -118,7 +120,7 @@ def add_school_member(school, validated_data: dict, *, actor=None) -> SchoolMemb
         user.save(update_fields=['password'])
         Profile.objects.create(user=user, **profile_data)
 
-        membership, _ = link_user_to_school(user, school, role)
+        membership, _ = link_user_to_school(user, school, role, staff_id=staff_id)
 
     from activities.models import Activity
     from activities.services import record_activity
@@ -353,6 +355,24 @@ def update_school_member(
         )
         phone_changed = target.user.phone_number != old_phone or linked_existing_user
 
+    staff_id_changed = False
+    if 'staff_id' in validated_data:
+        provided_staff_id = normalize_staff_id(validated_data.pop('staff_id'))
+        if provided_staff_id:
+            if provided_staff_id != target.staff_id:
+                assert_staff_id_available(
+                    school=target.school,
+                    staff_id=provided_staff_id,
+                    exclude_membership_id=target.id,
+                )
+                target.staff_id = provided_staff_id
+                target.save(update_fields=['staff_id', 'updated_at'])
+                staff_id_changed = True
+        elif target.staff_id:
+            target.staff_id = ''
+            target.save(update_fields=['staff_id', 'updated_at'])
+            staff_id_changed = True
+
     identity_changed = False
     profile_changed = False
     if not linked_existing_user:
@@ -409,7 +429,7 @@ def update_school_member(
             notify_recipients=[target, *other_admins],
         )
 
-    if editing_other and (identity_changed or profile_changed):
+    if editing_other and (identity_changed or profile_changed or staff_id_changed):
         record_activity(
             school=actor.school,
             actor=actor_user,

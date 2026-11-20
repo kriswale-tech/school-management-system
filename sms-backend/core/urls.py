@@ -79,4 +79,5 @@ urlpatterns = [
     ),
     path(f'{v1_path}communications/', include('communications.urls')),
     path(f'{v1_path}messaging/', include('messaging.urls')),
+    path(f'{v1_path}migration/', include('migration.urls')),
 ]

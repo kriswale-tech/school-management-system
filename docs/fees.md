@@ -3,7 +3,7 @@
 Reference for the fees product: catalog → bill → pay → advance.  
 Deferred items: [fees-backlog.md](./fees-backlog.md).
 
-**Last reviewed:** 2026-11-03
+**Last reviewed:** 2026-11-20
 
 ---
 
@@ -92,7 +92,7 @@ Refunding unused advance is **not built yet** (see backlog).
 
 | UI | Role |
 | --- | --- |
-| `/fees` | Desk: balances, stats, record payment, open student fee detail (admin + accountant). Term filter includes **All time** (`term=all`) for lifetime billed/paid on the active-term roster; debt reminders stay term-scoped. |
+| `/fees` | Desk: balances, stats, record payment, open student fee detail (admin + accountant). Opens on the **current term**. **All time** (`term=all`) is lifetime billed/paid for pupils enrolled this term, including opening balances and fee history. **Remind parents** follows the filter. The automatic reminder always uses all debt. See [migration.md](./migration.md). |
 | `/fees/settings` | Catalogs by term: add/edit items, **Publish**, **Copy from previous**, **Apply** (admin); accountant prepares/publishes next term in the lead window |
 | `/fees/:studentId` | Student fee breakdown + payment history; header shows **all-time owing** and advances. One cash payment can cover multiple owing terms (allocations) with a single receipt. |
 | Student detail → Fees | Same breakdown/history; nested tabs `?tab=fees&feesTab=breakdown\|history` |

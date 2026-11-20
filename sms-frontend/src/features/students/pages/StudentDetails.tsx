@@ -12,6 +12,8 @@ import Performance from '../components/detail-pages/Performance'
 import { getStudent } from '../services'
 import { STUDENT_DETAIL_QUERY_KEY } from '../utils'
 import DotComponent from '@/components/ui/DotComponent'
+import StudentRecordActions from '../components/StudentRecordActions'
+import StudentStatusBadges from '../components/StudentStatusBadges'
 
 const TAB_BIO = 'Bio'
 const TAB_GUARDIAN = 'Guardian'
@@ -103,34 +105,39 @@ const StudentDetails = () => {
           </p>
         ) : (
           <>
-            <div className="flex items-center gap-4 mb-6">
-              <AvatarComponent fullName={student.full_name} size={100} />
-              <div>
-                <div className="mb-1 flex flex-wrap items-center gap-2">
-                  <h2 className="text-2xl font-medium">{student.full_name}</h2>
-                  {student.is_new_student ? (
-                    <span className="inline-flex rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-medium text-sky-800">
-                      New student
-                    </span>
+            <div className="mb-6 flex items-center justify-between gap-4">
+              <div className="flex min-w-0 items-center gap-4">
+                <AvatarComponent fullName={student.full_name} size={100} />
+                <div>
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <h2 className="text-2xl font-medium">{student.full_name}</h2>
+                    <StudentStatusBadges
+                      isGraduated={student.is_graduated}
+                      isActive={student.is_active}
+                      leaveReason={student.leave_reason}
+                      isNewStudent={student.is_new_student}
+                      size="md"
+                    />
+                  </div>
+                  <span className="text-sm text-gray-500">#{student.student_id}</span>
+                  {student.class_assignment ? (
+                    <>
+                      <DotComponent />
+                      <span className="text-sm text-gray-500">
+                        {student.class_assignment.display_name}
+                      </span>
+                    </>
+                  ) : null}
+                  {student.is_active && !student.is_graduated ? (
+                    <>
+                      <DotComponent />
+                      <span className="text-sm text-green-600">Active</span>
+                    </>
                   ) : null}
                 </div>
-                <span className="text-sm text-gray-500">#{student.student_id}</span>
-                {student.class_assignment ? (
-                  <>
-                    <DotComponent />
-                    <span className="text-sm text-gray-500">
-                      {student.class_assignment.display_name}
-                    </span>
-                  </>
-                ) : null}
-                <DotComponent />
-                <span
-                  className={
-                    student.is_active ? 'text-sm text-green-600' : 'text-sm text-slate-500'
-                  }
-                >
-                  {student.is_active ? 'Active' : 'Inactive'}
-                </span>
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                <StudentRecordActions student={student} />
               </div>
             </div>
 

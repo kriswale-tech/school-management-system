@@ -10,6 +10,7 @@ from rest_framework.exceptions import ValidationError
 
 from accounts.models import Profile, SchoolMembership, User
 from accounts.services.memberships import link_user_to_school
+from accounts.services.staff_ids import assert_staff_id_available, normalize_staff_id
 from shared.helpers import format_phone_number
 from shared.services.spreadsheets import (
     build_csv_bytes,
@@ -41,6 +42,7 @@ class ParsedTeacherBulkRow:
     first_name: str = ''
     last_name: str = ''
     phone_number: str = ''
+    staff_id: str = ''
     email: str = ''
     assignment_type: str = ''
     class_name: str = ''
@@ -53,6 +55,7 @@ class ParsedTeacherBulkRow:
             'first_name': self.first_name,
             'last_name': self.last_name,
             'phone_number': self.phone_number,
+            'staff_id': self.staff_id,
             'email': self.email,
             'assignment_type': self.assignment_type,
             'class_name': self.class_name,
@@ -141,11 +144,12 @@ def preview_teacher_bulk_import(school, rows: list[ParsedTeacherBulkRow]) -> Tea
 
     context = build_teacher_bulk_reference_context(school)
     existing_phones = _load_existing_teacher_phones(school)
+    staff_id_errors, _explicit_staff_ids = _staff_id_plan(school, rows)
     summary = TeacherBulkImportSummary(rows_total=len(rows))
     results: list[TeacherBulkRowResult] = []
 
     for row in rows:
-        messages: list[str] = []
+        messages: list[str] = list(staff_id_errors.get(row.row_number, []))
         teacher_action = _resolve_teacher_action(row, school, existing_phones, messages)
         assignment_action, assignment_messages = _resolve_assignment_action(context, row)
         messages.extend(assignment_messages)
@@ -198,12 +202,23 @@ def commit_teacher_bulk_import(
 
     context = build_teacher_bulk_reference_context(school)
     existing_phones = _load_existing_teacher_phones(school)
+    staff_id_errors, explicit_staff_ids = _staff_id_plan(school, rows)
     summary = TeacherBulkImportSummary(rows_total=len(rows), rows_processed=len(rows))
     failed_rows: list[dict] = []
     teacher_cache: dict[str, User] = {}
+    assigned_staff_ids: dict[str, str] = {}
 
     for row in rows:
-        messages: list[str] = []
+        messages: list[str] = list(staff_id_errors.get(row.row_number, []))
+        if messages:
+            summary.rows_failed += 1
+            failed_row = row.as_dict()
+            failed_row['row_number'] = row.row_number
+            failed_row['failure_reason'] = '; '.join(
+                message.replace('ERROR: ', '') for message in messages
+            )
+            failed_rows.append(failed_row)
+            continue
         try:
             teacher = _upsert_teacher(
                 school,
@@ -212,6 +227,8 @@ def commit_teacher_bulk_import(
                 teacher_cache=teacher_cache,
                 summary=summary,
                 messages=messages,
+                explicit_staff_ids=explicit_staff_ids,
+                assigned_staff_ids=assigned_staff_ids,
             )
             assignment_created, assignment_replaced = _apply_assignment(
                 context,
@@ -283,6 +300,7 @@ def _to_parsed_row(raw_row: dict) -> ParsedTeacherBulkRow:
         first_name=normalize_cell(raw_row.get('first_name')),
         last_name=normalize_cell(raw_row.get('last_name')),
         phone_number=normalize_cell(raw_row.get('phone_number')),
+        staff_id=normalize_staff_id(normalize_cell(raw_row.get('staff_id'))),
         email=normalize_cell(raw_row.get('email')),
         assignment_type=normalize_cell(raw_row.get('assignment_type')).lower(),
         class_name=normalize_cell(raw_row.get('class_name')),
@@ -431,20 +449,30 @@ def _upsert_teacher(
     teacher_cache: dict[str, User],
     summary: TeacherBulkImportSummary,
     messages: list[str],
+    explicit_staff_ids: dict[str, str],
+    assigned_staff_ids: dict[str, str],
 ) -> User:
     action = _resolve_teacher_action(row, school, existing_phones, messages)
     if messages:
         raise ValidationError({'detail': messages[-1].replace('ERROR: ', '')})
 
     phone = format_phone_number(row.phone_number)
+    staff_id = explicit_staff_ids.get(phone, '')
     if phone in teacher_cache:
+        _apply_staff_id(
+            school,
+            teacher_cache[phone],
+            phone,
+            staff_id,
+            assigned_staff_ids,
+        )
         return teacher_cache[phone]
 
     if action == ACTION_LINK:
         # Identity is owned by another school, so their own name, email, and
         # profile stay authoritative; this school only gains access.
         user = User.objects.get(phone_number=phone)
-        link_user_to_school(user, school, User.RoleChoices.TEACHER)
+        link_user_to_school(user, school, User.RoleChoices.TEACHER, staff_id=staff_id)
         summary.teachers_linked += 1
         existing_phones[phone] = user
     elif action == ACTION_UPDATE:
@@ -467,12 +495,129 @@ def _upsert_teacher(
         user.set_unusable_password()
         user.save(update_fields=['password'])
         Profile.objects.get_or_create(user=user)
-        link_user_to_school(user, school, User.RoleChoices.TEACHER)
+        link_user_to_school(user, school, User.RoleChoices.TEACHER, staff_id=staff_id)
         summary.teachers_created += 1
         existing_phones[phone] = user
 
+    _apply_staff_id(school, user, phone, staff_id, assigned_staff_ids)
     teacher_cache[phone] = user
     return user
+
+
+def _apply_staff_id(
+    school,
+    user: User,
+    phone: str,
+    staff_id: str,
+    assigned_staff_ids: dict[str, str],
+) -> None:
+    """Keep one ID per phone in this file. Blank keeps an existing ID or generates one."""
+    if phone in assigned_staff_ids:
+        return
+
+    membership = SchoolMembership.objects.get(user=user, school=school)
+    if staff_id:
+        if membership.staff_id != staff_id:
+            assert_staff_id_available(
+                school=school,
+                staff_id=staff_id,
+                exclude_membership_id=membership.id,
+            )
+            membership.staff_id = staff_id
+            membership.save(update_fields=['staff_id', 'updated_at'])
+        assigned_staff_ids[phone] = staff_id
+        return
+
+    if not membership.staff_id:
+        membership.staff_id = ''
+        membership.save(update_fields=['staff_id', 'updated_at'])
+    assigned_staff_ids[phone] = membership.staff_id
+
+
+def _formatted_phone(row: ParsedTeacherBulkRow) -> str | None:
+    if not row.phone_number:
+        return None
+    try:
+        return format_phone_number(row.phone_number)
+    except ValueError:
+        return None
+
+
+def _staff_id_plan(
+    school,
+    rows: list[ParsedTeacherBulkRow],
+) -> tuple[dict[int, list[str]], dict[str, str]]:
+    """Row errors, and the staff ID to save for each valid phone.
+
+    Phone stays the match key. A blank cell keeps an existing ID or generates
+    one. Every filled cell for the same phone must agree, and that ID must be
+    free or already belong to that phone.
+    """
+    owners = {
+        membership.staff_id: membership.user.phone_number
+        for membership in SchoolMembership.objects.filter(school=school)
+        .exclude(staff_id='')
+        .select_related('user')
+    }
+    explicit: dict[str, str] = {}
+    conflict_phones: set[str] = set()
+
+    for row in rows:
+        phone = _formatted_phone(row)
+        provided = normalize_staff_id(row.staff_id)
+        if phone is None or not provided:
+            continue
+        current = explicit.get(phone)
+        if current and current != provided:
+            conflict_phones.add(phone)
+        else:
+            explicit[phone] = provided
+
+    duplicate_ids: set[str] = set()
+    phone_for_id: dict[str, str] = {}
+    taken_ids: set[str] = set()
+    for phone, staff_id in explicit.items():
+        if phone in conflict_phones:
+            continue
+        previous = phone_for_id.get(staff_id)
+        if previous and previous != phone:
+            duplicate_ids.add(staff_id)
+        else:
+            phone_for_id[staff_id] = phone
+        owner = owners.get(staff_id)
+        if owner and owner != phone:
+            taken_ids.add(staff_id)
+
+    bad_phones = set(conflict_phones)
+    for phone, staff_id in explicit.items():
+        if staff_id in duplicate_ids or staff_id in taken_ids:
+            bad_phones.add(phone)
+
+    row_errors: dict[int, list[str]] = {}
+    for row in rows:
+        phone = _formatted_phone(row)
+        if phone is None or phone not in bad_phones:
+            continue
+        provided = normalize_staff_id(row.staff_id)
+        messages: list[str] = []
+        if phone in conflict_phones and provided:
+            messages.append(
+                'ERROR: staff_id conflicts with another row for this phone number.',
+            )
+        if provided and provided in duplicate_ids:
+            messages.append('ERROR: staff_id is duplicated in this file.')
+        if provided and provided in taken_ids:
+            messages.append('ERROR: staff_id already exists for this school.')
+        if not messages:
+            messages.append(
+                'ERROR: staff_id on another row for this phone number is invalid.',
+            )
+        row_errors[row.row_number] = messages
+
+    for phone in bad_phones:
+        explicit.pop(phone, None)
+
+    return row_errors, explicit
 
 
 def _reactivate_teacher_membership(user: User, school) -> None:

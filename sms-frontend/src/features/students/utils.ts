@@ -30,6 +30,13 @@ export const formatGenderLabel = (gender: StudentGender | string) => {
   return gender.charAt(0).toUpperCase() + gender.slice(1)
 }
 
+export const formatLeaveReason = (reason?: string | null) => {
+  if (reason === 'dropout') return 'Dropped out'
+  if (reason === 'transfer') return 'Transferred'
+  if (reason === 'other') return 'Other'
+  return ''
+}
+
 export const formatFeeAmount = (amount: string | number) => {
   const parsed = typeof amount === 'number' ? amount : Number(amount)
   if (Number.isNaN(parsed)) return String(amount)

@@ -9,7 +9,8 @@ from rest_framework.test import APITestCase
 
 from academics.models import ClassLevel, Level
 from accounts.tests.factories import create_user, set_client_auth_cookies, user_school
-from fees.models import FeeItem, FeeStructure
+from communications.tests.helpers import seed_test_credits
+from fees.models import FeeItem, FeeStructure, Payment, StudentFee
 from fees.services import apply_fee_structure, publish_fee_structure
 from fees.services.auto_debt_reminders import (
     auto_debt_reminder_period_key,
@@ -130,6 +131,7 @@ class AutoDebtReminderProcessTests(APITestCase):
             SchoolSettings.DebtReminderFrequency.END_OF_MONTH
         )
         settings_row.save()
+        seed_test_credits(self.school)
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
     @patch(SEND_SMS_PATH, return_value={'status': 'success', 'data': [{'id': 'auto-1'}]})
@@ -146,7 +148,7 @@ class AutoDebtReminderProcessTests(APITestCase):
         self.assertEqual(
             GuardianDelivery.objects.filter(
                 event_type=GuardianDelivery.EventType.DEBT_REMINDER,
-                status=GuardianDelivery.Status.SENT,
+                status=GuardianDelivery.Status.SUBMITTED,
             ).count(),
             2,
         )
@@ -176,6 +178,69 @@ class AutoDebtReminderProcessTests(APITestCase):
             first_count,
         )
         self.assertEqual(mock_sms.call_count, 1)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
+    @patch(SEND_SMS_PATH, return_value={'status': 'success', 'data': [{'id': 'auto-past'}]})
+    def test_includes_past_term_debt_after_current_term_is_paid(self, mock_sms):
+        Payment.objects.create(
+            student=self.debtor,
+            term=self.term,
+            amount=Decimal('500.00'),
+            payment_method=Payment.PaymentMethod.CASH,
+            payment_reference='CUR-500',
+            recorded_by=self.user,
+        )
+        past_year = AcademicYear.objects.create(
+            school=self.school,
+            academic_year='2024/2025',
+            start_date=date(2024, 9, 1),
+            end_date=date(2025, 7, 31),
+            is_active=False,
+        )
+        past_term = Term.objects.create(
+            school=self.school,
+            academic_year=past_year,
+            term=Term.TermChoices.FIRST_TERM,
+            start_date=date(2024, 9, 1),
+            end_date=date(2024, 12, 15),
+            is_active=False,
+        )
+        past_structure = FeeStructure.objects.create(
+            school=self.school,
+            term=past_term,
+            created_by=self.user,
+        )
+        past_item = FeeItem.objects.create(
+            fee_structure=past_structure,
+            name='Opening balance',
+            amount=Decimal('0.00'),
+            applies_to_type=FeeItem.AppliesToType.SCHOOL,
+            student_type=FeeItem.StudentType.ALL_STUDENTS,
+            is_migration_opening_balance=True,
+        )
+        StudentFee.objects.create(
+            student=self.debtor,
+            term=past_term,
+            fee_structure=past_structure,
+            fee_item=past_item,
+            name='Opening balance',
+            amount=Decimal('150.00'),
+        )
+
+        result = process_school_auto_debt_reminders(
+            school_id=self.school.id,
+            today=date(2026, 1, 31),
+        )
+
+        self.assertEqual(result['queued_students'], 1)
+        self.assertTrue(result['all_time'])
+        message = GuardianDelivery.objects.filter(
+            event_type=GuardianDelivery.EventType.DEBT_REMINDER,
+            channel=GuardianDelivery.Channel.SMS,
+            student=self.debtor,
+        ).values_list('body_text', flat=True).first()
+        self.assertIn('150.00', message)
+        self.assertIn('across terms', message)
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
     @patch('fees.tasks.process_school_auto_debt_reminders_task.delay')

@@ -8,6 +8,10 @@ Project status and reference docs for the SMS monorepo (`sms-backend` + `sms-fro
 | --- | --- |
 | [platform-admin-billing-architecture-v4.md](./platform-admin-billing-architecture-v4.md) | **Source of truth:** Platform Admin & SaaS billing v4 (locked) + v4.1 Messages/communications extension — plans, capacity, proration, credit ledger, provider economics |
 | [platform-admin-schools.md](./platform-admin-schools.md) | Platform admin school directory: summary counts, list columns, overdue, and the create-school modal |
+| [2026-11-20.md](./2026-11-20.md) | 20 Nov 2026: data migration for existing schools, fee-list default, all-debt automatic reminders |
+| [migration.md](./migration.md) | Bringing in pupils, old classes, opening balances, and fee history |
+| [2026-11-15.md](./2026-11-15.md) | 15 Nov 2026: remaining work. Next is onboarding a school that already has pupils |
+| [2026-11-13.md](./2026-11-13.md) | 13 Nov 2026: onboard path confirmed; VPS deploy and the next-work list |
 | [2026-11-12.md](./2026-11-12.md) | 12 Nov 2026: curriculum adoption, platform overview, school messaging link, free and sponsored usage |
 | [2026-11-11.md](./2026-11-11.md) | 11 Nov 2026: platform school billing controls, school Paystack checkout, messaging usage and bulk resend |
 | [HOW_IT_WORKS.md](./HOW_IT_WORKS.md) | Simple walkthrough: signup → access → modules |
@@ -30,4 +34,4 @@ Related backend-only notes live under [`sms-backend/docs/`](../sms-backend/docs/
 
 URL tab conventions for page-level panels are summarized in [HOW_IT_WORKS.md](./HOW_IT_WORKS.md) (§ URL tabs).
 
-**Last reviewed:** 2026-11-12
+**Last reviewed:** 2026-11-20

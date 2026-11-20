@@ -60,6 +60,7 @@ Checklist by domain. Status values:
 | Detail bio edit | Yes | Yes | Done |
 | Guardians CRUD / parent reuse | Yes | Yes | Done |
 | Bulk import | Yes | Yes | Done — optional `student_id` (skip existing); dates prefer `YYYY-MM-DD`; see [`student-bulk-import.md`](../sms-backend/docs/student-bulk-import.md) |
+| Data migration | Yes | Yes (`/migration`, admin + staff) | Done — student information, enrollment history, opening balances, fee history. Marks are not imported. See [migration.md](./migration.md) |
 | Optional school student ID | Yes (onboard/update/bulk) | Yes (onboard + edit bio) | Done |
 | Class enrollment per term | Yes | Via onboard / class views | Done |
 | Fees on student (read) | Yes | Yes | Done |

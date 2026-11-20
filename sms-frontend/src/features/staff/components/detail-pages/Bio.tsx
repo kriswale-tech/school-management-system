@@ -25,6 +25,7 @@ const toEditableUser = (staff: StaffDeskDetail): EditableStaffUser => ({
   first_name: staff.first_name,
   last_name: staff.last_name,
   phone_number: staff.phone_number,
+  staff_id: staff.staff_id,
   email: staff.email,
   profile: staff.profile ?? emptyProfile,
 })
@@ -38,6 +39,7 @@ const StaffBio = ({ staff }: StaffBioProps) => {
 
   const bioFields = [
     { label: 'Full Name', value: staff.full_name },
+    { label: 'Staff ID', value: staff.staff_id || '—' },
     { label: 'Role', value: formatStaffRoleSubtitle(staff) },
     { label: 'Email', value: staff.email?.trim() || '—' },
     { label: 'Primary Contact', value: staff.phone_number },

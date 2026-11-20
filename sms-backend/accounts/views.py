@@ -649,7 +649,7 @@ class UserListCreateView(APIView):
             OpenApiParameter(
                 name='search',
                 type=str,
-                description='Search first name, last name, email, or phone number.',
+                description='Search first name, last name, email, phone number, or staff ID.',
             ),
             OpenApiParameter(name='page', type=int, description='Page number.'),
             OpenApiParameter(name='page_size', type=int, description='Page size (max 100).'),
@@ -831,7 +831,7 @@ class StaffDeskListView(APIView):
             OpenApiParameter(
                 name='search',
                 type=str,
-                description='Search first name, last name, email, or phone number.',
+                description='Search first name, last name, email, phone number, or staff ID.',
             ),
             OpenApiParameter(name='page', type=int, description='Page number.'),
             OpenApiParameter(name='page_size', type=int, description='Page size (max 100).'),

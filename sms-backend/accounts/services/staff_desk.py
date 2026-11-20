@@ -130,6 +130,7 @@ def serialize_staff_desk_row(membership) -> dict:
         'last_name': user.last_name,
         'email': user.email or None,
         'phone_number': user.phone_number,
+        'staff_id': membership.staff_id,
         'role': role,
         'is_active': membership.is_active,
         'date_added': membership.created_at,

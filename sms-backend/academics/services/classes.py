@@ -16,7 +16,7 @@ from teachers.models import ClassTeacher, TeachingAssignment
 
 def _active_streams_for_class_level(class_level):
     """Named streams if any exist; otherwise the default stream."""
-    streams = [s for s in class_level.streams.all() if s.is_active]
+    streams = [s for s in class_level.streams.all() if s.is_active and not s.is_migration_snapshot]
     named = sorted(
         (s for s in streams if not s.is_default),
         key=lambda item: item.name,
@@ -29,14 +29,14 @@ def _active_streams_for_class_level(class_level):
 
 def _iter_listed_streams(*, school):
     levels = (
-        Level.objects.filter(school=school, is_active=True)
+        Level.objects.filter(school=school, is_active=True, is_migration_snapshot=False)
         .prefetch_related('class_levels__streams')
         .order_by('order', 'name')
     )
 
     for level in levels:
         class_levels = sorted(
-            (cl for cl in level.class_levels.all() if cl.is_active),
+            (cl for cl in level.class_levels.all() if cl.is_active and not cl.is_migration_snapshot),
             key=lambda item: (item.order, item.name),
         )
         for class_level in class_levels:

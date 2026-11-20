@@ -32,7 +32,12 @@ class CapacitySnapshot:
 
 
 def active_student_count(school) -> int:
-    return Student.objects.filter(school=school, is_active=True).count()
+    """Seats used by students who are still at the school and have not graduated."""
+    return Student.objects.filter(
+        school=school,
+        is_active=True,
+        is_graduated=False,
+    ).count()
 
 
 def active_staff_count(school) -> int:

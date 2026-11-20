@@ -77,6 +77,7 @@ def apply_available_credits_for_student(*, student, term, recorded_by, school=No
             school=school,
             status=StudentFeeCredit.Status.AVAILABLE,
             remaining_amount__gt=0,
+            is_migration_hold=False,
         )
         .order_by('created_at'),
     )

@@ -16,7 +16,7 @@ def get_all_classes(*, school, term=None):
     )
 
     levels = (
-        Level.objects.filter(school=school, is_active=True)
+        Level.objects.filter(school=school, is_active=True, is_migration_snapshot=False)
         .prefetch_related('class_levels__streams')
         .order_by('order', 'name')
     )
@@ -37,11 +37,11 @@ def get_all_classes(*, school, term=None):
     for level in levels:
         classes_payload = []
         class_levels = sorted(
-            (cl for cl in level.class_levels.all() if cl.is_active),
+            (cl for cl in level.class_levels.all() if cl.is_active and not cl.is_migration_snapshot),
             key=lambda item: (item.order, item.name),
         )
         for class_level in class_levels:
-            streams = [s for s in class_level.streams.all() if s.is_active]
+            streams = [s for s in class_level.streams.all() if s.is_active and not s.is_migration_snapshot]
             named = sorted(
                 (s for s in streams if not s.is_default),
                 key=lambda item: item.name,

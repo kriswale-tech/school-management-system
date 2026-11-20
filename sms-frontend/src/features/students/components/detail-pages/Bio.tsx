@@ -1,65 +1,25 @@
 import { useState } from 'react'
-import toast from 'react-hot-toast'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Icon } from '@iconify/react'
 import Button from '@/components/ui/Button'
-import { Capability } from '@/features/auth/capabilities'
-import { useAuth } from '@/features/auth/hooks'
-import { useCan } from '@/features/auth/hooks/useCan'
-import { getApiErrorMessage } from '@/utils'
-import { clearStudentGraduation, reactivateStudent } from '../../services'
-import type { StudentDetail, StudentLeaveReason } from '../../types'
-import { formatGenderLabel, formatStudentDate, STUDENT_DETAIL_QUERY_KEY } from '../../utils'
+import type { StudentDetail } from '../../types'
+import { formatGenderLabel, formatLeaveReason, formatStudentDate } from '../../utils'
 import EditStudentBioForm from '../EditStudentBioForm'
-import MarkStudentLeftModal from '../MarkStudentLeftModal'
 
 type BioProps = {
   student: StudentDetail
 }
 
-const LEAVE_LABELS: Record<StudentLeaveReason, string> = {
-  dropout: 'Dropped out',
-  transfer: 'Transferred',
-  other: 'Other',
-}
-
 const statusLabel = (student: StudentDetail) => {
   if (student.is_graduated) return 'Graduated'
   if (!student.is_active) {
-    const reason = student.leave_reason ? LEAVE_LABELS[student.leave_reason] : 'Left'
-    return `Left · ${reason}`
+    const reason = formatLeaveReason(student.leave_reason)
+    return reason ? `Left · ${reason}` : 'Left'
   }
   return 'Active'
 }
 
 const Bio = ({ student }: BioProps) => {
   const [editOpen, setEditOpen] = useState(false)
-  const [leaveOpen, setLeaveOpen] = useState(false)
-  const { user } = useAuth()
-  const canMarkLeft = useCan(Capability.STUDENTS_MARK_LEFT)
-  const queryClient = useQueryClient()
-
-  const { mutate: clearGraduation, isPending: clearingGraduation } = useMutation({
-    mutationFn: () => clearStudentGraduation(student.id),
-    onSuccess: (updated) => {
-      queryClient.setQueryData([STUDENT_DETAIL_QUERY_KEY, student.id], updated)
-      toast.success('Graduation cleared')
-    },
-    onError: (error) => {
-      toast.error(getApiErrorMessage(error, 'Unable to clear graduation'))
-    },
-  })
-
-  const { mutate: reactivate, isPending: reactivating } = useMutation({
-    mutationFn: () => reactivateStudent(student.id),
-    onSuccess: (updated) => {
-      queryClient.setQueryData([STUDENT_DETAIL_QUERY_KEY, student.id], updated)
-      toast.success('Student reactivated')
-    },
-    onError: (error) => {
-      toast.error(getApiErrorMessage(error, 'Unable to reactivate student'))
-    },
-  })
 
   const bioFields = [
     { label: 'Full Name', value: student.full_name },
@@ -97,9 +57,6 @@ const Bio = ({ student }: BioProps) => {
     }
   }
 
-  const showMarkLeft = canMarkLeft && student.is_active && !student.is_graduated
-  const showReactivate = user?.role === 'admin' && !student.is_active && !student.is_graduated
-
   return (
     <>
       <div className="bg-gray-100 rounded-md px-4 w-full">
@@ -113,31 +70,6 @@ const Bio = ({ student }: BioProps) => {
           </div>
         ))}
         <div className="flex flex-wrap items-center justify-end gap-3 py-4 border-slate-300">
-          {student.is_graduated && user?.role === 'admin' ? (
-            <Button
-              className="w-fit"
-              variant="outline"
-              loading={clearingGraduation}
-              onClick={() => clearGraduation()}
-            >
-              Clear graduation
-            </Button>
-          ) : null}
-          {showReactivate ? (
-            <Button
-              className="w-fit"
-              variant="outline"
-              loading={reactivating}
-              onClick={() => reactivate()}
-            >
-              Reactivate
-            </Button>
-          ) : null}
-          {showMarkLeft ? (
-            <Button className="w-fit" color="red" onClick={() => setLeaveOpen(true)}>
-              Mark as left
-            </Button>
-          ) : null}
           <Button className="w-fit" onClick={() => setEditOpen(true)}>
             <Icon icon="hugeicons:pencil-edit-02" />
             Edit
@@ -149,11 +81,6 @@ const Bio = ({ student }: BioProps) => {
         open={editOpen}
         student={student}
         onClose={() => setEditOpen(false)}
-      />
-      <MarkStudentLeftModal
-        open={leaveOpen}
-        student={student}
-        onClose={() => setLeaveOpen(false)}
       />
     </>
   )

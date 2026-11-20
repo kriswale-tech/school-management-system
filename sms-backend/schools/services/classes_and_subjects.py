@@ -419,7 +419,7 @@ def validate_classes_and_subjects_ready(school):
     errors = []
 
     class_levels = (
-        ClassLevel.objects.filter(school=school)
+        ClassLevel.objects.filter(school=school, is_migration_snapshot=False)
         .prefetch_related('streams')
         .order_by('level__order', 'order', 'name')
     )

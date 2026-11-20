@@ -11,6 +11,7 @@ export const DEFAULT_PROFILE_IMAGE = '/images/default_profile.webp'
 export const STAFF_DESK_QUERY_KEY = 'staff-desk' as const
 
 const STAFF_FORM_FIELDS: (keyof StaffFormData)[] = [
+  'staff_id',
   'first_name',
   'last_name',
   'phone_number',
@@ -26,6 +27,7 @@ export function buildStaffFormData(data: StaffFormData, options: BuildStaffFormD
   const payload = new FormData()
 
   payload.append('role', options.role)
+  if (data.staff_id?.trim()) payload.append('staff_id', data.staff_id.trim())
   payload.append('first_name', data.first_name)
   payload.append('last_name', data.last_name)
   payload.append('phone_number', data.phone_number)
@@ -84,6 +86,7 @@ export const getStaffDeskProfileImage = (row: Pick<StaffDeskRow, 'profile_pictur
   row.profile_picture ?? DEFAULT_PROFILE_IMAGE
 
 export const mapStaffToFormData = (staff: {
+  staff_id?: string
   first_name: string
   last_name: string
   phone_number: string
@@ -93,6 +96,7 @@ export const mapStaffToFormData = (staff: {
   const gender = staff.profile.gender
 
   return {
+    staff_id: staff.staff_id ?? '',
     first_name: staff.first_name,
     last_name: staff.last_name,
     gender: gender === 'male' || gender === 'female' ? (gender as StaffGender) : undefined,

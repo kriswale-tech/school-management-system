@@ -17,6 +17,7 @@ IMPORT_HEADERS = [
     'first_name',
     'last_name',
     'phone_number',
+    'staff_id',
     'email',
     'assignment_type',
     'class_name',
@@ -38,11 +39,11 @@ ASSIGNMENT_TYPES = ['class_teacher', 'teaching']
 
 # Dropdown columns on the Import sheet (fixed positions for import headers).
 _DROPDOWN_COLUMNS = {
-    'assignment_type': 'E',
-    'class_name': 'F',
-    'subject_name': 'G',
-    'stream_name': 'H',
-    'subject_group_name': 'I',
+    'assignment_type': 'F',
+    'class_name': 'G',
+    'subject_name': 'H',
+    'stream_name': 'I',
+    'subject_group_name': 'J',
 }
 
 
@@ -52,6 +53,7 @@ def build_teacher_import_template(school) -> bytes:
         'first_name': 'Ama',
         'last_name': 'Boateng',
         'phone_number': '0244567891',
+        'staff_id': '',
         'email': 'ama@school.com',
         'assignment_type': 'class_teacher',
         'class_name': context.class_names[0] if context.class_names else 'Basic 4',

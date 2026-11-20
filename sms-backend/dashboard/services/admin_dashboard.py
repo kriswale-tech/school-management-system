@@ -484,7 +484,11 @@ def _academic_progress(*, school, assessment) -> list[dict]:
             'level_id': str(item.level_id),
             'level_name': item.level.name,
         }
-        for item in ClassLevel.objects.filter(school=school, is_active=True).select_related(
+        for item in ClassLevel.objects.filter(
+            school=school,
+            is_active=True,
+            is_migration_snapshot=False,
+        ).select_related(
             'level',
         )
     }
@@ -518,7 +522,11 @@ def _academic_progress(*, school, assessment) -> list[dict]:
 def _levels_for_progress(*, school, assessment) -> list[dict]:
     level_by_class = {
         str(item.id): item.level
-        for item in ClassLevel.objects.filter(school=school, is_active=True).select_related(
+        for item in ClassLevel.objects.filter(
+            school=school,
+            is_active=True,
+            is_migration_snapshot=False,
+        ).select_related(
             'level',
         )
     }

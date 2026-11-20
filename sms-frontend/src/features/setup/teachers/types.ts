@@ -52,6 +52,7 @@ export interface Teacher {
   first_name: string
   last_name: string
   phone_number: string
+  staff_id: string
   email: string | null
   role: string
   is_active: boolean

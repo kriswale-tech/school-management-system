@@ -1,5 +1,6 @@
 from decimal import Decimal
 import re
+from uuid import UUID
 
 from django.db import transaction
 from django.db.models import (
@@ -10,6 +11,7 @@ from django.db.models import (
     F,
     OuterRef,
     Prefetch,
+    Q,
     Subquery,
     Sum,
     Value,
@@ -22,6 +24,7 @@ from academics.models import ClassStream
 from fees.models import StudentFee
 from schools.models import Term
 from shared.helpers import format_phone_number
+from students.filters import student_text_search_q
 from students.models import ClassEnrollment, Parent, Student, StudentParent
 
 
@@ -166,6 +169,141 @@ def list_enrollments_for_term(*, school, term):
     return _annotate_payment_status(queryset)
 
 
+class RosterRow:
+    """List row for a student who is not on the current-term enrollment list."""
+
+    def __init__(self, student, enrollment=None):
+        self.student = student
+        self.class_level = enrollment.class_level if enrollment is not None else None
+        self.stream = enrollment.stream if enrollment is not None else None
+        self.is_new_student = enrollment.is_new_student if enrollment is not None else False
+        self.payment_status = 'no_fees'
+        self.has_guardian = bool(getattr(student, 'has_guardian', False))
+
+
+def list_former_students(*, school, status, params):
+    """Graduated students, or students marked left, with search and class filters."""
+    if status == 'graduated':
+        queryset = Student.objects.filter(school=school, is_graduated=True)
+    elif status == 'left':
+        queryset = Student.objects.filter(
+            school=school,
+            is_active=False,
+            is_graduated=False,
+        )
+    else:
+        raise ValidationError({'status': 'Choose enrolled, graduated, or left.'})
+    return _filter_student_roster(queryset, params)
+
+
+def students_matching_default_search(*, school, enrolled_ids, params):
+    """Active roster matches, plus left or graduated students the search names."""
+    extras = _filter_student_roster(
+        Student.objects.filter(school=school).filter(
+            Q(is_graduated=True) | Q(is_active=False),
+        ),
+        params,
+    )
+    return _roster_students(
+        Student.objects.filter(school=school).filter(
+            Q(id__in=enrolled_ids) | Q(id__in=extras.order_by().values('id')),
+        ),
+    )
+
+
+def _filter_student_roster(queryset, params):
+    search = (params.get('search') or '').strip()
+    if search:
+        queryset = queryset.filter(student_text_search_q(search))
+
+    latest = ClassEnrollment.objects.filter(student_id=OuterRef('pk')).order_by(
+        '-term__start_date',
+        '-created_at',
+    )
+    queryset = queryset.annotate(
+        last_class_level_id=Subquery(latest.values('class_level_id')[:1]),
+        last_stream_id=Subquery(latest.values('stream_id')[:1]),
+        last_is_new_student=Subquery(latest.values('is_new_student')[:1]),
+        has_guardian=Exists(
+            StudentParent.objects.filter(student_id=OuterRef('pk')),
+        ),
+    )
+
+    class_level = _query_uuid(params, 'class_level')
+    if class_level is not None:
+        queryset = queryset.filter(last_class_level_id=class_level)
+    stream = _query_uuid(params, 'stream')
+    if stream is not None:
+        queryset = queryset.filter(last_stream_id=stream)
+
+    missing_guardian = _query_bool(params, 'missing_guardian')
+    if missing_guardian is True:
+        queryset = queryset.filter(has_guardian=False)
+    elif missing_guardian is False:
+        queryset = queryset.filter(has_guardian=True)
+
+    is_new_student = _query_bool(params, 'is_new_student')
+    if is_new_student is not None:
+        queryset = queryset.filter(last_is_new_student=is_new_student)
+
+    return _roster_students(queryset)
+
+
+def _roster_students(queryset):
+    if 'has_guardian' not in queryset.query.annotations:
+        queryset = queryset.annotate(
+            has_guardian=Exists(
+                StudentParent.objects.filter(student_id=OuterRef('pk')),
+            ),
+        )
+    return queryset.prefetch_related(
+        Prefetch(
+            'parent_links',
+            queryset=StudentParent.objects.filter(is_primary=True).select_related('parent'),
+            to_attr='primary_parent_links',
+        ),
+    ).order_by('last_name', 'first_name')
+
+
+def roster_rows_for_students(students):
+    if not students:
+        return []
+    student_ids = [student.id for student in students]
+    latest = {}
+    enrollments = (
+        ClassEnrollment.objects.filter(student_id__in=student_ids)
+        .select_related('class_level', 'stream', 'term')
+        .order_by('-term__start_date', '-created_at')
+    )
+    for enrollment in enrollments:
+        latest.setdefault(enrollment.student_id, enrollment)
+    return [RosterRow(student, latest.get(student.id)) for student in students]
+
+
+def _query_uuid(params, key):
+    raw = (params.get(key) or '').strip()
+    if not raw:
+        return None
+    try:
+        return UUID(raw)
+    except ValueError as exc:
+        raise ValidationError({key: 'Enter a valid id.'}) from exc
+
+
+def _query_bool(params, key):
+    if key not in params:
+        return None
+    raw = params.get(key)
+    if raw is None or raw == '':
+        return None
+    lowered = str(raw).lower()
+    if lowered in {'true', '1'}:
+        return True
+    if lowered in {'false', '0'}:
+        return False
+    raise ValidationError({key: 'Choose true or false.'})
+
+
 def _annotate_has_guardian(queryset):
     return queryset.annotate(
         has_guardian=Exists(
@@ -182,8 +320,13 @@ def get_enrollment_for_student(*, school, term, student):
     return list_enrollments_for_term(school=school, term=term).filter(student=student).first()
 
 
-def get_student_stats(*, school, term):
+def get_student_stats(*, school, term, active_only=False):
     enrollments = list_enrollments_for_term(school=school, term=term)
+    if active_only:
+        enrollments = enrollments.filter(
+            student__is_active=True,
+            student__is_graduated=False,
+        )
 
     return {
         'term_id': term.id,
@@ -206,8 +349,11 @@ def _resolve_stream(*, school, stream_id):
             id=stream_id,
             class_level__school=school,
             is_active=True,
+            is_migration_snapshot=False,
             class_level__is_active=True,
+            class_level__is_migration_snapshot=False,
             class_level__level__is_active=True,
+            class_level__level__is_migration_snapshot=False,
         )
         .first()
     )
@@ -566,6 +712,10 @@ def clear_student_graduation(*, school, student_id):
     student = get_student(school=school, student_id=student_id)
     if not student.is_graduated:
         raise ValidationError({'student': 'This student has not graduated.'})
+    if student.is_active:
+        from billing.services.capacity import ensure_can_add_students
+
+        ensure_can_add_students(school, additional=1)
     student.is_graduated = False
     student.save(update_fields=['is_graduated', 'updated_at'])
     return build_student_detail(

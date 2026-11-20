@@ -64,7 +64,7 @@ const Staff = () => {
       <ActionBar title={pageTitle}>
         <SearchComponent
           value={search}
-          placeholder={teachersOnly ? 'Search teachers...' : 'Search staff...'}
+          placeholder="Search name, phone, or staff ID..."
           onChange={(value) => {
             setSearch(value)
             setPage(1)

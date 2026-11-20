@@ -62,7 +62,13 @@ def next_term_fee_prep_status(school, *, today=None):
     next_label = f'{target.get_term_display()} {target.academic_year.academic_year}'
     href = f'/fees/settings?term={target.id}'
     structure = FeeStructure.objects.filter(school=school, term=target).first()
-    item_count = structure.fee_items.count() if structure else 0
+    item_count = (
+        structure.fee_items.filter(
+            is_migration_opening_balance=False,
+            is_migration_historical=False,
+        ).count()
+        if structure else 0
+    )
 
     if structure is None or item_count == 0:
         fee_status = 'missing' if structure is None else 'empty'

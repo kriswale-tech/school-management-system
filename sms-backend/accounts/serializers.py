@@ -295,6 +295,7 @@ class SchoolMemberSerializer(serializers.Serializer):
     email = serializers.EmailField(source='user.email', read_only=True)
     role = serializers.CharField(read_only=True)
     is_active = serializers.BooleanField(read_only=True)
+    staff_id = serializers.CharField(read_only=True)
     school_id = serializers.UUIDField(read_only=True)
     full_name = serializers.SerializerMethodField()
     school_setup_completed = serializers.SerializerMethodField()
@@ -349,6 +350,7 @@ class AddUserSerializer(serializers.Serializer):
         allow_null=True,
         max_length=15,
     )
+    staff_id = serializers.CharField(max_length=255, required=False, allow_blank=True)
 
     def validate_phone_number(self, value):
         phone = _formatted_phone(value)
@@ -435,6 +437,7 @@ class UpdateUserSerializer(serializers.Serializer):
         allow_null=True,
         max_length=15,
     )
+    staff_id = serializers.CharField(max_length=255, required=False, allow_blank=True)
 
     def validate_role(self, value):
         request = self.context.get('request')

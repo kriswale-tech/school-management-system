@@ -1040,7 +1040,8 @@ def _final_year_class(school):
     when the school only runs through primary.
     """
     ordered = (
-        ClassLevel.objects.filter(school=school)
+        ClassLevel.objects.filter(school=school, is_migration_snapshot=False)
+        .exclude(level__is_migration_snapshot=True)
         .select_related('level')
         .order_by('level__order', 'order', 'name')
     )

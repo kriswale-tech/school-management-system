@@ -5,12 +5,14 @@ interface ActionBarProps {
   title?: string
   children?: React.ReactNode
   back?: boolean
+  backTo?: string
 }
 
-const ActionBar = ({ title, children, back = false }: ActionBarProps) => {
+const ActionBar = ({ title, children, back = false, backTo }: ActionBarProps) => {
   const navigate = useNavigate()
   const onBack = () => {
-    navigate(-1)
+    if (backTo) navigate(backTo)
+    else navigate(-1)
   }
 
   return (

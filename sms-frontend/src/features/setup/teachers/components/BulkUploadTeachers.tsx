@@ -13,7 +13,10 @@ import {
   downloadTeacherImportTemplate,
   previewTeacherBulkImport,
 } from '../bulk-upload'
-import { TEACHER_BULK_UPLOAD_PREVIEW_HINT } from '../bulk-upload/constants'
+import {
+  TEACHER_BULK_UPLOAD_PREVIEW_HINT,
+  TEACHER_BULK_UPLOAD_TEMPLATE_HINT,
+} from '../bulk-upload/constants'
 import type { TeacherBulkImportFailuresInfo } from '../bulk-upload/types'
 import {
   getFailureDownloadLabel,
@@ -105,6 +108,7 @@ const BulkUploadTeachers = ({ onSuccess }: BulkUploadTeachersProps) => {
 
   return (
     <BulkUpload
+      templateHint={TEACHER_BULK_UPLOAD_TEMPLATE_HINT}
       onDownloadTemplate={() => downloadTemplateMutation.mutate()}
       onValidate={(file) => previewMutation.mutate(file)}
       onUpload={(file) => confirmMutation.mutate(file)}

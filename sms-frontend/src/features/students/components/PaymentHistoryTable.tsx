@@ -59,7 +59,9 @@ const PaymentHistoryTable = ({
                       <>
                         <p>{allocations[0]?.term_label?.split(' · ')[1] ?? payment.term_name}</p>
                         <p className="text-xs text-slate-500">
-                          {allocations[0]?.term_label?.split(' · ')[0] ?? payment.academic_year}
+                          {payment.is_advance && allocations.length === 0
+                            ? 'Advance'
+                            : allocations[0]?.term_label?.split(' · ')[0] ?? payment.academic_year}
                         </p>
                       </>
                     )}
@@ -69,9 +71,9 @@ const PaymentHistoryTable = ({
                 <Table.Cell>{formatFeeAmount(payment.amount)}</Table.Cell>
                 <Table.Cell>{formatStudentDate(payment.paid_at)}</Table.Cell>
                 <Table.Cell>
-                  {payment.receipt?.receipt_number ? (
+                  {payment.receipt?.receipt_number || payment.legacy_receipt_number ? (
                     <span className="font-medium text-slate-800">
-                      {payment.receipt.receipt_number}
+                      {payment.receipt?.receipt_number || payment.legacy_receipt_number}
                     </span>
                   ) : (
                     <span className="text-sm text-slate-400">—</span>

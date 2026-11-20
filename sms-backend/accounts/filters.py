@@ -15,7 +15,7 @@ class SchoolMemberFilter(django_filters.FilterSet):
     )
     search = django_filters.CharFilter(
         method='filter_search',
-        help_text='Search first name, last name, email, or phone number.',
+        help_text='Search first name, last name, email, phone number, or staff ID.',
     )
 
     class Meta:
@@ -42,5 +42,6 @@ class SchoolMemberFilter(django_filters.FilterSet):
             Q(user__first_name__icontains=term)
             | Q(user__last_name__icontains=term)
             | Q(user__email__icontains=term)
-            | Q(user__phone_number__icontains=term),
+            | Q(user__phone_number__icontains=term)
+            | Q(staff_id__icontains=term),
         )

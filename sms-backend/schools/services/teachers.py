@@ -85,6 +85,7 @@ def _serialize_teacher(membership) -> dict:
         'first_name': user.first_name,
         'last_name': user.last_name,
         'phone_number': user.phone_number,
+        'staff_id': membership.staff_id,
         'email': user.email,
         'role': membership.role,
         'is_active': membership.is_active,

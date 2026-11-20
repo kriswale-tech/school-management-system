@@ -77,9 +77,15 @@ const Fees = () => {
   })
 
   const term: FilterSelection =
-    termSelection !== undefined ? termSelection : FEE_DESK_ALL_TIME_TERM
+    termSelection !== undefined
+      ? termSelection
+      : filterOptions?.active_term_id
+        ? filterOptions.active_term_id
+        : filterOptions
+          ? FEE_DESK_ALL_TIME_TERM
+          : ''
 
-  const filtersReady = Boolean(filterOptions)
+  const filtersReady = Boolean(filterOptions) && term !== ''
 
   const { data: classes = [] } = useQuery({
     queryKey: ['classes'],

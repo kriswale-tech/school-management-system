@@ -11,7 +11,11 @@ from django.db.models import F
 from django.utils import timezone
 
 from fees.services.desk import list_fee_desk_rows
-from fees.services.fees import get_student_term_balance
+from fees.services.payments import (
+    format_outstanding_terms_summary,
+    get_student_all_time_balance,
+    list_student_outstanding_term_balances,
+)
 from notifications.models import GuardianDelivery
 from notifications.services import guardians as guardian_services
 from notifications.services.outbound import enqueue_guardian_outbound
@@ -74,7 +78,7 @@ def process_school_auto_debt_reminders(
     school_id,
     today: date | None = None,
 ) -> dict:
-    """Find active-term debtors and enqueue guardian reminders for one school."""
+    """Find enrolled students who still owe across all terms and enqueue reminders."""
     today = today or timezone.localdate()
     school = School.objects.filter(id=school_id).first()
     if school is None:
@@ -103,11 +107,11 @@ def process_school_auto_debt_reminders(
         preferences.guardian_debt_reminder_frequency,
         today,
     )
-    batch_id = f'auto-{school.id}-{term.id}-{period}'
+    batch_id = f'auto-all-{school.id}-{period}'
     threshold = preferences.fees_alert_threshold or Decimal('0.00')
 
     debtor_ids = list(
-        list_fee_desk_rows(school=school, term=term)
+        list_fee_desk_rows(school=school, term=term, all_time=True)
         .filter(total_billed__gt=F('total_paid'))
         .values_list('student_id', flat=True),
     )
@@ -117,6 +121,7 @@ def process_school_auto_debt_reminders(
             'sms': 0,
             'email': 0,
             'period': period,
+            'all_time': True,
             'term_id': str(term.id),
         }
 
@@ -137,14 +142,27 @@ def process_school_auto_debt_reminders(
             student = students.get(str(student_id))
             if student is None:
                 continue
-            balance = get_student_term_balance(student=student, term=term)['balance']
+            balance = get_student_all_time_balance(student=student)['balance']
             if balance <= 0 or balance < threshold:
                 continue
+            outstanding_terms = list_student_outstanding_term_balances(
+                school=school,
+                student=student,
+            )
             planned_sms, planned_email = guardian_services.plan_guardians_debt_reminder(
                 student=student,
                 term=term,
                 balance=balance,
                 batch_id=batch_id,
+                all_time=True,
+                terms_owed=[
+                    {
+                        'term_label': row['term_label'],
+                        'balance': f"{row['balance']:.2f}",
+                    }
+                    for row in outstanding_terms
+                ],
+                terms_summary=format_outstanding_terms_summary(outstanding_terms),
             )
             if planned_sms or planned_email:
                 students_queued += 1
@@ -165,6 +183,7 @@ def process_school_auto_debt_reminders(
         'sms': queued['sms'],
         'email': queued['email'],
         'period': period,
+        'all_time': True,
         'term_id': str(term.id),
         'batch_id': batch_id,
         'event_type': GuardianDelivery.EventType.DEBT_REMINDER,

@@ -124,7 +124,13 @@ def build_teacher_bulk_reference_context(school) -> TeacherBulkReferenceContext:
     context = TeacherBulkReferenceContext(term_id=str(term.id))
 
     class_levels = (
-        ClassLevel.objects.filter(school=school, is_active=True, level__is_active=True)
+        ClassLevel.objects.filter(
+            school=school,
+            is_active=True,
+            is_migration_snapshot=False,
+            level__is_active=True,
+            level__is_migration_snapshot=False,
+        )
         .select_related('level')
         .prefetch_related('streams', 'class_subjects__subject', 'class_subjects__groups')
         .order_by('level__order', 'order', 'name')

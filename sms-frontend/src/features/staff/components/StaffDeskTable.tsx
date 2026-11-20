@@ -69,6 +69,7 @@ const StaffDeskTable = ({
                   />
                   <div className="space-y-1">
                     <p>{row.full_name}</p>
+                    <p className="text-xs font-normal text-slate-500">{row.staff_id}</p>
                     <p className="text-xs font-normal text-slate-500">
                       {formatStaffRoleSubtitle(row)}
                     </p>

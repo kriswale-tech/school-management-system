@@ -3,7 +3,8 @@ import ActionButton from '@/components/ui/ActionButton'
 import AvatarComponent from '@/components/ui/AvatarComponent'
 import dayjs from '@/lib/dayjs'
 import type { PaginatedResponse } from '@/types/generalTypes'
-import type { Student } from '../types'
+import type { Student, StudentRosterStatus } from '../types'
+import StudentStatusBadges from './StudentStatusBadges'
 
 type StudentsTableProps = {
   students?: Student[]
@@ -12,6 +13,7 @@ type StudentsTableProps = {
   onPageChange?: (page: number) => void
   onAddStudent?: () => void
   onViewStudent?: (student: Student) => void
+  rosterStatus?: StudentRosterStatus | ''
 }
 
 const getStudentFullName = (student: Student) =>
@@ -29,14 +31,27 @@ const StudentsTable = ({
   onPageChange,
   onAddStudent,
   onViewStudent,
+  rosterStatus = '',
 }: StudentsTableProps) => {
+  const emptyTitle =
+    rosterStatus === 'graduated'
+      ? 'No graduated students'
+      : rosterStatus === 'left'
+        ? 'No students marked left'
+        : 'No students added yet'
+  const emptyDescription =
+    rosterStatus === 'graduated'
+      ? 'Students who finish the last class appear here after the next term opens.'
+      : rosterStatus === 'left'
+        ? 'Students marked as having left the school appear here.'
+        : 'Add students to start tracking enrollment, classes, and parent information.'
   return (
     <TableWrapper
       isLoading={isLoading}
       isEmpty={!isLoading && students.length === 0}
       emptyState={{
-        title: 'No students added yet',
-        description: 'Add students to start tracking enrollment, classes, and parent information.',
+        title: emptyTitle,
+        description: emptyDescription,
         actionLabel: onAddStudent ? 'Add Student' : undefined,
         onAction: onAddStudent,
         icon: 'hugeicons:student',
@@ -68,11 +83,12 @@ const StudentsTable = ({
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p>{fullName}</p>
-                        {student.is_new_student ? (
-                          <span className="inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-800">
-                            New student
-                          </span>
-                        ) : null}
+                        <StudentStatusBadges
+                          isGraduated={student.is_graduated}
+                          isActive={student.is_active}
+                          leaveReason={student.leave_reason}
+                          isNewStudent={student.is_new_student}
+                        />
                         {student.missing_guardian ? (
                           <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
                             Needs guardian

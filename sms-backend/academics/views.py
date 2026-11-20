@@ -123,7 +123,9 @@ class ActiveClassLevelListView(SchoolScopedAPIView):
         class_levels = ClassLevel.objects.filter(
             school=self.school,
             is_active=True,
+            is_migration_snapshot=False,
             level__is_active=True,
+            level__is_migration_snapshot=False,
         ).select_related('level').order_by('level__order', 'order', 'name')
 
         return Response([

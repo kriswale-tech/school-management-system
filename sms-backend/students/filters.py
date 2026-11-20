@@ -7,7 +7,7 @@ from students.models import ClassEnrollment, Parent
 class StudentEnrollmentFilter(django_filters.FilterSet):
     search = django_filters.CharFilter(
         method='filter_search',
-        help_text='Search student ID, first name, last name, or other names.',
+        help_text='Search student ID or full name.',
     )
     class_level = django_filters.UUIDFilter(field_name='class_level_id')
     stream = django_filters.UUIDFilter(field_name='stream_id')
@@ -33,12 +33,7 @@ class StudentEnrollmentFilter(django_filters.FilterSet):
         if not term:
             return queryset
 
-        return queryset.filter(
-            Q(student__student_id__icontains=term)
-            | Q(student__first_name__icontains=term)
-            | Q(student__last_name__icontains=term)
-            | Q(student__other_names__icontains=term),
-        )
+        return queryset.filter(student_text_search_q(term, prefix='student__'))
 
     def filter_debtors(self, queryset, name, value):
         if value is True:
@@ -53,6 +48,26 @@ class StudentEnrollmentFilter(django_filters.FilterSet):
         if value is False:
             return queryset.filter(has_guardian=True)
         return queryset
+
+
+def student_text_search_q(term, *, prefix=''):
+    """Match a student ID, one name part, or every word of a full name."""
+    term = (term or '').strip()
+    if not term:
+        return Q()
+
+    def field(name):
+        return f'{prefix}{name}'
+
+    name_match = Q()
+    for word in term.split():
+        name_match &= (
+            Q(**{f'{field("first_name")}__icontains': word})
+            | Q(**{f'{field("last_name")}__icontains': word})
+            | Q(**{f'{field("other_names")}__icontains': word})
+        )
+
+    return Q(**{f'{field("student_id")}__icontains': term}) | name_match
 
 
 class ParentFilter(django_filters.FilterSet):

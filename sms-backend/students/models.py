@@ -187,6 +187,13 @@ class ClassEnrollment(BaseModel):
         default=False,
         help_text='True when this is the student\'s first term at the school.',
     )
+    source_class_name = models.CharField(max_length=255, blank=True, default='')
+    class_resolution = models.CharField(
+        max_length=32,
+        blank=True,
+        default='',
+        help_text='How a migration chose this class: operational, historical_existing, or snapshot.',
+    )
 
     class Meta:
         constraints = [

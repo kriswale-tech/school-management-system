@@ -75,7 +75,7 @@ def school_queryset() -> QuerySet[School]:
             ),
             student_count=Count(
                 'students',
-                filter=Q(students__is_active=True),
+                filter=Q(students__is_active=True, students__is_graduated=False),
                 distinct=True,
             ),
             payment_overdue=_payment_overdue_annotation(),
@@ -104,7 +104,7 @@ def school_directory_summary() -> dict[str, int]:
     return {
         'school_count': School.objects.count(),
         'active_school_count': School.objects.filter(status=School.Status.ACTIVE).count(),
-        'student_count': Student.objects.filter(is_active=True).count(),
+        'student_count': Student.objects.filter(is_active=True, is_graduated=False).count(),
         'staff_count': SchoolMembership.objects.filter(is_active=True).count(),
         'overdue_school_count': overdue.count(),
     }
@@ -129,7 +129,9 @@ def active_staff_count(school: School) -> int:
 
 
 def active_student_count(school: School) -> int:
-    return Student.objects.filter(school=school, is_active=True).count()
+    from billing.services.capacity import active_student_count as capacity_count
+
+    return capacity_count(school)
 
 
 def _active_plan(code: str):

@@ -77,12 +77,22 @@ class SchoolMembership(BaseModel):
         blank=True,
         verbose_name='last acted in this school at',
     )
+    staff_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text='School identification number. Blank values are filled on save.',
+    )
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
                 fields=['user', 'school'],
                 name='unique_membership_per_user_and_school',
+            ),
+            models.UniqueConstraint(
+                fields=['school', 'staff_id'],
+                name='unique_staff_id_per_school',
             ),
         ]
         indexes = [
@@ -91,6 +101,19 @@ class SchoolMembership(BaseModel):
         # Never-used memberships sort last so the picker leads with the school
         # the person actually works in most recently.
         ordering = [models.F('last_active_at').desc(nulls_last=True), 'school__name']
+
+    def save(self, *args, **kwargs):
+        cleaned = (self.staff_id or '').strip()
+        if not cleaned:
+            from accounts.services.staff_ids import generate_staff_id
+
+            cleaned = generate_staff_id(school=self.school)
+        if cleaned != (self.staff_id or ''):
+            self.staff_id = cleaned
+            update_fields = kwargs.get('update_fields')
+            if update_fields is not None:
+                kwargs['update_fields'] = list({*update_fields, 'staff_id'})
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.user.get_full_name()} - {self.get_role_display()} @ {self.school.name}'

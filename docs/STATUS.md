@@ -170,7 +170,8 @@ Under `/api/v1/`:
 - `reports/` — overview, teacher desk, academic/finance/enrollment/staff insights  
 - `dashboard/`, `activities/` — role dashboards and time-ordered activity feed (optional `?term=`)  
 - `notifications/` — personal in-app inbox (list, unread count, mark read) + guardian delivery log
-- Guardian communications — ward enrolled (onboard + bulk import), payment receipt links, manual + automatic debt reminders (end-of-month default), report-ready signed links, next-term fee schedules; Celery batch SMS/email (100) + beat; see [guardian-communications.md](./guardian-communications.md)
+- Guardian communications — ward enrolled (onboard + bulk import), payment receipt links, manual debt reminders (follow the fee-list filter) and automatic debt reminders for all debt owed by pupils enrolled this term (end-of-month default), report-ready signed links, next-term fee schedules; Celery batch SMS/email (100) + beat; see [guardian-communications.md](./guardian-communications.md)
+- Data migration for an existing school — student information, enrollment history, opening balances, and fee history. Marks are not imported. See [migration.md](./migration.md)
 
 **Still light / deferred:** advance refund. SMS and email credit balances, usage, and top-up checkout are on Settings → Messaging ([2026-11-11.md](./2026-11-11.md)).
 

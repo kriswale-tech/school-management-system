@@ -8,6 +8,7 @@ export interface TeacherBulkImportRow {
   first_name: string
   last_name: string
   phone_number: string
+  staff_id?: string
   email?: string
   assignment_type?: TeacherAssignmentType | ''
   class_name?: string

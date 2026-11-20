@@ -91,6 +91,7 @@ const TeacherTable = ({
                     />
                     <div className="space-y-1">
                       <p>{teacher.full_name}</p>
+                      <p className="text-xs font-normal text-slate-500">{teacher.staff_id}</p>
                       <p className="text-xs font-normal text-slate-500">
                         {formatClassTeacherAssignmentsLabel(teacher.class_teacher_assignments)}
                       </p>

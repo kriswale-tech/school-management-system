@@ -1,3 +1,5 @@
+export type StudentRosterStatus = 'graduated' | 'left'
+
 export type StudentQueryParams = {
   page?: number
   page_size?: number
@@ -9,6 +11,7 @@ export type StudentQueryParams = {
   term?: string
   missing_guardian?: boolean
   is_new_student?: boolean
+  status?: StudentRosterStatus
 }
 
 export interface StudentClassLevel {
@@ -42,10 +45,13 @@ export interface Student {
   gender: string
   date_of_birth: string
   admission_date: string
-  class_level: StudentClassLevel
-  stream: StudentStream
+  class_level: StudentClassLevel | null
+  stream: StudentStream | null
   is_new_student: boolean
   payment_status: string
+  is_graduated: boolean
+  is_active: boolean
+  leave_reason: StudentLeaveReason | ''
   missing_guardian: boolean
   primary_parent: PrimaryParent | null
 }
@@ -269,6 +275,8 @@ export type StudentPayment = {
   payment_method_display: string
   paid_at: string
   payment_reference: string
+  legacy_receipt_number?: string
+  is_advance?: boolean
   received_by: string
   allocations: StudentPaymentAllocation[]
   receipt: StudentPaymentReceipt | null

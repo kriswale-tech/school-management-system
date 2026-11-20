@@ -24,6 +24,9 @@ class StaffDeskRowSerializer(serializers.Serializer):
     phone_number = serializers.CharField(
         help_text='Primary phone number used for login.',
     )
+    staff_id = serializers.CharField(
+        help_text='School identification number for this person.',
+    )
     role = serializers.CharField(
         help_text='Role in this school: admin, teacher, accountant, or staff.',
     )

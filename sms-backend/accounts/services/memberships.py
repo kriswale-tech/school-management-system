@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework.exceptions import NotAuthenticated, PermissionDenied, ValidationError
 
 from accounts.models import SchoolMembership, User
+from accounts.services.staff_ids import assert_staff_id_available, normalize_staff_id
 
 logger = logging.getLogger(__name__)
 
@@ -91,8 +92,14 @@ def link_user_to_school(
     role: str,
     *,
     reactivate: bool = True,
+    staff_id: str | None = None,
 ) -> tuple[SchoolMembership, bool]:
-    """Give an existing identity access to a school. Returns (membership, created)."""
+    """Give an existing identity access to a school. Returns (membership, created).
+
+    A blank staff_id is generated for a new membership. An existing membership
+    keeps its ID unless a new one is provided.
+    """
+    provided_staff_id = normalize_staff_id(staff_id)
     existing = SchoolMembership.objects.filter(user=user, school=school).first()
     if existing is not None and existing.is_active:
         raise ValidationError({
@@ -106,10 +113,13 @@ def link_user_to_school(
         ensure_can_add_staff(school, additional=1)
 
     if existing is None:
+        if provided_staff_id:
+            assert_staff_id_available(school=school, staff_id=provided_staff_id)
         membership = SchoolMembership.objects.create(
             user=user,
             school=school,
             role=role,
+            staff_id=provided_staff_id,
         )
         logger.info(
             'Linked user %s to school %s as %s',
@@ -124,9 +134,16 @@ def link_user_to_school(
             'phone_number': 'This person previously belonged to this school.',
         })
 
+    if provided_staff_id and provided_staff_id != existing.staff_id:
+        assert_staff_id_available(
+            school=school,
+            staff_id=provided_staff_id,
+            exclude_membership_id=existing.id,
+        )
+        existing.staff_id = provided_staff_id
     existing.is_active = True
     existing.role = role
-    existing.save(update_fields=['is_active', 'role', 'updated_at'])
+    existing.save(update_fields=['is_active', 'role', 'staff_id', 'updated_at'])
     return existing, False
 
 

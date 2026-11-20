@@ -61,6 +61,10 @@ class IsAdmin(HasRole):
     allowed_roles = [User.RoleChoices.ADMIN]
 
 
+class IsAdminOrStaff(HasRole):
+    allowed_roles = [User.RoleChoices.ADMIN, User.RoleChoices.STAFF]
+
+
 class IsStaff(HasRole):
     allowed_roles = [User.RoleChoices.STAFF]
 

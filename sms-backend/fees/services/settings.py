@@ -80,7 +80,10 @@ def _previous_term_has_items(term) -> bool:
     source = FeeStructure.objects.filter(school=term.school, term=previous).first()
     if source is None:
         return False
-    return source.fee_items.exists()
+    return source.fee_items.filter(
+        is_migration_opening_balance=False,
+        is_migration_historical=False,
+    ).exists()
 
 
 def serialize_fee_structure(fee_structure, *, fee_items=None):
@@ -133,7 +136,11 @@ def serialize_structure_detail(fee_structure):
         'term__academic_year',
     ).get(pk=fee_structure.pk)
     fee_items = list(
-        FeeItem.objects.filter(fee_structure=fee_structure)
+        FeeItem.objects.filter(
+            fee_structure=fee_structure,
+            is_migration_opening_balance=False,
+            is_migration_historical=False,
+        )
         .select_related('fee_structure__term', 'fee_structure__term__academic_year')
         .order_by('name')
     )
@@ -175,6 +182,10 @@ def _get_editable_fee_item(school, fee_item_id):
     except FeeItem.DoesNotExist as exc:
         raise NotFound('Fee item not found.') from exc
 
+    if fee_item.is_migration_opening_balance:
+        raise ValidationError('Opening balance items are not part of the fee catalog.')
+    if fee_item.is_migration_historical:
+        raise ValidationError('Historical fee items are not part of the fee catalog.')
     if fee_item.fee_structure.is_locked:
         raise ValidationError('Fee items cannot be changed after the structure is applied.')
     _ensure_term_allows_mutations(fee_item.fee_structure.term)

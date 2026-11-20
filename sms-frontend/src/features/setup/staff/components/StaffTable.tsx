@@ -75,7 +75,10 @@ const StaffTable = ({
                       fullName={member.full_name}
                       size={40}
                     />
-                    <p>{member.full_name}</p>
+                    <div className="space-y-1">
+                      <p>{member.full_name}</p>
+                      <p className="text-xs font-normal text-slate-500">{member.staff_id}</p>
+                    </div>
                   </div>
                 </Table.Cell>
                 <Table.Cell>

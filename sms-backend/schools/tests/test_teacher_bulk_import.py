@@ -376,11 +376,183 @@ class TeacherBulkImportTests(APITestCase):
         self.assertIn('Reference', workbook.sheetnames)
         self.assertGreater(len(workbook['Import'].data_validations.dataValidation), 0)
 
+    def test_commit_generates_one_staff_id_for_blank_rows_of_the_same_phone(self):
+        self.school.student_id_prefix = 'UA'
+        self.school.save(update_fields=['student_id_prefix', 'updated_at'])
+        upload = self._csv_upload([
+            {
+                'first_name': 'Ama',
+                'last_name': 'Boateng',
+                'phone_number': '0244567891',
+                'assignment_type': 'class_teacher',
+                'class_name': 'Basic 4',
+            },
+            {
+                'first_name': 'Ama',
+                'last_name': 'Boateng',
+                'phone_number': '0244567891',
+                'assignment_type': 'teaching',
+                'class_name': 'Basic 4',
+                'subject_name': 'Mathematics',
+            },
+        ])
+
+        response = self.client.post(f'{self.upload_url}?dry_run=false', {'file': upload}, format='multipart')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['summary']['rows_failed'], 0)
+        membership = SchoolMembership.objects.get(
+            school=self.school,
+            user__phone_number='+233244567891',
+        )
+        self.assertEqual(membership.staff_id, 'UA-S0001')
+
+    def test_commit_uses_a_provided_staff_id_and_keeps_it_on_a_blank_follow_up_row(self):
+        upload = self._csv_upload([
+            {
+                'first_name': 'Ama',
+                'last_name': 'Boateng',
+                'phone_number': '0244567891',
+                'staff_id': 'EMP-9',
+            },
+            {
+                'first_name': 'Ama',
+                'last_name': 'Boateng',
+                'phone_number': '0244567891',
+                'assignment_type': 'class_teacher',
+                'class_name': 'Basic 4',
+            },
+        ])
+
+        response = self.client.post(f'{self.upload_url}?dry_run=false', {'file': upload}, format='multipart')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['summary']['rows_succeeded'], 2)
+        membership = SchoolMembership.objects.get(
+            school=self.school,
+            user__phone_number='+233244567891',
+        )
+        self.assertEqual(membership.staff_id, 'EMP-9')
+
+    def test_blank_staff_id_keeps_the_existing_teacher_id(self):
+        teacher = create_user(
+            phone_number='+233244567892',
+            email='keep@test.com',
+            school=self.school,
+            role=User.RoleChoices.TEACHER,
+            is_active=True,
+            first_name='Old',
+            last_name='Teacher',
+        )
+        membership = SchoolMembership.objects.get(user=teacher, school=self.school)
+        membership.staff_id = 'KEEP-1'
+        membership.save(update_fields=['staff_id', 'updated_at'])
+
+        upload = self._csv_upload([
+            {
+                'first_name': 'Old',
+                'last_name': 'Teacher',
+                'phone_number': '0244567892',
+            },
+        ])
+
+        response = self.client.post(f'{self.upload_url}?dry_run=false', {'file': upload}, format='multipart')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        membership.refresh_from_db()
+        self.assertEqual(membership.staff_id, 'KEEP-1')
+
+    def test_filled_staff_id_updates_an_existing_teacher(self):
+        teacher = create_user(
+            phone_number='+233244567892',
+            email='move@test.com',
+            school=self.school,
+            role=User.RoleChoices.TEACHER,
+            is_active=True,
+            first_name='Old',
+            last_name='Teacher',
+        )
+        membership = SchoolMembership.objects.get(user=teacher, school=self.school)
+
+        upload = self._csv_upload([
+            {
+                'first_name': 'Old',
+                'last_name': 'Teacher',
+                'phone_number': '0244567892',
+                'staff_id': 'EMP-2',
+            },
+        ])
+
+        response = self.client.post(f'{self.upload_url}?dry_run=false', {'file': upload}, format='multipart')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        membership.refresh_from_db()
+        self.assertEqual(membership.staff_id, 'EMP-2')
+
+    def test_duplicate_staff_id_in_the_file_is_an_error(self):
+        upload = self._csv_upload([
+            {
+                'first_name': 'Ama',
+                'last_name': 'Boateng',
+                'phone_number': '0244567891',
+                'staff_id': 'EMP-1',
+            },
+            {
+                'first_name': 'Kojo',
+                'last_name': 'Mensah',
+                'phone_number': '0244567894',
+                'staff_id': 'EMP-1',
+            },
+        ])
+
+        response = self.client.post(f'{self.upload_url}?dry_run=true', {'file': upload}, format='multipart')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['summary']['rows_with_errors'], 2)
+        self.assertTrue(
+            any('duplicated' in message for message in response.data['rows'][0]['messages']),
+        )
+
+    def test_staff_id_already_used_by_someone_else_is_an_error(self):
+        other = create_user(
+            phone_number='+233244567895',
+            email='other@test.com',
+            school=self.school,
+            role=User.RoleChoices.TEACHER,
+            is_active=True,
+            first_name='Other',
+            last_name='Teacher',
+        )
+        membership = SchoolMembership.objects.get(user=other, school=self.school)
+        membership.staff_id = 'TAKEN'
+        membership.save(update_fields=['staff_id', 'updated_at'])
+
+        upload = self._csv_upload([
+            {
+                'first_name': 'Ama',
+                'last_name': 'Boateng',
+                'phone_number': '0244567891',
+                'staff_id': 'TAKEN',
+            },
+        ])
+
+        response = self.client.post(f'{self.upload_url}?dry_run=false', {'file': upload}, format='multipart')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['summary']['rows_failed'], 1)
+        self.assertFalse(
+            SchoolMembership.objects.filter(
+                school=self.school,
+                user__phone_number='+233244567891',
+            ).exists(),
+        )
+
     def _csv_upload(self, rows: list[dict]) -> SimpleUploadedFile:
         headers = [
             'first_name',
             'last_name',
             'phone_number',
+            'staff_id',
             'email',
             'assignment_type',
             'class_name',
@@ -406,6 +578,7 @@ class TeacherBulkImportTests(APITestCase):
                 row.get('first_name', ''),
                 row.get('last_name', ''),
                 row.get('phone_number', ''),
+                row.get('staff_id', ''),
                 row.get('email', ''),
                 row.get('assignment_type', ''),
                 row.get('class_name', ''),

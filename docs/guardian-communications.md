@@ -150,7 +150,7 @@ Body: `{ "term_id": "<uuid?>", "student_ids": ["…"] }`. Requires `fees.record_
 1. Enable **Debt reminders** and **Send automatically on a schedule**  
 2. Choose frequency (default **end of each month**; also weekly / biweekly Mondays)  
 3. Celery beat ~08:00 UTC (documented in UI as ~8:00 AM Accra time)  
-4. Active-term debtors with balance ≥ `fees_alert_threshold`; period-scoped batch ids keep runs idempotent  
+4. Pupils enrolled this term whose **all-time** balance is at least `fees_alert_threshold`, including opening balances and fee history. The message names the terms. A period-scoped batch id keeps a second run in the same period from sending again  
 
 Compose service: `celery-beat` (`sms_celery_beat`).
 
