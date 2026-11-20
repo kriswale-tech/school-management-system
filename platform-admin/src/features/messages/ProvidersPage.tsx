@@ -22,6 +22,7 @@ import {
   Td,
   Th,
   Thead,
+  TextArea,
   TextInput,
 } from './components/ui'
 import {
@@ -42,6 +43,7 @@ import {
   listProviders,
   listPurchases,
   listSesUsage,
+  sendSesTest,
   syncArkeselBalance,
   syncSesUsage,
 } from './services'
@@ -69,6 +71,13 @@ const EMPTY_EXPENSE: ProviderExpenseInput = {
   notes: '',
 }
 
+const PROVIDER_TABS = [
+  { id: 'arkesel', label: 'Arkesel' },
+  { id: 'ses', label: 'Amazon SES' },
+] as const
+
+type ProviderTab = (typeof PROVIDER_TABS)[number]['id']
+
 export default function ProvidersPage() {
   const queryClient = useQueryClient()
   const { can } = useMessagesAccess()
@@ -82,6 +91,10 @@ export default function ProvidersPage() {
   const [showExpenseForm, setShowExpenseForm] = useState(false)
   const [purchasePage, setPurchasePage] = useState(1)
   const [expensePage, setExpensePage] = useState(1)
+  const [providerTab, setProviderTab] = useState<ProviderTab>('arkesel')
+  const [testTo, setTestTo] = useState('')
+  const [testSubject, setTestSubject] = useState('')
+  const [testMessage, setTestMessage] = useState('')
 
   const providersQuery = useQuery({
     queryKey: ['platform-messages-providers'],
@@ -135,6 +148,17 @@ export default function ProvidersPage() {
     onError: (error) => toast.error(errorMessage(error)),
   })
 
+  const testSendMutation = useMutation({
+    mutationFn: sendSesTest,
+    onSuccess: (data) => {
+      toast.success(`Sent from ${data.from_email} to ${data.to}. Check that inbox, including spam.`)
+      setTestTo('')
+      setTestSubject('')
+      setTestMessage('')
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+
   const purchaseMutation = useMutation({
     mutationFn: createPurchase,
     onSuccess: () => {
@@ -180,8 +204,31 @@ export default function ProvidersPage() {
     <div>
       <PageHeader
         title="Provider credits & accounts"
-        description="Arkesel runs a prepaid wallet. Amazon SES is pay-per-send (no prepaid balance) — usage syncs as a placeholder until AWS credentials are configured."
+        description="Arkesel is a prepaid SMS wallet. Amazon SES is pay-per-send. Each provider has its own tab."
       />
+
+      <div className="mb-4 flex gap-1 overflow-x-auto rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] p-1" role="tablist">
+        {PROVIDER_TABS.map((tab) => {
+          const selected = providerTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              className={[
+                'whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition',
+                selected
+                  ? 'bg-[var(--color-accent)] text-white'
+                  : 'text-[var(--color-ink)]/70 hover:bg-white',
+              ].join(' ')}
+              onClick={() => setProviderTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
 
       <QueryNotice
         isLoading={providersQuery.isLoading}
@@ -189,6 +236,8 @@ export default function ProvidersPage() {
         error={providersQuery.error}
       />
 
+      {providerTab === 'arkesel' && (
+      <>
       {/* ---------------------------------------------------------- */}
       {/* Arkesel                                                     */}
       {/* ---------------------------------------------------------- */}
@@ -455,11 +504,15 @@ export default function ProvidersPage() {
           </Panel>
         </div>
       )}
+      </>
+      )}
 
+      {providerTab === 'ses' && (
+      <>
       {/* ---------------------------------------------------------- */}
       {/* Amazon SES                                                  */}
       {/* ---------------------------------------------------------- */}
-      <div className="mt-4">
+      <div>
         <Panel
           title="Amazon SES — pay-per-send"
           description={
@@ -484,7 +537,7 @@ export default function ProvidersPage() {
               </PrimaryButton>
             )
           }
-          footnote="SES has no prepaid wallet. Until AWS credentials are set, sync writes a placeholder snapshot so flows can be tested. Record AWS usage/monitoring costs as provider expenses."
+          footnote="SES has no prepaid wallet. Daily volume is the last 24 hours against the SES send quota. Monthly volume is sends this month, which has no SES cap. Received is inbound mail and stays 0 while the identity only sends. Record AWS charges as provider expenses."
         >
           <SummaryStrip>
             <LayerTile
@@ -499,7 +552,6 @@ export default function ProvidersPage() {
                         : formatUnits(latestUsage.monthly_limit)
                     }`
               }
-              hint="Placeholder until CloudWatch/SES metrics are wired"
             />
             <LayerTile
               layer="provider"
@@ -739,6 +791,68 @@ export default function ProvidersPage() {
       )}
 
       <div className="mt-4">
+        <Panel
+          title="Send a test email"
+          description="One plain message through the same SES credentials this app uses."
+          footnote="Sandbox delivery only reaches a verified address. pseudofaux25@gmail.com is verified, so a message to that inbox is delivered. Check spam if it is not in the inbox."
+        >
+          {canSync ? (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault()
+                testSendMutation.mutate({
+                  to: testTo.trim(),
+                  subject: testSubject.trim(),
+                  message: testMessage.trim(),
+                })
+              }}
+              className="grid gap-3 md:grid-cols-2"
+            >
+              <Field label="Recipient">
+                <TextInput
+                  type="email"
+                  required
+                  value={testTo}
+                  placeholder="pseudofaux25@gmail.com"
+                  onChange={(event) => setTestTo(event.target.value)}
+                />
+              </Field>
+              <Field label="Subject">
+                <TextInput
+                  required
+                  value={testSubject}
+                  placeholder="SES test"
+                  onChange={(event) => setTestSubject(event.target.value)}
+                />
+              </Field>
+              <div className="md:col-span-2">
+                <Field label="Message">
+                  <TextArea
+                    required
+                    rows={4}
+                    value={testMessage}
+                    placeholder="Write the test message."
+                    onChange={(event) => setTestMessage(event.target.value)}
+                  />
+                </Field>
+              </div>
+              <div>
+                <PrimaryButton type="submit" disabled={testSendMutation.isPending}>
+                  {testSendMutation.isPending ? 'Sending…' : 'Send test email'}
+                </PrimaryButton>
+              </div>
+            </form>
+          ) : (
+            <p className="text-sm text-[var(--color-ink)]/55">
+              Sending a test email is limited to Super Admin and Operations.
+            </p>
+          )}
+        </Panel>
+      </div>
+      </>
+      )}
+
+      <div className="mt-4">
         <ReconciliationPanel />
       </div>
 
@@ -750,7 +864,9 @@ export default function ProvidersPage() {
 
       {providersQuery.data && (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {providersQuery.data.map((account) => (
+          {providersQuery.data
+            .filter((account) => account.provider === providerTab)
+            .map((account) => (
             <div
               key={account.id}
               className="rounded-xl border border-[var(--color-line)] bg-white p-4"

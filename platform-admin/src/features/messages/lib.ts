@@ -1,9 +1,25 @@
 import { isAxiosError } from 'axios'
 
+function firstErrorText(value: unknown): string {
+  if (typeof value === 'string' && value.trim()) return value
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const text = firstErrorText(item)
+      if (text) return text
+    }
+  }
+  if (value && typeof value === 'object') {
+    for (const item of Object.values(value as Record<string, unknown>)) {
+      const text = firstErrorText(item)
+      if (text) return text
+    }
+  }
+  return ''
+}
+
 export function errorMessage(error: unknown) {
   if (isAxiosError(error)) {
-    const data = error.response?.data as { detail?: string } | undefined
-    return data?.detail || 'Request failed'
+    return firstErrorText(error.response?.data) || 'Request failed'
   }
   return 'Request failed'
 }

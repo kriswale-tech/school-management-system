@@ -8,6 +8,8 @@ import hmac
 import json
 import logging
 import time
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 from django.conf import settings
 from django.utils.decorators import method_decorator
@@ -33,6 +35,26 @@ from notifications.services.email_status import (
 from notifications.services.sms_status import apply_provider_status
 
 logger = logging.getLogger(__name__)
+
+
+def confirm_sns_subscription(subscribe_url: str, topic_arn: str = '') -> bool:
+    """Confirm an SNS subscription by calling Amazon's SubscribeURL.
+
+    Only https URLs on sns.<region>.amazonaws.com are followed. When
+    ``SES_SNS_TOPIC_ARN`` is set, a confirmation for any other topic is ignored.
+    """
+    parsed = urlparse(subscribe_url or '')
+    host = (parsed.hostname or '').lower()
+    if parsed.scheme != 'https' or not host.startswith('sns.') or not host.endswith('.amazonaws.com'):
+        logger.warning('Refusing SNS confirmation URL host %s', host or '(missing)')
+        return False
+    expected = (getattr(settings, 'SES_SNS_TOPIC_ARN', '') or '').strip()
+    if expected and topic_arn and topic_arn != expected:
+        logger.warning('Ignoring SNS confirmation for topic %s', topic_arn)
+        return False
+    request = Request(subscribe_url, method='GET')
+    with urlopen(request, timeout=10) as response:
+        return 200 <= getattr(response, 'status', 200) < 300
 
 # Svix tolerates a 5 minute clock skew on the signed timestamp.
 SVIX_TIMESTAMP_TOLERANCE_SECONDS = 5 * 60
@@ -171,19 +193,20 @@ class SesWebhookView(APIView):
         # SNS subscription handshake — acknowledge so AWS can confirm.
         sns_type = str(payload.get('Type') or '').strip()
         if sns_type == 'SubscriptionConfirmation':
-            logger.info(
-                'SES SNS SubscriptionConfirmation received (subscribe_url present=%s)',
-                bool(payload.get('SubscribeURL')),
-            )
+            subscribe_url = str(payload.get('SubscribeURL') or '')
+            topic_arn = str(payload.get('TopicArn') or '')
+            try:
+                confirmed = confirm_sns_subscription(subscribe_url, topic_arn)
+            except Exception:
+                logger.exception('SNS subscription confirmation failed')
+                confirmed = False
+            if not confirmed:
+                return Response(
+                    {'received': False, 'sns_type': sns_type, 'confirmed': False},
+                    status=500,
+                )
             return Response(
-                {
-                    'received': True,
-                    'sns_type': sns_type,
-                    'note': (
-                        'Confirm the subscription in AWS (or GET SubscribeURL). '
-                        'This stub does not auto-confirm.'
-                    ),
-                },
+                {'received': True, 'sns_type': sns_type, 'confirmed': True},
                 status=200,
             )
 

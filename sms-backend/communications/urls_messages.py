@@ -21,6 +21,7 @@ from communications.views.messages import (
     ResendSyncUsageView,
     ResendUsageListView,
     SesSyncUsageView,
+    SesTestSendView,
     SesUsageListView,
     SchoolReportView,
     SchoolUsageView,
@@ -71,6 +72,11 @@ urlpatterns = [
         'providers/ses/usage/',
         SesUsageListView.as_view(),
         name='platform-messages-ses-usage',
+    ),
+    path(
+        'providers/ses/test-send/',
+        SesTestSendView.as_view(),
+        name='platform-messages-ses-test-send',
     ),
     # Legacy Resend paths → same SES handlers
     path(

@@ -116,6 +116,16 @@ export async function syncSesUsage() {
   return data
 }
 
+export async function sendSesTest(payload: { to: string; subject: string; message: string }) {
+  const { data } = await api.post<{
+    ok: boolean
+    to: string
+    from_email: string
+    provider_message_id: string
+  }>(`${BASE}/providers/ses/test-send/`, payload)
+  return data
+}
+
 export async function listSesUsage(params?: { page?: number }) {
   const { data } = await api.get<Paginated<SesUsageSnapshot>>(
     `${BASE}/providers/ses/usage/`,

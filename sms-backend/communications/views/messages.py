@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime, time
 
+from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_email
 from django.http import HttpResponse
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -63,6 +66,7 @@ from communications.services.providers import (
     sync_arkesel_balance,
     sync_ses_usage,
 )
+from communications.services.providers.ses_usage import send_ses_test_email
 from communications.services.ranges import resolve_range
 from communications.services.reconciliation import reconcile_arkesel, reconcile_ses, resolve_item
 from communications.services.segments import analyze_sms
@@ -331,6 +335,51 @@ class SesSyncUsageView(MessagesAPIView):
         data = ResendUsageSnapshotSerializer(snapshot).data
         data['placeholder'] = bool(result.get('placeholder'))
         return Response(data)
+
+
+class SesTestSendView(MessagesAPIView):
+    """Send one plain email through the app's SES credentials."""
+
+    allowed_roles = OPS_SYNC
+
+    def post(self, request):
+        to_addr = str(request.data.get('to') or '').strip()
+        subject = str(request.data.get('subject') or '').strip()
+        message = str(request.data.get('message') or '').strip()
+        errors = {}
+        try:
+            validate_email(to_addr)
+        except DjangoValidationError:
+            errors['to'] = 'Enter a valid recipient email.'
+        if not subject:
+            errors['subject'] = 'Enter a subject.'
+        elif len(subject) > 200:
+            errors['subject'] = 'Subject must be 200 characters or fewer.'
+        if not message:
+            errors['message'] = 'Enter a message.'
+        elif len(message) > 5000:
+            errors['message'] = 'Message must be 5000 characters or fewer.'
+        if errors:
+            raise ValidationError(errors)
+
+        result = send_ses_test_email(to=to_addr, subject=subject, body=message)
+        if not result.get('ok'):
+            raise ValidationError(result.get('error') or 'SES rejected the message.')
+
+        record_audit(
+            actor=request.platform_user,
+            action='messages.ses_test.sent',
+            target_type='ses_test',
+            target_id=result.get('provider_message_id') or '',
+            detail={'to': to_addr, 'subject': subject[:200]},
+            ip_address=client_ip(request),
+        )
+        return Response({
+            'ok': True,
+            'to': to_addr,
+            'from_email': settings.DEFAULT_FROM_EMAIL,
+            'provider_message_id': result.get('provider_message_id') or '',
+        })
 
 
 # Legacy aliases — same handlers, old paths.

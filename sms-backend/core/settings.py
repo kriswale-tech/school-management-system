@@ -440,6 +440,10 @@ AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', '').strip()
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', '').strip()
 # Optional SNS topic subscription secret / shared token for SES event webhooks.
 SES_WEBHOOK_AUTH_TOKEN = os.getenv('SES_WEBHOOK_AUTH_TOKEN', '').strip()
+# SES configuration set that publishes send, delivery, bounce, and complaint events.
+SES_CONFIGURATION_SET = os.getenv('SES_CONFIGURATION_SET', '').strip()
+# When set, the webhook only confirms an SNS subscription for this topic.
+SES_SNS_TOPIC_ARN = os.getenv('SES_SNS_TOPIC_ARN', '').strip()
 
 # Legacy Resend env vars kept so old .env files do not crash imports.
 RESEND_API_KEY = os.getenv('RESEND_API_KEY', '').strip()
@@ -473,6 +477,9 @@ ANYMAIL = {
         'aws_secret_access_key': AWS_SECRET_ACCESS_KEY or None,
     },
 }
+if SES_CONFIGURATION_SET:
+    # Staff and OTP mail goes through Anymail. Guardian batches set the same name.
+    ANYMAIL['AMAZON_SES_CONFIGURATION_SET_NAME'] = SES_CONFIGURATION_SET
 
 _ses_ready = bool(
     EMAIL_ENABLED

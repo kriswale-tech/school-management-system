@@ -1,10 +1,8 @@
-"""Amazon SES usage snapshots (placeholder-friendly).
+"""Amazon SES usage snapshots.
 
-Until AWS credentials exist, ``sync_ses_usage`` records a **placeholder**
-snapshot so Platform Admin can exercise the Providers UI end-to-end.
-When credentials are present, this still stores a structured snapshot; live
-CloudWatch wiring can replace the placeholder payload later without changing
-the Messages UI contract.
+Without AWS credentials, ``sync_ses_usage`` records a placeholder so Platform
+Admin can still exercise the Providers UI. With credentials, daily figures
+come from the SES send quota and the monthly send total comes from CloudWatch.
 """
 
 from __future__ import annotations
@@ -39,8 +37,75 @@ def ses_credentials_configured() -> bool:
     )
 
 
+def _boto_client(service: str):
+    import boto3
+
+    return boto3.client(
+        service,
+        region_name=settings.AWS_REGION,
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+    )
+
+
+def _metric_period(start, end) -> int:
+    """One bucket for a short window, otherwise daily buckets for the month."""
+    span = max(int((end - start).total_seconds()), 60)
+    if span >= 86400:
+        return 86400
+    return max(60, (span // 60) * 60)
+
+
+def fetch_ses_usage() -> dict:
+    """SES 24-hour quota plus this month's CloudWatch Send total.
+
+    ``received`` is inbound mail. A send-only identity reports 0.
+    SES has no monthly cap, so the monthly limit stays unset.
+    """
+    now = timezone.now()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    quota = _boto_client('ses').get_send_quota()
+    metrics = _boto_client('cloudwatch').get_metric_statistics(
+        Namespace='AWS/SES',
+        MetricName='Send',
+        StartTime=month_start,
+        EndTime=now,
+        Period=_metric_period(month_start, now),
+        Statistics=['Sum'],
+    )
+    sent = int(round(sum(
+        float(point.get('Sum') or 0) for point in metrics.get('Datapoints') or []
+    )))
+    daily_used = int(round(float(quota.get('SentLast24Hours') or 0)))
+    daily_limit = int(round(float(quota.get('Max24HourSend') or 0)))
+    return {
+        'object': 'ses_usage',
+        'configured': True,
+        'region': getattr(settings, 'AWS_REGION', '') or None,
+        'note': (
+            'Daily figures are the SES rolling 24-hour quota. '
+            'Monthly sent is the CloudWatch Send total for this month. '
+            'Received is inbound mail and stays 0 while the identity only sends.'
+        ),
+        'emails': {
+            'monthly': {'used': sent, 'limit': None, 'sent': sent, 'received': 0},
+            'daily': {
+                'used': daily_used,
+                'limit': daily_limit,
+                'sent': daily_used,
+                'received': 0,
+            },
+        },
+        'quota': {
+            'max_24_hour_send': daily_limit,
+            'sent_last_24_hours': daily_used,
+            'max_send_rate': quota.get('MaxSendRate'),
+        },
+    }
+
+
 def fetch_ses_usage_placeholder() -> dict:
-    """Structured placeholder until CloudWatch/Cost Explorer is wired."""
+    """Structured placeholder when AWS credentials are not configured."""
     return {
         'object': 'ses_usage_placeholder',
         'configured': ses_credentials_configured(),
@@ -79,6 +144,26 @@ def parse_usage_payload(payload: dict) -> dict:
     }
 
 
+def send_ses_test_email(*, to: str, subject: str, body: str) -> dict:
+    """Send one plain test message through the same SES path as the app."""
+    from notifications.services.email_batch import send_email_batch, ses_configured
+
+    if not ses_configured():
+        return {'ok': False, 'error': 'SES credentials are not configured on the server.'}
+    results = send_email_batch([{
+        'key': 'platform-ses-test',
+        'to': to,
+        'subject': subject,
+        'text': body,
+    }])
+    row = results[0] if results else {'ok': False, 'error': 'SES returned no result.'}
+    return {
+        'ok': bool(row.get('ok')),
+        'error': row.get('error') or '',
+        'provider_message_id': row.get('provider_message_id') or '',
+    }
+
+
 def sync_ses_usage(*, actor=None) -> dict:
     """Create a usage snapshot. Never raises to the caller."""
     account = _ses_account()
@@ -106,14 +191,7 @@ def sync_ses_usage(*, actor=None) -> dict:
                 'snapshot': snapshot,
             }
 
-        # Credentials present: still snapshot a placeholder shape for now so the
-        # UI works before CloudWatch queries are implemented.
-        payload = fetch_ses_usage_placeholder()
-        payload['configured'] = True
-        payload['note'] = (
-            'AWS credentials detected. Live CloudWatch metric pull is not wired yet; '
-            'this is a structured placeholder snapshot.'
-        )
+        payload = fetch_ses_usage()
         parsed = parse_usage_payload(payload)
         snapshot = ResendUsageSnapshot.objects.create(
             provider_account=account,
@@ -123,8 +201,8 @@ def sync_ses_usage(*, actor=None) -> dict:
             captured_by=platform_actor(actor),
             **parsed,
         )
-        mark_sync_success(account, metadata={'ses_usage_mode': 'placeholder'})
-        return {'ok': True, 'placeholder': True, 'error': '', 'snapshot': snapshot}
+        mark_sync_success(account, metadata={'ses_usage_mode': 'live'})
+        return {'ok': True, 'placeholder': False, 'error': '', 'snapshot': snapshot}
     except Exception as exc:
         logger.exception('SES usage sync failed')
         mark_sync_failure(account, error=f'{type(exc).__name__}: {exc}')

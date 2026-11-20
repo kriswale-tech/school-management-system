@@ -135,11 +135,17 @@ def _send_via_ses(items: list[dict]) -> list[dict]:
                 html=item.get('html') or '',
                 attachments=item.get('attachments') or [],
             )
-            response = client.send_raw_email(
-                Source=_from_email(),
-                Destinations=[to_addr],
-                RawMessage={'Data': raw},
-            )
+            params = {
+                'Source': _from_email(),
+                'Destinations': [to_addr],
+                'RawMessage': {'Data': raw},
+            }
+            configuration_set = (
+                getattr(settings, 'SES_CONFIGURATION_SET', '') or ''
+            ).strip()
+            if configuration_set:
+                params['ConfigurationSetName'] = configuration_set
+            response = client.send_raw_email(**params)
             message_id = str(response.get('MessageId') or '')
             results.append({
                 'key': key,
