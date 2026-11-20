@@ -10,9 +10,10 @@ from rest_framework.test import APITestCase
 from academics.models import ClassLevel, Level
 from accounts.tests.factories import create_user, set_client_auth_cookies, user_school
 from communications.tests.helpers import seed_test_credits
-from fees.models import FeeItem, FeeStructure, StudentFee
+from fees.models import FeeItem, FeeScheduleDocument, FeeStructure, StudentFee
 from fees.services import apply_fee_structure, publish_fee_structure
 from fees.services.fee_schedule_links import (
+    build_fee_schedule_context,
     build_fee_schedule_public_url,
     make_fee_schedule_token,
 )
@@ -145,9 +146,14 @@ class NextTermFeeNoticeTests(APITestCase):
             1,
         )
         self.assertGreaterEqual(len(mail.outbox), 1)
-        bodies = '\n'.join(item.body for item in mail.outbox)
-        self.assertIn('Tuition Fee', bodies)
-        self.assertIn('New student levy', bodies)
+        notice = next(item for item in mail.outbox if 'attached' in item.body.lower())
+        self.assertIn('Tuition Fee', notice.body)
+        self.assertIn('New student levy', notice.body)
+        self.assertNotIn('/api/v1/public/fee-schedules/', notice.body)
+        filename, content, mimetype = notice.attachments[0]
+        self.assertTrue(filename.endswith('.pdf'))
+        self.assertEqual(mimetype, 'application/pdf')
+        self.assertTrue(content.startswith(b'%PDF'))
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
     @patch(SEND_SMS_PATH, return_value={'status': 'success'})
@@ -192,18 +198,33 @@ class NextTermFeeNoticeTests(APITestCase):
             first_deliveries,
         )
 
-    def test_public_fee_schedule_page_lists_items(self):
+    def test_public_fee_schedule_redirects_to_pdf(self):
         apply_fee_structure(self.structure)
+        fees = list(
+            StudentFee.objects.filter(student=self.student, term=self.term).select_related('fee_item'),
+        )
+        context = build_fee_schedule_context(
+            student=self.student,
+            term=self.term,
+            fees=fees,
+        )
+        self.assertEqual(context['begins_on'], date(2025, 9, 1))
+        self.assertEqual(context['total'], '550.00')
+
         token = make_fee_schedule_token(student_id=self.student.id, term_id=self.term.id)
         url = reverse('public-fee-schedule', kwargs={'token': token})
-
         response = self.client.get(url)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Tuition Fee')
-        self.assertContains(response, 'New student levy')
-        self.assertContains(response, 'GHS 550.00')
-        self.assertContains(response, 'Ama')
+        document = FeeScheduleDocument.objects.get(student=self.student, term=self.term)
+        parts = document.file.name.split('/')
+        self.assertEqual(parts[1:3], ['fees', 'next-billings'])
+        self.assertIn(self.student.student_id, parts[-1])
+        self.assertTrue(parts[-1].endswith('.pdf'))
+        with document.file.open('rb') as handle:
+            self.assertTrue(handle.read(5).startswith(b'%PDF'))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/fees/next-billings/', response['Location'])
         self.assertIn(
             '/api/v1/public/fee-schedules/',
             build_fee_schedule_public_url(
@@ -211,6 +232,20 @@ class NextTermFeeNoticeTests(APITestCase):
                 term_id=self.term.id,
             ),
         )
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
+    @patch(
+        'fees.services.fee_schedule_links.render_fee_schedule_pdf',
+        side_effect=RuntimeError('pdf'),
+    )
+    @patch(SEND_SMS_PATH, return_value={'status': 'success'})
+    def test_notice_waits_when_pdf_fails(self, mock_sms, _render):
+        with self.captureOnCommitCallbacks(execute=True):
+            apply_fee_structure(self.structure)
+
+        self.assertEqual(StudentFee.objects.filter(student=self.student).count(), 2)
+        mock_sms.assert_not_called()
+        self.assertEqual(len(mail.outbox), 0)
 
     def test_public_fee_schedule_rejects_bad_token(self):
         response = self.client.get(

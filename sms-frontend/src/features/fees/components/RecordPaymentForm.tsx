@@ -26,7 +26,7 @@ import {
   STUDENT_PAYMENT_TARGET_QUERY_KEY,
   formatFeeAmount,
 } from '../utils'
-import { openReceiptPrintWindow } from '../utils/receiptPrint'
+import { openReceiptPdf } from '../utils/receiptPdf'
 import StudentPaymentSummary from './StudentPaymentSummary'
 
 const STUDENT_SEARCH_DEBOUNCE_MS = 300
@@ -56,7 +56,7 @@ const RecordPaymentForm = ({
   const [paymentMethod, setPaymentMethod] = useState('')
   const [paidAt, setPaidAt] = useState(dayjs().format('YYYY-MM-DD'))
   const [successResult, setSuccessResult] = useState<RecordPaymentResponse | null>(null)
-  const [isPrinting, setIsPrinting] = useState(false)
+  const [isOpeningReceipt, setIsOpeningReceipt] = useState(false)
 
   const isPreselected = Boolean(preselectedStudentId)
 
@@ -165,20 +165,24 @@ const RecordPaymentForm = ({
     })
   }
 
-  const handlePrintReceipt = async () => {
-    if (!successResult || isPrinting) return
-    setIsPrinting(true)
+  const handleOpenReceipt = async () => {
+    if (!successResult || isOpeningReceipt) return
+    setIsOpeningReceipt(true)
     try {
       const receipt = await getReceiptDetail(successResult.receipt_id)
-      openReceiptPrintWindow(receipt)
+      if (!receipt.url) {
+        toast.error('Receipt PDF is not ready yet.')
+        return
+      }
+      openReceiptPdf(receipt.url)
     } catch (error) {
       toast.error(
         error instanceof Error && error.message.includes('Pop-up')
           ? error.message
-          : getApiErrorMessage(error, 'Unable to open receipt for printing.'),
+          : getApiErrorMessage(error, 'Unable to open the receipt.'),
       )
     } finally {
-      setIsPrinting(false)
+      setIsOpeningReceipt(false)
     }
   }
 
@@ -217,10 +221,10 @@ const RecordPaymentForm = ({
           <Button
             type="button"
             className="w-full"
-            loading={isPrinting}
-            onClick={handlePrintReceipt}
+            loading={isOpeningReceipt}
+            onClick={handleOpenReceipt}
           >
-            Print receipt
+            Open receipt
           </Button>
           <Button type="button" variant="outline" className="w-full" onClick={resetForAnotherPayment}>
             Record another

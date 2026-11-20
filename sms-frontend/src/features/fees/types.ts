@@ -211,6 +211,7 @@ export type ReceiptDetail = {
   received_by: string
   term_label: string
   allocations: ReceiptAllocation[]
+  url: string | null
 }
 
 export type RecordPaymentPayload = {

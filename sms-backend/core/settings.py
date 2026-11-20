@@ -356,14 +356,17 @@ R2_BUCKET_NAME = os.getenv('R2_BUCKET_NAME', '')
 R2_ENDPOINT_URL = os.getenv('R2_ENDPOINT_URL', '')
 R2_SIGNED_URL_EXPIRE_SECONDS = int(os.getenv('R2_SIGNED_URL_EXPIRE_SECONDS', '3600'))
 
-STORAGES = {
-    'default': {
-        'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
-    },
-    'staticfiles': {
-        'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
-    },
-    'reports': {
+def _document_storage() -> dict:
+    """Private PDF storage. The bucket name is the container; the key starts with the school."""
+    if 'test' in sys.argv:
+        return {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+            'OPTIONS': {
+                'location': str(BASE_DIR / 'tmp' / 'pdfs'),
+                'base_url': '/pdfs/',
+            },
+        }
+    return {
         'BACKEND': 'storages.backends.s3.S3Storage',
         'OPTIONS': {
             'access_key': R2_ACCESS_KEY_ID,
@@ -383,7 +386,18 @@ STORAGES = {
                 'ContentDisposition': 'inline',
             },
         },
+    }
+
+
+STORAGES = {
+    'default': {
+        'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
     },
+    'staticfiles': {
+        'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+    },
+    'reports': _document_storage(),
+    'receipts': _document_storage(),
     'migration': {
         'BACKEND': 'storages.backends.s3.S3Storage',
         'OPTIONS': {

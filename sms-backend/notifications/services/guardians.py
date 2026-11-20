@@ -135,13 +135,14 @@ def _email_item(
     event_type,
     context,
     idempotency_key,
+    attachment=None,
 ) -> dict:
     subject, text_body, html_body = compose_email(
         school=school,
         event_type=event_type,
         context=context,
     )
-    return {
+    item = {
         'school_id': str(school.id),
         'parent_id': str(parent.id),
         'student_id': str(student.id) if student is not None else None,
@@ -152,6 +153,9 @@ def _email_item(
         'html_body': html_body,
         'idempotency_key': idempotency_key,
     }
+    if attachment:
+        item['attachment'] = attachment
+    return item
 
 
 def _record_skip(*, school, parent, student, event_type, scope_id) -> None:
@@ -373,6 +377,10 @@ def notify_guardians_payment_receipt(
                         parent_id=parent.id,
                         channel=CHANNEL_EMAIL,
                     ),
+                    attachment={
+                        'kind': 'receipt',
+                        'receipt_id': str(receipt_id),
+                    },
                 ),
             )
 
@@ -641,6 +649,10 @@ def plan_guardians_report_ready(
                         parent_id=parent.id,
                         channel=CHANNEL_EMAIL,
                     ),
+                    attachment={
+                        'kind': 'report',
+                        'report_id': str(report.id),
+                    },
                 ),
             )
 
@@ -670,7 +682,10 @@ def plan_guardians_next_term_fees(
 ) -> tuple[list[dict], list[dict]]:
     """Build SMS/email items for one student's applied fee schedule."""
     from fees.models import StudentFee
-    from fees.services.fee_schedule_links import build_fee_schedule_public_url
+    from fees.services.fee_schedule_links import (
+        build_fee_schedule_public_url,
+        publish_fee_schedule_pdf,
+    )
 
     school = student.school
     preferences = get_school_settings(school)
@@ -686,6 +701,8 @@ def plan_guardians_next_term_fees(
         ).order_by('name'),
     )
     if not fees:
+        return [], []
+    if not publish_fee_schedule_pdf(student=student, term=term):
         return [], []
 
     student_name = _student_display_name(student)
@@ -781,6 +798,11 @@ def plan_guardians_next_term_fees(
                         parent_id=parent.id,
                         channel=CHANNEL_EMAIL,
                     ),
+                    attachment={
+                        'kind': 'fee_schedule',
+                        'student_id': str(student.id),
+                        'term_id': str(term.id),
+                    },
                 ),
             )
 

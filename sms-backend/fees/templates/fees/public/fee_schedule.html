@@ -72,25 +72,7 @@
       padding-top: 16px;
       font-weight: 700;
     }
-    .actions {
-      margin: 24px auto 0;
-      max-width: 640px;
-      text-align: center;
-    }
-    .actions button {
-      border: 0;
-      border-radius: 8px;
-      background: #0369a1;
-      color: #fff;
-      padding: 10px 16px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-    @media print {
-      body { background: #fff; padding: 0; }
-      .actions { display: none; }
-      .sheet { border: 0; border-radius: 0; }
-    }
+    @page { margin: 16mm; }
   </style>
 </head>
 <body>
@@ -110,6 +92,7 @@
         Fee schedule for {{ student_name }} ({{ student_code }})
       </p>
       <p class="muted" style="margin-top:0;">{{ term_label }}</p>
+      <p class="muted" style="margin-top:0;">Next term begins {{ begins_on|date:"j F Y" }}</p>
 
       <table>
         <thead>
@@ -139,9 +122,6 @@
         </tfoot>
       </table>
     </div>
-  </div>
-  <div class="actions">
-    <button type="button" onclick="window.print()">Print / save as PDF</button>
   </div>
 </body>
 </html>

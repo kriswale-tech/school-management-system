@@ -2,6 +2,6 @@
 
 {% endif %}{{ student_name }}'s report for {{ term_label }} at {{ school_name }} is ready.
 
-Download: {{ report_url }}
+The report card is attached to this email.
 
 If you have questions, please contact the school.

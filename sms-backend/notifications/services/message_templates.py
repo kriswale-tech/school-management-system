@@ -59,7 +59,7 @@ DEFAULT_EMAIL_TEXT: dict[str, str] = {
     GuardianDelivery.EventType.PAYMENT_RECEIPT: (
         '{{greeting_line}}We received a payment of GHS {{amount}} for {{student_name}}.\n\n'
         'Receipt {{receipt_number}}\n'
-        'Download: {{receipt_url}}'
+        'The receipt is attached to this email.'
     ),
     GuardianDelivery.EventType.DEBT_REMINDER: (
         '{{greeting_line}}This is a reminder that {{student_name}} has an outstanding balance '
@@ -68,12 +68,12 @@ DEFAULT_EMAIL_TEXT: dict[str, str] = {
     ),
     GuardianDelivery.EventType.REPORT_READY: (
         '{{greeting_line}}{{student_name}}\'s report for {{term_label}} is ready.\n\n'
-        'Download: {{report_url}}'
+        'The report card is attached to this email.'
     ),
     GuardianDelivery.EventType.NEXT_TERM_FEES: (
         '{{greeting_line}}Fee schedule for {{student_name}} ({{term_label}}).\n\n'
         'Total: GHS {{total_display}}\n'
-        'Details: {{schedule_url}}'
+        'The bill is attached to this email.'
     ),
 }
 

@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+import logging
 from decimal import Decimal
 
 from django.conf import settings
 from django.core import signing
+from django.core.files.base import ContentFile
+from django.template.loader import render_to_string
 
-from fees.models import StudentFee
+from fees.models import FeeScheduleDocument, StudentFee
 from students.models import Student
+
+logger = logging.getLogger(__name__)
 
 FEE_SCHEDULE_SALT = 'guardian-fee-schedule-v1'
 
@@ -97,7 +104,7 @@ def build_fee_schedule_context(*, student: Student, term, fees: list[StudentFee]
     items = [
         {
             'name': fee.name,
-            'amount': fee.amount,
+            'amount': f'{fee.amount:.2f}',
             'description': (fee.fee_item.description if fee.fee_item_id else '') or '',
         }
         for fee in fees
@@ -110,6 +117,98 @@ def build_fee_schedule_context(*, student: Student, term, fees: list[StudentFee]
         'student_name': student_name,
         'student_code': student.student_id,
         'term_label': term_label,
-        'total': total,
+        'begins_on': term.start_date,
+        'total': f'{total:.2f}',
         'items': items,
     }
+
+
+def _schedule_fingerprint(context: dict) -> str:
+    payload = {
+        'school_name': context['school_name'],
+        'school_phone': context['school_phone'] or '',
+        'school_email': context['school_email'],
+        'school_address': context['school_address'],
+        'student_name': context['student_name'],
+        'student_code': context['student_code'],
+        'term_label': context['term_label'],
+        'begins_on': context['begins_on'].isoformat(),
+        'total': context['total'],
+        'items': context['items'],
+    }
+    raw = json.dumps(payload, sort_keys=True)
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _document_file_exists(document: FeeScheduleDocument) -> bool:
+    name = getattr(document.file, 'name', '') or ''
+    if not name:
+        return False
+    try:
+        return document.file.storage.exists(name)
+    except Exception:
+        logger.exception('Could not check fee schedule for %s', document.student_id)
+        return False
+
+
+def fee_schedule_file_url(*, student, term) -> str | None:
+    document = (
+        FeeScheduleDocument.objects.filter(student=student, term=term)
+        .first()
+    )
+    if document is None or not _document_file_exists(document):
+        return None
+    return document.file.url
+
+
+def render_fee_schedule_pdf(*, student, term, fees) -> bytes:
+    from weasyprint import HTML
+
+    html = render_to_string(
+        'fees/public/fee_schedule.html',
+        build_fee_schedule_context(student=student, term=term, fees=fees),
+    )
+    return HTML(string=html).write_pdf()
+
+
+def publish_fee_schedule_pdf(*, student, term) -> bool:
+    """Store the current bill. Rewrite when the fees or the term date change."""
+    fees = list(
+        StudentFee.objects.filter(student=student, term=term)
+        .select_related('fee_item')
+        .order_by('name'),
+    )
+    if not fees:
+        return False
+
+    context = build_fee_schedule_context(student=student, term=term, fees=fees)
+    digest = _schedule_fingerprint(context)
+    document, _created = FeeScheduleDocument.objects.get_or_create(
+        student=student,
+        term=term,
+    )
+    if document.content_hash == digest and _document_file_exists(document):
+        return True
+
+    document = (
+        FeeScheduleDocument.objects.select_related(
+            'student__school',
+            'term__academic_year',
+        ).get(pk=document.pk)
+    )
+    try:
+        pdf_bytes = render_fee_schedule_pdf(student=student, term=term, fees=fees)
+        document.content_hash = digest
+        document.file.save(
+            f'{student.student_id}.pdf',
+            ContentFile(pdf_bytes),
+            save=False,
+        )
+        document.save(update_fields=['file', 'content_hash', 'updated_at'])
+    except Exception:
+        logger.exception(
+            'Could not store fee schedule PDF for %s',
+            student.student_id,
+        )
+        return False
+    return _document_file_exists(document)

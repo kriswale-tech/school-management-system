@@ -6,7 +6,6 @@ Total: GHS {{ total }}
 
 {% for item in items %}- {{ item.name }}: GHS {{ item.amount }}
 {% endfor %}
-View / download the full schedule:
-{{ schedule_url }}
+The bill is attached to this email.
 
 If you have questions, please contact the school.

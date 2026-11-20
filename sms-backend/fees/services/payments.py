@@ -260,15 +260,9 @@ def record_student_payment(
         payment=payment,
     )
 
-    from notifications.services.guardians import schedule_payment_receipt_notice
+    from fees.services.receipts import publish_receipt_pdf
 
-    schedule_payment_receipt_notice(
-        student_id=student.id,
-        payment_id=payment.id,
-        receipt_id=receipt.id,
-        receipt_number=receipt.receipt_number,
-        amount=amount,
-    )
+    publish_receipt_pdf(receipt)
 
     return {
         'payment_id': payment.id,

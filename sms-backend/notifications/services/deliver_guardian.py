@@ -437,22 +437,68 @@ def deliver_guardian_email_batch(items: list[dict]) -> dict:
             'skipped': len(items) - len(fresh) + skipped_pre,
         }
 
-    payload = [
-        {
+    from notifications.services.email_attachments import load_email_attachment
+
+    ready: list[dict] = []
+    payload = []
+    sent = 0
+    failed = 0
+    for item in sendable:
+        attachments = []
+        spec = item.get('attachment')
+        if spec:
+            loaded = load_email_attachment(spec)
+            if loaded is None:
+                user_msg = 'The PDF is not ready yet.'
+                logger.error(
+                    'Guardian email skipped attachment for key=%s kind=%s',
+                    item.get('idempotency_key'),
+                    spec.get('kind'),
+                )
+                record_delivery_result(
+                    school_id=item['school_id'],
+                    parent_id=item['parent_id'],
+                    student_id=item.get('student_id'),
+                    event_type=item['event_type'],
+                    channel=GuardianDelivery.Channel.EMAIL,
+                    status=GuardianDelivery.Status.FAILED,
+                    recipient_address=item['recipient_address'],
+                    body_preview=(item.get('subject') or '')[:500],
+                    body_text=item.get('text_body', ''),
+                    idempotency_key=item['idempotency_key'],
+                    error_message=user_msg,
+                    user_error_message=user_msg,
+                    source_delivery_id=item.get('source_delivery_id'),
+                )
+                failed += 1
+                continue
+            filename, content = loaded
+            attachments = [{
+                'filename': filename,
+                'content': content,
+                'mimetype': 'application/pdf',
+            }]
+        ready.append(item)
+        payload.append({
             'key': item['idempotency_key'],
             'to': item['recipient_address'],
             'subject': item['subject'],
             'text': item.get('text_body', ''),
             'html': item.get('html_body', ''),
+            'attachments': attachments,
+        })
+
+    if not ready:
+        return {
+            'sent': sent,
+            'failed': failed,
+            'skipped': len(items) - len(fresh) + skipped_pre,
         }
-        for item in sendable
-    ]
+
     results = send_email_batch(payload)
     by_key = {row['key']: row for row in results}
 
-    sent = 0
-    failed = 0
-    for item in sendable:
+    for item in ready:
         key = item['idempotency_key']
         result = by_key.get(key) or {}
         school = schools[str(item['school_id'])]

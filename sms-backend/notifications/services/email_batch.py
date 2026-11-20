@@ -9,6 +9,7 @@ so the full guardian + staff flows can be exercised before any AWS account exist
 from __future__ import annotations
 
 import logging
+from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -81,6 +82,12 @@ def _send_via_django(items: list[dict]) -> list[dict]:
             html = item.get('html') or ''
             if html:
                 message.attach_alternative(html, 'text/html')
+            for attachment in item.get('attachments') or []:
+                message.attach(
+                    attachment['filename'],
+                    attachment['content'],
+                    attachment.get('mimetype') or 'application/pdf',
+                )
             message.send(fail_silently=False)
             # Placeholder id so downstream rows still look "provider accepted".
             results.append({
@@ -126,6 +133,7 @@ def _send_via_ses(items: list[dict]) -> list[dict]:
                 subject=item['subject'],
                 text=item.get('text') or '',
                 html=item.get('html') or '',
+                attachments=item.get('attachments') or [],
             )
             response = client.send_raw_email(
                 Source=_from_email(),
@@ -144,13 +152,38 @@ def _send_via_ses(items: list[dict]) -> list[dict]:
     return results
 
 
-def _build_raw_message(*, to_addr: str, subject: str, text: str, html: str) -> bytes:
+def _build_raw_message(
+    *,
+    to_addr: str,
+    subject: str,
+    text: str,
+    html: str,
+    attachments: list | None = None,
+) -> bytes:
+    files = list(attachments or [])
     if html:
-        msg = MIMEMultipart('alternative')
-        msg.attach(MIMEText(text or '', 'plain', 'utf-8'))
-        msg.attach(MIMEText(html, 'html', 'utf-8'))
+        body = MIMEMultipart('alternative')
+        body.attach(MIMEText(text or '', 'plain', 'utf-8'))
+        body.attach(MIMEText(html, 'html', 'utf-8'))
     else:
-        msg = MIMEText(text or '', 'plain', 'utf-8')
+        body = MIMEText(text or '', 'plain', 'utf-8')
+
+    if files:
+        msg = MIMEMultipart('mixed')
+        msg.attach(body)
+        for attachment in files:
+            part = MIMEApplication(
+                attachment['content'],
+                _subtype='pdf',
+            )
+            part.add_header(
+                'Content-Disposition',
+                'attachment',
+                filename=attachment['filename'],
+            )
+            msg.attach(part)
+    else:
+        msg = body
     msg['Subject'] = subject
     msg['From'] = _from_email()
     msg['To'] = to_addr

@@ -49,7 +49,7 @@ const FeesSetupTable = ({
           title: 'No fee items added yet',
           description: readOnly
             ? 'No fee items for this term.'
-            : 'Use the form above to add your first fee item.',
+            : 'Add a fee item to get started.',
         }}
         skeletonColumns={showTerm ? 5 : 4}
         variant="form-field"

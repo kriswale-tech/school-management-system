@@ -25,7 +25,12 @@ from fees.serializers import (
     StudentPaymentTargetSerializer,
     UpdateFeeStructureItemSerializer,
 )
-from fees.services.receipts import build_receipt_context, load_receipt_for_school
+from fees.services.receipts import (
+    build_receipt_context,
+    load_receipt_for_school,
+    publish_receipt_pdf,
+    receipt_file_url,
+)
 from fees.services.debt_reminders import preview_debt_reminders, send_debt_reminders
 from fees.services.desk import (
     get_fee_desk_stats,
@@ -214,14 +219,17 @@ class ReceiptDetailView(SchoolScopedAPIView):
     @extend_schema(
         tags=['Fees'],
         summary='Payment receipt detail',
-        description='Returns receipt content for staff view/print (same fields as the public receipt).',
+        description='Returns receipt details and a signed URL for the stored PDF.',
         responses={200: ReceiptDetailSerializer},
     )
     def get(self, request, receipt_id):
         receipt = load_receipt_for_school(school=self.school, receipt_id=receipt_id)
         if receipt is None:
             raise NotFound({'detail': 'Receipt not found.'})
-        return Response(ReceiptDetailSerializer(build_receipt_context(receipt)).data)
+        publish_receipt_pdf(receipt)
+        context = build_receipt_context(receipt)
+        context['url'] = receipt_file_url(receipt)
+        return Response(ReceiptDetailSerializer(context).data)
 
 
 class RecordPaymentView(SchoolScopedAPIView):

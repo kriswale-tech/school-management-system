@@ -9,6 +9,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { Button } from '@/components/ui'
 import FilterComponent, { type FilterSelection } from '@/components/ui/FilterComponent'
 import { useAuthStore } from '@/features/auth/store'
+import { getSchoolSettings, SCHOOL_SETTINGS_QUERY_KEY } from '@/features/settings/services'
 import FeesSetupForm from '@/features/setup/fees/components/FeesSetupForm'
 import FeesSetupTable from '@/features/setup/fees/components/FeesSetupTable'
 import {
@@ -47,11 +48,19 @@ const FeeSettings = ({ embedded = false }: FeeSettingsProps) => {
   const [termSelection, setTermSelection] = useState<FilterSelection | undefined>(undefined)
   const [applyOpen, setApplyOpen] = useState(false)
   const [publishOpen, setPublishOpen] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
 
   const { data: filterOptions, isLoading: filtersLoading } = useQuery({
     queryKey: [FEE_DESK_FILTERS_QUERY_KEY],
     queryFn: getFeeDeskFilterOptions,
   })
+
+  const { data: schoolSettings } = useQuery({
+    queryKey: [SCHOOL_SETTINGS_QUERY_KEY],
+    queryFn: getSchoolSettings,
+    enabled: isAdmin,
+  })
+  const parentsReceiveBills = Boolean(schoolSettings?.guardian_next_term_fees_enabled)
 
   const settingsTerms = useMemo(
     () =>
@@ -198,16 +207,27 @@ const FeeSettings = ({ embedded = false }: FeeSettingsProps) => {
         <div className={embedded ? 'space-y-6' : 'bg-white p-4 custom-shadow-md space-y-6'}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg text-slate-900">{structure.name}</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg text-slate-900">{structure.name}</h2>
+                <span
+                  className={`text-xs font-medium px-2 py-1 border ${statusClassName(structure.status)}`}
+                >
+                  {structure.status_display}
+                </span>
+              </div>
               <p className="text-sm text-slate-500 mt-1">
                 {structure.academic_year} · {structure.term_name}
               </p>
             </div>
-            <span
-              className={`text-xs font-medium px-2 py-1 border ${statusClassName(structure.status)}`}
-            >
-              {structure.status_display}
-            </span>
+            {editable && !emptyCatalog ? (
+              <Button
+                type="button"
+                className="py-2 text-sm max-w-fit"
+                onClick={() => setAddOpen(true)}
+              >
+                Add fee item
+              </Button>
+            ) : null}
           </div>
 
           {termEnded ? (
@@ -248,8 +268,8 @@ const FeeSettings = ({ embedded = false }: FeeSettingsProps) => {
             <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center space-y-3">
               <p className="text-sm font-medium text-slate-900">No fees for this term yet</p>
               <p className="text-sm text-slate-600 max-w-md mx-auto">
-                Copy items from the previous term and adjust amounts, or start blank and add items
-                below.
+                Copy items from the previous term and adjust amounts, or add the first item
+                yourself.
               </p>
               <div className="flex flex-wrap items-center justify-center gap-3">
                 {canCopy ? (
@@ -263,37 +283,45 @@ const FeeSettings = ({ embedded = false }: FeeSettingsProps) => {
                   >
                     Copy from previous term
                   </Button>
-                ) : (
-                  <p className="text-xs text-slate-500">
-                    No previous term with fee items to copy from.
-                  </p>
-                )}
+                ) : null}
+                <Button
+                  type="button"
+                  variant={canCopy ? 'outline' : 'solid'}
+                  onClick={() => setAddOpen(true)}
+                >
+                  Add fee item
+                </Button>
               </div>
+              {canCopy ? null : (
+                <p className="text-xs text-slate-500">No previous term with fee items to copy from.</p>
+              )}
             </div>
-          ) : null}
-
-          {editable ? (
-            <FeesSetupForm
+          ) : (
+            <FeesSetupTable
+              feeItems={data.fee_items}
               queryKey={structureQueryKey}
-              onCreate={(payload) =>
-                createFeeStructureItem({
-                  ...payload,
-                  term: structure.term_id,
-                })
-              }
+              readOnly={!editable}
+              showTerm
+              onUpdate={updateFeeStructureItem}
+              onDelete={deleteFeeStructureItem}
             />
-          ) : null}
-
-          <FeesSetupTable
-            feeItems={data.fee_items}
-            queryKey={structureQueryKey}
-            readOnly={!editable}
-            showTerm
-            onUpdate={updateFeeStructureItem}
-            onDelete={deleteFeeStructureItem}
-          />
+          )}
         </div>
       )}
+
+      {structure ? (
+        <FeesSetupForm
+          open={addOpen && editable}
+          queryKey={structureQueryKey}
+          onClose={() => setAddOpen(false)}
+          onCreate={(payload) =>
+            createFeeStructureItem({
+              ...payload,
+              term: structure.term_id,
+            })
+          }
+        />
+      ) : null}
 
       <ConfirmDialog
         open={publishOpen}
@@ -310,8 +338,13 @@ const FeeSettings = ({ embedded = false }: FeeSettingsProps) => {
       <ConfirmDialog
         open={applyOpen}
         title="Apply fees"
-        message="This bills currently enrolled students for this term and locks the catalog. You will not be able to change amounts afterwards. Students who join later will still receive these items."
+        message={
+          parentsReceiveBills
+            ? 'Students already enrolled will be billed for this term, and their guardians will receive the bill. These amounts then lock, including for pupils who join later.'
+            : 'Students already enrolled will be billed for this term. These amounts then lock, including for pupils who join later.'
+        }
         confirmLabel="Apply fees"
+        confirmColor="slate"
         onClose={() => setApplyOpen(false)}
         onConfirm={() => {
           if (structure) apply(structure.id)

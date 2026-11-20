@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
+from fees.storage import fee_schedule_upload_to, receipt_storage, receipt_upload_to
 from shared.models import BaseModel
 
 
@@ -287,12 +288,51 @@ class Receipt(BaseModel):
         on_delete=models.PROTECT,
         related_name='issued_receipts',
     )
+    file = models.FileField(
+        storage=receipt_storage,
+        upload_to=receipt_upload_to,
+        blank=True,
+        max_length=500,
+    )
 
     class Meta:
         ordering = ['-issued_at']
 
     def __str__(self):
         return self.receipt_number
+
+
+class FeeScheduleDocument(BaseModel):
+    """Stored next-term fee bill PDF for one student and term."""
+
+    student = models.ForeignKey(
+        'students.Student',
+        on_delete=models.CASCADE,
+        related_name='fee_schedule_documents',
+    )
+    term = models.ForeignKey(
+        'schools.Term',
+        on_delete=models.CASCADE,
+        related_name='fee_schedule_documents',
+    )
+    file = models.FileField(
+        storage=receipt_storage,
+        upload_to=fee_schedule_upload_to,
+        blank=True,
+        max_length=500,
+    )
+    content_hash = models.CharField(max_length=64, blank=True, default='')
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['student', 'term'],
+                name='unique_fee_schedule_document_per_term',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.student_id} {self.term_id}'
 
 
 class PaymentAllocation(BaseModel):

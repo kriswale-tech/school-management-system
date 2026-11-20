@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import logging
+
 from django.conf import settings
 from django.core import signing
+from django.core.files.base import ContentFile
+from django.template.loader import render_to_string
 
 from fees.models import Receipt
+
+logger = logging.getLogger(__name__)
 
 RECEIPT_SALT = 'guardian-receipt-v1'
 
@@ -131,3 +137,62 @@ def build_receipt_context(receipt: Receipt) -> dict:
         'term_label': term_label,
         'allocations': allocation_rows,
     }
+
+
+def _receipt_file_exists(receipt: Receipt) -> bool:
+    name = getattr(receipt.file, 'name', '') or ''
+    if not name:
+        return False
+    try:
+        return receipt.file.storage.exists(name)
+    except Exception:
+        logger.exception('Could not check receipt file %s', receipt.receipt_number)
+        return False
+
+
+def receipt_file_url(receipt: Receipt) -> str | None:
+    if not _receipt_file_exists(receipt):
+        return None
+    return receipt.file.url
+
+
+def render_receipt_pdf(receipt: Receipt) -> bytes:
+    from weasyprint import HTML
+
+    html = render_to_string('fees/public/receipt.html', build_receipt_context(receipt))
+    return HTML(string=html).write_pdf()
+
+
+def _write_receipt_pdf(receipt: Receipt) -> None:
+    pdf_bytes = render_receipt_pdf(receipt)
+    receipt.file.save(
+        f'{receipt.receipt_number}.pdf',
+        ContentFile(pdf_bytes),
+        save=True,
+    )
+
+
+def _schedule_receipt_notice(receipt: Receipt) -> None:
+    from notifications.services.guardians import schedule_payment_receipt_notice
+
+    payment = receipt.payment
+    schedule_payment_receipt_notice(
+        student_id=payment.student_id,
+        payment_id=payment.id,
+        receipt_id=receipt.id,
+        receipt_number=receipt.receipt_number,
+        amount=payment.amount,
+    )
+
+
+def publish_receipt_pdf(receipt: Receipt) -> None:
+    """Store the PDF once. Tell guardians only after that first successful write."""
+    already_stored = _receipt_file_exists(receipt)
+    if not already_stored:
+        try:
+            _write_receipt_pdf(receipt)
+        except Exception:
+            logger.exception('Could not store receipt PDF %s', receipt.receipt_number)
+            return
+    if not already_stored and _receipt_file_exists(receipt):
+        _schedule_receipt_notice(receipt)

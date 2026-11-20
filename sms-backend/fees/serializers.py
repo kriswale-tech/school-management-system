@@ -196,6 +196,7 @@ class ReceiptDetailSerializer(serializers.Serializer):
     received_by = serializers.CharField(allow_blank=True)
     term_label = serializers.CharField()
     allocations = ReceiptAllocationSerializer(many=True)
+    url = serializers.CharField(allow_null=True, required=False)
 
 
 class RecordPaymentSerializer(serializers.Serializer):

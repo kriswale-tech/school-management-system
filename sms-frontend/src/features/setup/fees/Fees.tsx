@@ -1,6 +1,7 @@
 import toast from 'react-hot-toast'
 import { Icon } from '@iconify/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -16,6 +17,7 @@ const Fees = () => {
   const queryClient = useQueryClient()
   const setUser = useAuthStore((state) => state.setUser)
   const user = useAuthStore((state) => state.user)
+  const [addOpen, setAddOpen] = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey: ['feeStructures'],
@@ -53,10 +55,16 @@ const Fees = () => {
         </div>
       </div>
 
-      <FeesSetupForm onCreate={createFeeItem} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-lg text-slate-900">{data.fee_structure.name}</h3>
+        <Button type="button" className="w-fit" onClick={() => setAddOpen(true)}>
+          Add fee item
+        </Button>
+      </div>
+
+      <FeesSetupForm open={addOpen} onClose={() => setAddOpen(false)} onCreate={createFeeItem} />
 
       <div>
-        <h3 className="text-lg mb-2 text-slate-900">{data.fee_structure.name}</h3>
         <FeesSetupTable
           feeItems={data.fee_items}
           onUpdate={updateFeeItem}

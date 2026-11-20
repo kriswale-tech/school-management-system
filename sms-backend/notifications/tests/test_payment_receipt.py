@@ -3,7 +3,8 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.core import mail
-from django.test import TestCase, override_settings
+from django.core.files.base import ContentFile
+from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
@@ -121,6 +122,12 @@ class PaymentReceiptNotifyTests(TestCase):
         self.assertIn('/api/v1/public/receipts/', mock_sms.call_args.args[1])
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn(result['receipt_number'], mail.outbox[0].subject)
+        self.assertIn('attached', mail.outbox[0].body.lower())
+        self.assertNotIn('/api/v1/public/receipts/', mail.outbox[0].body)
+        filename, content, mimetype = mail.outbox[0].attachments[0]
+        self.assertTrue(filename.endswith('.pdf'))
+        self.assertEqual(mimetype, 'application/pdf')
+        self.assertTrue(content.startswith(b'%PDF'))
         self.assertEqual(
             GuardianDelivery.objects.filter(
                 event_type=GuardianDelivery.EventType.PAYMENT_RECEIPT,
@@ -150,17 +157,57 @@ class PaymentReceiptNotifyTests(TestCase):
         )
 
     @patch(SEND_SMS_PATH, return_value={'status': 'success'})
-    def test_public_receipt_page_renders(self, mock_sms):
+    def test_public_receipt_redirects_to_pdf(self, mock_sms):
         result = self._record_payment()
         receipt = Receipt.objects.get(id=result['receipt_id'])
-        url = reverse('public-receipt', kwargs={'token': make_receipt_token(receipt.id)})
+        parts = receipt.file.name.split('/')
+        self.assertEqual(parts[1:3], ['fees', 'receipts'])
+        self.assertIn(receipt.receipt_number, parts[-1])
+        self.assertTrue(parts[-1].endswith('.pdf'))
+        self.assertNotIn('schoolassist', receipt.file.name)
+        with receipt.file.open('rb') as handle:
+            self.assertTrue(handle.read(5).startswith(b'%PDF'))
 
+        url = reverse('public-receipt', kwargs={'token': make_receipt_token(receipt.id)})
         response = self.client.get(url)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, receipt.receipt_number)
-        self.assertContains(response, 'Kofi')
-        self.assertContains(response, 'GHS')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/fees/receipts/', response['Location'])
+        self.assertIn(receipt.receipt_number, response['Location'])
+
+    @patch('fees.services.receipts.render_receipt_pdf', side_effect=RuntimeError('pdf'))
+    @patch(SEND_SMS_PATH, return_value={'status': 'success'})
+    def test_payment_stands_when_pdf_fails(self, mock_sms, _render):
+        result = self._record_payment()
+
+        receipt = Receipt.objects.get(id=result['receipt_id'])
+        self.assertFalse(receipt.file)
+        mock_sms.assert_not_called()
+        self.assertEqual(len(mail.outbox), 0)
+
+    @patch(SEND_SMS_PATH, return_value={'status': 'success'})
+    def test_opening_a_receipt_without_a_file_stores_the_pdf(self, mock_sms):
+        payment = Payment.objects.create(
+            student=self.student,
+            term=self.term,
+            amount=Decimal('40.00'),
+            payment_method=Payment.PaymentMethod.CASH,
+            recorded_by=self.user,
+        )
+        receipt = Receipt.objects.create(
+            payment=payment,
+            receipt_number='RCPT-TEST-OLD',
+            issued_by=self.user,
+        )
+        url = reverse('public-receipt', kwargs={'token': make_receipt_token(receipt.id)})
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.get(url)
+
+        receipt.refresh_from_db()
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(receipt.file.name.endswith('.pdf'))
+        self.assertIn(receipt.receipt_number, mock_sms.call_args.args[1])
 
     def test_public_receipt_rejects_bad_token(self):
         response = self.client.get(reverse('public-receipt', kwargs={'token': 'not-valid'}))
@@ -180,6 +227,11 @@ class PaymentReceiptNotifyTests(TestCase):
             receipt_number='RCPT-TEST-0001',
             issued_by=self.user,
         )
+        receipt.file.save(
+            'RCPT-TEST-0001.pdf',
+            ContentFile(b'%PDF-1.4\n%receipt\n'),
+            save=True,
+        )
         expected = build_receipt_public_url(receipt.id)
 
         notify_guardians_payment_receipt(
@@ -191,4 +243,9 @@ class PaymentReceiptNotifyTests(TestCase):
         )
 
         self.assertIn(expected, mock_sms.call_args.args[1])
-        self.assertIn(expected, mail.outbox[0].body)
+        self.assertNotIn(expected, mail.outbox[0].body)
+        self.assertIn('attached', mail.outbox[0].body.lower())
+        filename, content, mimetype = mail.outbox[0].attachments[0]
+        self.assertIn('RCPT-TEST-0001', filename)
+        self.assertEqual(mimetype, 'application/pdf')
+        self.assertTrue(content.startswith(b'%PDF'))

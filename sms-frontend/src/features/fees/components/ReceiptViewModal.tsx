@@ -5,7 +5,7 @@ import dayjs from '@/lib/dayjs'
 import { getApiErrorMessage } from '@/utils'
 import { getReceiptDetail } from '../services'
 import { formatFeeAmount } from '../utils'
-import { openReceiptPrintWindow } from '../utils/receiptPrint'
+import { openReceiptPdf } from '../utils/receiptPdf'
 
 type ReceiptViewModalProps = {
   open: boolean
@@ -30,12 +30,15 @@ const ReceiptViewModal = ({ open, receiptId, onClose }: ReceiptViewModalProps) =
     enabled: open && Boolean(receiptId),
   })
 
-  const handlePrint = () => {
-    if (!receipt) return
+  const handleOpen = () => {
+    if (!receipt?.url) {
+      toast.error('Receipt PDF is not ready yet.')
+      return
+    }
     try {
-      openReceiptPrintWindow(receipt)
+      openReceiptPdf(receipt.url)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Unable to open print preview')
+      toast.error(err instanceof Error ? err.message : 'Unable to open the receipt.')
     }
   }
 
@@ -132,8 +135,8 @@ const ReceiptViewModal = ({ open, receiptId, onClose }: ReceiptViewModalProps) =
             <Button type="button" variant="outline" className="w-fit" onClick={onClose}>
               Close
             </Button>
-            <Button type="button" className="w-fit" onClick={handlePrint}>
-              Print / save as PDF
+            <Button type="button" className="w-fit" onClick={handleOpen}>
+              Open receipt
             </Button>
           </div>
         </div>

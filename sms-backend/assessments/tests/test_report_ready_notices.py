@@ -3,6 +3,7 @@ from datetime import date
 from unittest.mock import patch
 
 from django.core import mail
+from django.core.files.base import ContentFile
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -104,10 +105,14 @@ class ReportReadyNoticeAPITests(APITestCase):
             student=self.with_report,
             stream=self.stream,
             term=self.term,
-            file='reports/test/ama_mensah.pdf',
             generated_at=timezone.now(),
             generation_id=uuid.uuid4(),
             generated_by=self.user,
+        )
+        self.report.file.save(
+            'ama_mensah.pdf',
+            ContentFile(b'%PDF-1.4\n%report\n'),
+            save=True,
         )
 
         settings_row = get_school_settings(self.school)
@@ -180,7 +185,12 @@ class ReportReadyNoticeAPITests(APITestCase):
         self.assertEqual(response.data['email_sent'], 1)
         mock_sms.assert_called_once()
         self.assertEqual(len(mail.outbox), 1)
-        self.assertIn('report', mail.outbox[0].body.lower())
+        self.assertIn('attached', mail.outbox[0].body.lower())
+        filename, content, mimetype = mail.outbox[0].attachments[0]
+        self.assertTrue(filename.endswith('.pdf'))
+        self.assertEqual(mimetype, 'application/pdf')
+        self.assertTrue(content.startswith(b'%PDF'))
+        self.assertNotIn('/api/v1/public/reports/', mail.outbox[0].body)
         self.assertEqual(
             GuardianDelivery.objects.filter(
                 event_type=GuardianDelivery.EventType.REPORT_READY,

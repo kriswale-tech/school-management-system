@@ -35,4 +35,4 @@ def report_upload_to(instance, filename):
     safe_name = _path_segment(safe_name[:-4], fallback='student') + '.pdf'
     safe_name = safe_name.replace(' ', '_')
 
-    return f'{school_name}/{year_term}/{class_name}/{safe_name}'
+    return f'{school_name}/reports/{year_term}/{class_name}/{safe_name}'

@@ -1,16 +1,17 @@
 from django.http import HttpResponseBadRequest, HttpResponseNotFound
-from django.shortcuts import render
+from django.shortcuts import redirect
 from django.views import View
 
 from fees.services.fee_schedule_links import (
-    build_fee_schedule_context,
+    fee_schedule_file_url,
     load_fee_schedule_from_token,
+    publish_fee_schedule_pdf,
 )
-from fees.services.receipts import build_receipt_context, load_receipt_from_token
+from fees.services.receipts import load_receipt_from_token, publish_receipt_pdf, receipt_file_url
 
 
 class PublicReceiptView(View):
-    """Unauthenticated receipt page opened from a signed guardian link."""
+    """Unauthenticated receipt link. Redirects to the stored PDF."""
 
     def get(self, request, token: str):
         try:
@@ -21,28 +22,27 @@ class PublicReceiptView(View):
                 return HttpResponseNotFound(message)
             return HttpResponseBadRequest(message)
 
-        context = build_receipt_context(receipt)
-        response = render(request, 'fees/public/receipt.html', context)
-        response['Content-Disposition'] = (
-            f'inline; filename="{receipt.receipt_number}.html"'
-        )
-        return response
+        publish_receipt_pdf(receipt)
+        url = receipt_file_url(receipt)
+        if not url:
+            return HttpResponseNotFound('Receipt file is unavailable.')
+        return redirect(url)
 
 
 class PublicFeeScheduleView(View):
-    """Unauthenticated per-student fee schedule from a signed guardian link."""
+    """Unauthenticated fee-schedule link. Redirects to the stored PDF."""
 
     def get(self, request, token: str):
         try:
-            student, term, fees = load_fee_schedule_from_token(token)
+            student, term, _fees = load_fee_schedule_from_token(token)
         except ValueError as exc:
             message = str(exc)
             if 'not found' in message.lower():
                 return HttpResponseNotFound(message)
             return HttpResponseBadRequest(message)
 
-        context = build_fee_schedule_context(student=student, term=term, fees=fees)
-        filename = f'fees-{student.student_id}-{term.id}.html'
-        response = render(request, 'fees/public/fee_schedule.html', context)
-        response['Content-Disposition'] = f'inline; filename="{filename}"'
-        return response
+        publish_fee_schedule_pdf(student=student, term=term)
+        url = fee_schedule_file_url(student=student, term=term)
+        if not url:
+            return HttpResponseNotFound('Fee schedule file is unavailable.')
+        return redirect(url)
