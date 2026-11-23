@@ -99,7 +99,9 @@ function ValueTable({
             <Table.HeaderCell>Rows</Table.HeaderCell>
             <Table.HeaderCell>SCHOOLASST</Table.HeaderCell>
             <Table.HeaderCell>Status</Table.HeaderCell>
-            <Table.HeaderCell />
+            <Table.HeaderCell>
+              <span className="sr-only">Actions</span>
+            </Table.HeaderCell>
           </Table.Row>
         </Table.Head>
         <Table.Body>

@@ -65,6 +65,12 @@ const remarksClassName =
 const DETAIL_QUERY_KEY = (id: string, termId: string) =>
   ['assessments', 'admin', 'detail', id, termId] as const
 
+const isReleased = (student: AdminAssessmentDetailStudent) => student.status === 'released'
+const isNotifyEligible = (student: AdminAssessmentDetailStudent) =>
+  isReleased(student) && Boolean(student.has_report)
+const needsReport = (student: AdminAssessmentDetailStudent) =>
+  isReleased(student) && !student.has_report
+
 const AdminAssessmentDetail = () => {
   const { streamId } = useParams<{ streamId: string }>()
   const navigate = useNavigate()
@@ -193,11 +199,6 @@ const AdminAssessmentDetail = () => {
     []
 
   const canManageReports = canRelease
-  const isReleased = (student: AdminAssessmentDetailStudent) => student.status === 'released'
-  const isNotifyEligible = (student: AdminAssessmentDetailStudent) =>
-    isReleased(student) && Boolean(student.has_report)
-  const needsReport = (student: AdminAssessmentDetailStudent) =>
-    isReleased(student) && !student.has_report
 
   const releasedIds = useMemo(
     () => (data?.students ?? []).filter(isReleased).map((student) => student.id),

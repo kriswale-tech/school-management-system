@@ -15,7 +15,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Keep a running push workflow alive so a newer push cannot interrupt deployment.
+  cancel-in-progress: false
 
 jobs:
   main-pr-source:
@@ -43,6 +44,29 @@ jobs:
     name: Backend checks and tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: school_management_ci
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d school_management_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       APP_ENV: local
       DEBUG: "true"
@@ -168,3 +192,4 @@ jobs:
 
       - name: Build production image without publishing
         run: docker build --file sms-backend/Dockerfile.prod --tag school-management-system-backend:ci sms-backend
+
