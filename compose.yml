@@ -59,6 +59,8 @@ services:
     volumes:
       - ./sms-frontend:/app
       - node_modules:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:9000/api/v1}
     ports:
       - "3003:5173"
     stdin_open: true
@@ -72,6 +74,8 @@ services:
     volumes:
       - ./platform-admin:/app
       - platform_admin_node_modules:/app/node_modules
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:9000/api/v1}
     ports:
       - "3004:5174"
     stdin_open: true

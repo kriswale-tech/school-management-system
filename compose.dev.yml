@@ -1,0 +1,29 @@
+name: sms-dev
+
+services:
+  backend:
+    env_file:
+      - .env.dev
+    # Host Caddy proxies API requests to this loopback-only port.
+    ports:
+      - "127.0.0.1:18100:8000"
+
+  celery-worker:
+    env_file:
+      - .env.dev
+
+  celery-beat:
+    env_file:
+      - .env.dev
+
+  migrate:
+    env_file:
+      - .env.dev
+
+  db:
+    env_file:
+      - .env.dev
+
+  redis:
+    env_file:
+      - .env.dev

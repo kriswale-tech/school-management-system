@@ -8,7 +8,7 @@ declare module 'axios' {
   }
 }
 
-const baseURL = 'http://localhost:9000/api/v1'
+const baseURL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:9000/api/v1'
 
 function getCsrfToken(): string | null {
   const match = document.cookie.match(/csrftoken=([^;]+)/)

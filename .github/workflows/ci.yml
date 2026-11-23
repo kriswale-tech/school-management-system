@@ -1,0 +1,170 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+  push:
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  main-pr-source:
+    name: Main PR must come from dev
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require the dev branch in this repository
+        env:
+          PR_SOURCE_BRANCH: ${{ github.head_ref }}
+          PR_SOURCE_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          TARGET_REPOSITORY: ${{ github.repository }}
+        run: |
+          if [[ "$PR_SOURCE_BRANCH" != "dev" ]]; then
+            echo "Pull requests into main must come from dev."
+            exit 1
+          fi
+          if [[ "$PR_SOURCE_REPOSITORY" != "$TARGET_REPOSITORY" ]]; then
+            echo "The dev branch must be in this repository."
+            exit 1
+          fi
+
+  backend-tests:
+    name: Backend checks and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      APP_ENV: local
+      DEBUG: "true"
+      POSTGRES_DB: school_management_ci
+      POSTGRES_USER: ci
+      POSTGRES_PASSWORD: ci-only
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: "5432"
+      CELERY_BROKER_URL: redis://127.0.0.1:6379/0
+      CELERY_RESULT_BACKEND: redis://127.0.0.1:6379/0
+      EMAIL_ENABLED: "false"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: sms-backend/requirements.txt
+
+      - name: Install system libraries for WeasyPrint
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            libcairo2 \
+            libffi-dev \
+            libgdk-pixbuf-2.0-0 \
+            libpango-1.0-0 \
+            libpangocairo-1.0-0 \
+            shared-mime-info \
+            fonts-dejavu-core
+
+      - name: Install Python requirements
+        working-directory: sms-backend
+        run: python -m pip install -r requirements.txt
+
+      - name: Generate an ephemeral Django key for CI
+        run: python -c 'import secrets; print("SECRET_KEY=" + secrets.token_urlsafe(48))' >> "$GITHUB_ENV"
+
+      - name: Check Django configuration
+        working-directory: sms-backend
+        run: python manage.py check
+
+      - name: Check migration files
+        working-directory: sms-backend
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Run Django tests
+        working-directory: sms-backend
+        run: python manage.py test --verbosity 2
+
+  school-frontend:
+    name: School frontend checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: sms-frontend/package-lock.json
+
+      - name: Install packages
+        working-directory: sms-frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: sms-frontend
+        run: npm run lint
+
+      - name: Typecheck
+        working-directory: sms-frontend
+        run: npm run typecheck
+
+      - name: Build frontend
+        working-directory: sms-frontend
+        env:
+          VITE_API_BASE_URL: https://api.ci.invalid/api/v1
+        run: npm run build
+
+  platform-admin:
+    name: Platform admin checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: platform-admin/package-lock.json
+
+      - name: Install packages
+        working-directory: platform-admin
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: platform-admin
+        run: npm run typecheck
+
+      - name: Build frontend
+        working-directory: platform-admin
+        env:
+          VITE_API_BASE_URL: https://api.ci.invalid/api/v1
+        run: npm run build
+
+  backend-image:
+    name: Production backend image build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build production image without publishing
+        run: docker build --file sms-backend/Dockerfile.prod --tag school-management-system-backend:ci sms-backend
