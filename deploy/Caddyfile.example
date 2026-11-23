@@ -1,0 +1,39 @@
+# Example blocks for the Caddy service already installed on the VPS.
+# Replace each example hostname and merge these blocks into the existing
+# Caddyfile; do not replace unrelated sites already hosted on the server.
+
+dev.school.example.com {
+	root * /srv/school-management-system/dev/school/current
+	encode zstd gzip
+	try_files {path} /index.html
+	file_server
+}
+
+dev-admin.school.example.com {
+	root * /srv/school-management-system/dev/platform-admin/current
+	encode zstd gzip
+	try_files {path} /index.html
+	file_server
+}
+
+dev-api.school.example.com {
+	reverse_proxy 127.0.0.1:18100
+}
+
+school.example.com {
+	root * /srv/school-management-system/prod/school/current
+	encode zstd gzip
+	try_files {path} /index.html
+	file_server
+}
+
+admin.school.example.com {
+	root * /srv/school-management-system/prod/platform-admin/current
+	encode zstd gzip
+	try_files {path} /index.html
+	file_server
+}
+
+api.school.example.com {
+	reverse_proxy 127.0.0.1:18200
+}

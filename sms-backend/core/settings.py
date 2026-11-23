@@ -16,6 +16,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from celery.schedules import crontab
+from django.core.exceptions import ImproperlyConfigured
 
 
 
@@ -23,40 +24,114 @@ from celery.schedules import crontab
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+def _env_bool(name: str, default: str) -> bool:
+    value = os.getenv(name, default).strip().lower()
+    if value not in {'1', 'true', 'yes', 'on', '0', 'false', 'no', 'off'}:
+        raise ImproperlyConfigured(f'{name} must be set to a boolean value.')
+    return value in {'1', 'true', 'yes', 'on'}
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-j@7)g#=w221!e04+^xp08%7!r63%8y7m2gkk51q%lr8lr*3_ci'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+def _env_list(name: str, default: str = '') -> list[str]:
+    return [item.strip() for item in os.getenv(name, default).split(',') if item.strip()]
 
-ALLOWED_HOSTS = ['*']
 
-# Security settings
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3003',
-    'http://127.0.0.1:3003',
-    'http://localhost:3004',
-    'http://127.0.0.1:3004',
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:5174',
-    'http://127.0.0.1:5174',
-]
+APP_ENV = os.getenv('APP_ENV', 'local').strip().lower()
+if APP_ENV not in {'local', 'development', 'production'}:
+    raise ImproperlyConfigured('APP_ENV must be local, development, or production.')
+
+# Deployed dev and production both run with DEBUG off. Only local development
+# defaults to DEBUG on; deployments must explicitly provide their environment.
+DEBUG = _env_bool('DEBUG', 'true' if APP_ENV == 'local' else 'false')
+if APP_ENV != 'local' and DEBUG:
+    raise ImproperlyConfigured('DEBUG must be false for development and production deployments.')
+
+SECRET_KEY = os.getenv('SECRET_KEY', '').strip()
+if (
+    len(SECRET_KEY) < 50
+    or SECRET_KEY.lower().startswith('django-insecure-')
+    or SECRET_KEY.lower() in {'change-me', 'changeme', 'replace-me'}
+):
+    raise ImproperlyConfigured(
+        'SECRET_KEY must be a unique random value of at least 50 characters; '
+        'generate a separate key for each environment.',
+    )
+
+ALLOWED_HOSTS = _env_list(
+    'ALLOWED_HOSTS',
+    'localhost,127.0.0.1,testserver' if APP_ENV == 'local' else '',
+)
+CORS_ALLOWED_ORIGINS = _env_list(
+    'CORS_ALLOWED_ORIGINS',
+    ','.join([
+        'http://localhost:3003',
+        'http://127.0.0.1:3003',
+        'http://localhost:3004',
+        'http://127.0.0.1:3004',
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'http://localhost:5174',
+        'http://127.0.0.1:5174',
+    ]) if APP_ENV == 'local' else '',
+)
+CSRF_TRUSTED_ORIGINS = _env_list(
+    'CSRF_TRUSTED_ORIGINS',
+    ','.join([
+        'http://localhost:3003',
+        'http://127.0.0.1:3003',
+        'http://localhost:3004',
+        'http://127.0.0.1:3004',
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'http://localhost:5174',
+        'http://127.0.0.1:5174',
+    ]) if APP_ENV == 'local' else '',
+)
+
+if APP_ENV != 'local':
+    if not ALLOWED_HOSTS or '*' in ALLOWED_HOSTS:
+        raise ImproperlyConfigured('Set explicit ALLOWED_HOSTS for deployed environments.')
+    if not CORS_ALLOWED_ORIGINS or not CSRF_TRUSTED_ORIGINS:
+        raise ImproperlyConfigured(
+            'Set CORS_ALLOWED_ORIGINS and CSRF_TRUSTED_ORIGINS for deployed environments.',
+        )
+    if any(not origin.startswith('https://') for origin in CORS_ALLOWED_ORIGINS + CSRF_TRUSTED_ORIGINS):
+        raise ImproperlyConfigured('Deployed CORS and CSRF origins must use HTTPS.')
+
+# The reverse proxy must be the only route to the app container and must set
+# X-Forwarded-Proto itself before Django trusts this header.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https') if APP_ENV != 'local' else None
+SECURE_SSL_REDIRECT = _env_bool('SECURE_SSL_REDIRECT', 'true' if APP_ENV != 'local' else 'false')
+SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '0'))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'false')
+SECURE_HSTS_PRELOAD = _env_bool('SECURE_HSTS_PRELOAD', 'false')
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = 'same-origin'
+
+if SECURE_HSTS_SECONDS < 0:
+    raise ImproperlyConfigured('SECURE_HSTS_SECONDS cannot be negative.')
+if APP_ENV != 'local' and not SECURE_SSL_REDIRECT:
+    raise ImproperlyConfigured('SECURE_SSL_REDIRECT must be true for deployed environments.')
+
 CORS_ALLOW_CREDENTIALS = True
 CORS_EXPOSE_HEADERS = ['Content-Disposition']
 
 # Used for notification email CTAs and the app-logo fallback image URL.
 FRONTEND_URL = os.getenv(
     'FRONTEND_URL',
-    os.getenv('FRONTEND_BASE_URL', 'http://localhost:3003'),
-)
+    os.getenv('FRONTEND_BASE_URL', 'http://localhost:3003' if APP_ENV == 'local' else ''),
+).rstrip('/')
 
 # Absolute origin for unauthenticated guardian links (receipts, reports).
-# Compose publishes the API on host port 9000 by default.
-PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL', 'http://localhost:9000').rstrip('/')
+# Local Compose publishes the API on host port 9000 by default.
+PUBLIC_BASE_URL = os.getenv(
+    'PUBLIC_BASE_URL',
+    'http://localhost:9000' if APP_ENV == 'local' else '',
+).rstrip('/')
+
+if APP_ENV != 'local' and (
+    not FRONTEND_URL.startswith('https://') or not PUBLIC_BASE_URL.startswith('https://')
+):
+    raise ImproperlyConfigured('Set FRONTEND_URL and PUBLIC_BASE_URL to their HTTPS URLs.')
 RECEIPT_LINK_MAX_AGE_SECONDS = int(
     os.getenv('RECEIPT_LINK_MAX_AGE_SECONDS', str(60 * 60 * 24 * 30)),
 )
@@ -66,17 +141,6 @@ REPORT_LINK_MAX_AGE_SECONDS = int(
 FEE_SCHEDULE_LINK_MAX_AGE_SECONDS = int(
     os.getenv('FEE_SCHEDULE_LINK_MAX_AGE_SECONDS', str(60 * 60 * 24 * 90)),
 )
-
-CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:3003',
-    'http://127.0.0.1:3003',
-    'http://localhost:3004',
-    'http://127.0.0.1:3004',
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:5174',
-    'http://127.0.0.1:5174',
-]
 
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
@@ -127,6 +191,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -283,7 +348,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Local filesystem storage for ephemeral bulk-import exports (not Cloudinary).
 BULK_IMPORT_LOCAL_MEDIA_ROOT = BASE_DIR / 'media' / 'bulk-imports'
@@ -394,7 +460,7 @@ STORAGES = {
         'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
     },
     'staticfiles': {
-        'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
     },
     'reports': _document_storage(),
     'receipts': _document_storage(),
@@ -426,7 +492,7 @@ STORAGES = {
 # ---------------------------------------------------------------------------
 
 def _env_flag(name: str, default: str = 'false') -> bool:
-    return os.getenv(name, default).strip().lower() in {'1', 'true', 'yes', 'on'}
+    return _env_bool(name, default)
 
 
 EMAIL_ENABLED = _env_flag('EMAIL_ENABLED', 'false')

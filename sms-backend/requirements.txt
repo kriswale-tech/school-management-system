@@ -15,6 +15,7 @@ django-storages==1.14.6
 djangorestframework==3.17.1
 djangorestframework_simplejwt==5.5.1
 drf-spectacular==0.29.0
+gunicorn==25.3.0
 idna==3.18
 inflection==0.5.1
 jsonschema==4.26.0
@@ -34,4 +35,5 @@ sqlparse==0.5.5
 typing_extensions==4.15.0
 uritemplate==4.2.0
 urllib3==2.7.0
+whitenoise==6.12.0
 weasyprint==67.0
