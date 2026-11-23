@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -21,9 +21,10 @@ const MigrationMap = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const job = useQuery({ queryKey: ['migration-job', jobId], queryFn: () => getMigrationJob(jobId) })
-  const sheets = (job.data?.files ?? []).flatMap((file) => file.sheets).filter((sheet) => sheet.included)
-  const sheetsRef = useRef(sheets)
-  sheetsRef.current = sheets
+  const sheets = useMemo(
+    () => (job.data?.files ?? []).flatMap((file) => file.sheets).filter((sheet) => sheet.included),
+    [job.data?.files],
+  )
   const [sheetId, setSheetId] = useState('')
   const [mappings, setMappings] = useState<FieldMappingInput[]>([])
   const [targets, setTargets] = useState<TargetField[]>([])
@@ -44,7 +45,7 @@ const MigrationMap = () => {
       .then((data) => {
         if (cancelled) return
         setTargets(data.targets)
-        const sheet = sheetsRef.current.find((item) => item.id === activeId)
+        const sheet = sheets.find((item) => item.id === activeId)
         setMappings(sheet && sheet.mappings.length > 0 ? sheet.mappings : data.suggestions)
       })
       .catch((error) => {
@@ -56,7 +57,7 @@ const MigrationMap = () => {
     return () => {
       cancelled = true
     }
-  }, [activeId, jobId])
+  }, [activeId, jobId, sheets])
 
   const suggest = useMutation({
     mutationFn: () => suggestMapping(jobId, activeId),

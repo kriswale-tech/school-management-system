@@ -14,7 +14,7 @@ const MigrationUpload = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const fileInput = useRef<HTMLInputElement>(null)
-  const roleRef = useRef('')
+  const [selectedRole, setSelectedRole] = useState('')
   const [chosenName, setChosenName] = useState('')
   const job = useQuery({ queryKey: ['migration-job', jobId], queryFn: () => getMigrationJob(jobId) })
   const historical = job.data?.template === 'historical_finance'
@@ -43,17 +43,17 @@ const MigrationUpload = () => {
               const file = event.target.files?.[0]
               if (!file) return
               setChosenName(file.name)
-              upload.mutate({ file, role: historical ? roleRef.current : undefined })
+              upload.mutate({ file, role: historical ? selectedRole : undefined })
               event.target.value = ''
             }}
           />
           {historical ? (
             <>
-              <Button className="max-w-fit py-2" loading={upload.isPending && roleRef.current === 'charges'} loadingText="Reading file" onClick={() => { roleRef.current = 'charges'; fileInput.current?.click() }}>
+              <Button className="max-w-fit py-2" loading={upload.isPending && selectedRole === 'charges'} loadingText="Reading file" onClick={() => { setSelectedRole('charges'); fileInput.current?.click() }}>
                 <Icon icon="hugeicons:upload-01" className="size-4" />
                 Charges file
               </Button>
-              <Button className="max-w-fit py-2" loading={upload.isPending && roleRef.current === 'payments'} loadingText="Reading file" onClick={() => { roleRef.current = 'payments'; fileInput.current?.click() }}>
+              <Button className="max-w-fit py-2" loading={upload.isPending && selectedRole === 'payments'} loadingText="Reading file" onClick={() => { setSelectedRole('payments'); fileInput.current?.click() }}>
                 <Icon icon="hugeicons:upload-01" className="size-4" />
                 Payments file
               </Button>
