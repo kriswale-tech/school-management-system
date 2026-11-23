@@ -26,44 +26,62 @@ const MigrationMap = () => {
     [job.data?.files],
   )
   const [sheetId, setSheetId] = useState('')
-  const [mappings, setMappings] = useState<FieldMappingInput[]>([])
-  const [targets, setTargets] = useState<TargetField[]>([])
   const [profileName, setProfileName] = useState('')
-  const [filling, setFilling] = useState(false)
+  const [draft, setDraft] = useState<{
+    sheetId: string
+    mappings: FieldMappingInput[]
+    targets: TargetField[]
+  } | null>(null)
   const activeId = sheets.some((sheet) => sheet.id === sheetId) ? sheetId : sheets[0]?.id || ''
   const profiles = useQuery({
     queryKey: ['migration-profiles', job.data?.job_type],
     queryFn: () => listMappingProfiles(job.data!.job_type),
     enabled: Boolean(job.data?.job_type),
   })
+  const suggestion = useQuery({
+    queryKey: ['migration-suggestion', jobId, activeId],
+    queryFn: () => suggestMapping(jobId, activeId),
+    enabled: Boolean(activeId),
+    retry: false,
+  })
 
   useEffect(() => {
-    if (!activeId) return
-    let cancelled = false
-    setFilling(true)
-    suggestMapping(jobId, activeId)
-      .then((data) => {
-        if (cancelled) return
-        setTargets(data.targets)
-        const sheet = sheets.find((item) => item.id === activeId)
-        setMappings(sheet && sheet.mappings.length > 0 ? sheet.mappings : data.suggestions)
-      })
-      .catch((error) => {
-        if (!cancelled) toast.error(getApiErrorMessage(error, 'Could not suggest columns'))
-      })
-      .finally(() => {
-        if (!cancelled) setFilling(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [activeId, jobId, sheets])
+    if (!suggestion.error || !suggestion.errorUpdatedAt) return
+    toast.error(getApiErrorMessage(suggestion.error, 'Could not suggest columns'))
+  }, [suggestion.error, suggestion.errorUpdatedAt])
+
+  const activeSheet = sheets.find((sheet) => sheet.id === activeId)
+  const suggestedMappings =
+    activeSheet && activeSheet.mappings.length > 0
+      ? activeSheet.mappings
+      : (suggestion.data?.suggestions ?? [])
+  const suggestedTargets = suggestion.data?.targets ?? []
+  const mappings = draft?.sheetId === activeId ? draft.mappings : suggestedMappings
+  const targets =
+    draft?.sheetId === activeId && draft.targets.length > 0 ? draft.targets : suggestedTargets
+  const filling = Boolean(activeId) && suggestion.isPending && draft?.sheetId !== activeId
+
+  const setMappings = (
+    value: FieldMappingInput[] | ((current: FieldMappingInput[]) => FieldMappingInput[]),
+  ) => {
+    setDraft((current) => {
+      const baseMappings = current?.sheetId === activeId ? current.mappings : suggestedMappings
+      const baseTargets =
+        current?.sheetId === activeId && current.targets.length > 0
+          ? current.targets
+          : suggestedTargets
+      return {
+        sheetId: activeId,
+        mappings: typeof value === 'function' ? value(baseMappings) : value,
+        targets: baseTargets,
+      }
+    })
+  }
 
   const suggest = useMutation({
     mutationFn: () => suggestMapping(jobId, activeId),
     onSuccess: (data) => {
-      setMappings(data.suggestions)
-      setTargets(data.targets)
+      setDraft({ sheetId: activeId, mappings: data.suggestions, targets: data.targets })
     },
     onError: (error) => toast.error(getApiErrorMessage(error, 'Could not suggest columns')),
   })

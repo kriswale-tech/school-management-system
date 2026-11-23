@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Icon } from '@iconify/react'
@@ -237,13 +237,13 @@ const MessagingPage = ({ embedded = false }: MessagingPageProps) => {
     enabled: tab === 'history' && canManageMessaging,
   })
 
-  const invalidateAfterTopup = () => {
+  const invalidateAfterTopup = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['messaging-overview'] })
     void queryClient.invalidateQueries({ queryKey: ['billing-upcoming'] })
     void queryClient.invalidateQueries({ queryKey: ['billing-invoices'] })
     void queryClient.invalidateQueries({ queryKey: ['billing-payments'] })
     void queryClient.invalidateQueries({ queryKey: ['communication-credits'] })
-  }
+  }, [queryClient])
 
   const paymentReference = searchParams.get('reference')
   const paymentReturn = searchParams.get('payment')
@@ -262,18 +262,23 @@ const MessagingPage = ({ embedded = false }: MessagingPageProps) => {
         if (!cancelled) toast.error(errorMessage(error))
       } finally {
         if (!cancelled) {
-          const next = new URLSearchParams(searchParams)
-          next.delete('reference')
-          next.delete('payment')
-          next.delete('trxref')
-          setSearchParams(next, { replace: true })
+          setSearchParams(
+            (current) => {
+              const next = new URLSearchParams(current)
+              next.delete('reference')
+              next.delete('payment')
+              next.delete('trxref')
+              return next
+            },
+            { replace: true },
+          )
         }
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [paymentReference, paymentReturn])
+  }, [invalidateAfterTopup, paymentReference, paymentReturn, setSearchParams])
 
   const bulkRetryMutation = useMutation({
     mutationFn: retryMessagingDeliveries,

@@ -77,7 +77,9 @@ const MigrationEnrollments = () => {
               <Table.HeaderCell>Rows</Table.HeaderCell>
               <Table.HeaderCell>Class</Table.HeaderCell>
               <Table.HeaderCell>Status</Table.HeaderCell>
-              <Table.HeaderCell />
+              <Table.HeaderCell>
+                <span className="sr-only">Actions</span>
+              </Table.HeaderCell>
             </Table.Row>
           </Table.Head>
           <Table.Body>

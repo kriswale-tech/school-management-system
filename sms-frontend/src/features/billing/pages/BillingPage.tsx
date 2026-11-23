@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
@@ -177,14 +177,14 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
     queryFn: () => getCommunicationSkus(subscriptionQuery.data?.interval),
     enabled: Boolean(subscriptionQuery.data?.interval),
   })
-  const invalidateBilling = () => {
+  const invalidateBilling = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['billing-subscription'] })
     void queryClient.invalidateQueries({ queryKey: ['billing-invoices'] })
     void queryClient.invalidateQueries({ queryKey: ['billing-upcoming'] })
     void queryClient.invalidateQueries({ queryKey: ['billing-payments'] })
     void queryClient.invalidateQueries({ queryKey: ['billing-payment-stats'] })
     void queryClient.invalidateQueries({ queryKey: ['messaging-overview'] })
-  }
+  }, [queryClient])
 
   const paymentReference = searchParams.get('reference')
   const paymentReturn = searchParams.get('payment')
@@ -203,18 +203,23 @@ const BillingPage = ({ embedded = false }: BillingPageProps) => {
         if (!cancelled) toast.error(errorMessage(error))
       } finally {
         if (!cancelled) {
-          const next = new URLSearchParams(searchParams)
-          next.delete('reference')
-          next.delete('payment')
-          next.delete('trxref')
-          setSearchParams(next, { replace: true })
+          setSearchParams(
+            (current) => {
+              const next = new URLSearchParams(current)
+              next.delete('reference')
+              next.delete('payment')
+              next.delete('trxref')
+              return next
+            },
+            { replace: true },
+          )
         }
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [paymentReference, paymentReturn])
+  }, [invalidateBilling, paymentReference, paymentReturn, setSearchParams])
 
   const scheduleMutation = useMutation({
     mutationFn: schedulePlanChange,
