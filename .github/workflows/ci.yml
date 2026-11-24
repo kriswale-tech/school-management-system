@@ -202,6 +202,7 @@ jobs:
       - backend-image
     if: github.event_name == 'push' && (github.ref_name == 'dev' || github.ref_name == 'main')
     uses: ./.github/workflows/deploy.yml
+    secrets: inherit
     permissions:
       contents: read
       packages: write
