@@ -11,20 +11,20 @@ This is the working deployment checklist for the repository. The VPS layout is o
 - [x] Production backend image uses Gunicorn, a non-root runtime, collected static files, and a health check. Frontends are built as static files for host Caddy; no production frontend images are needed.
 - [x] Deployment Compose files use separate project names, volumes, databases, Redis instances, and loopback-only published ports for host Caddy.
 - [x] A CI workflow now checks backend tests/migrations, both frontend typechecks/builds (plus school frontend lint), the production backend image build, and the `dev`-only source rule for PRs into `main`.
-- [ ] GitHub still needs the `main` ruleset enabled; private backend GHCR publishing and the frontend/backend deployment workflow remain to be added.
-- [ ] No real `.env.dev` or `.env.prod` values are created yet; create them in the project directory on the VPS only, with restrictive permissions. Both names are gitignored.
+- [x] GitHub `main` ruleset blocks direct pushes and requires the existing CI checks. The deployment workflow is now connected locally and waits for the CI jobs to pass; merge this change to `dev` before the first deploy.
+- [ ] No real `.env.dev` or `.env.prod` values are created yet; create them in `~/school-management-system/dev` and `~/school-management-system/prod` on the VPS only, with restrictive permissions. Both names are gitignored.
 - [ ] `MIGRATION_FILE_STORAGE` defaults to local disk. Production should use private R2 storage for migration staging files; bulk-import failure files currently use app-local disk and need an explicit persistence/expiry plan.
-- [ ] CI is in `.github/workflows/ci.yml`. Add Compose/config validation, security/dependency scanning, then GHCR publishing and deployment automation.
+- [ ] `.github/workflows/deploy.yml` is connected to CI locally; merge it to `dev` after the VPS registry login and environment setup are ready.
 - [ ] `docs/STATUS.md` is older than the November 2026 feature notes. Use code and the recent notes as operational evidence; update the status doc as deployment work lands.
 - [ ] Current worktree has a modified `.DS_Store` and untracked `AGENTS.md` / `CLAUDE.md`. Decide whether these are intended repository changes before staging; do not bundle them into a deployment commit by accident.
 
 ## Environment separation to establish
 
 - [ ] Create GitHub Environments named `development` and `production`; scope deploy secrets and variables to the matching environment. Restrict dev deploys to `dev` and prod deploys to `main`; gate production where supported.
-- [ ] Deploy `dev` commits to the dev stack and `main` commits to production. PRs run CI only and never receive deploy credentials.
+- [ ] Connect deployment so pushes to `dev` deploy the dev stack and pushes to `main` deploy production after CI passes. PRs must remain CI-only.
 - [x] Use one Hetzner VPS with isolated Compose projects, networks, volumes, databases, Redis instances, credentials, and domains. Never point dev at production data or services.
 - [x] Use host Caddy as the public HTTPS reverse proxy; app ports bind to localhost and database/Redis ports are not published.
-- [x] Keep `.env.dev` and `.env.prod` inside the project directory on the VPS and ignored by Git; create actual values after the project is on the server.
+- [x] Keep `.env.dev` and `.env.prod` in their matching per-environment deployment directories under `~/school-management-system/` on the VPS and ignored by Git.
 - [ ] Use separate hostnames, for example `dev.school-domain` / `dev-admin.school-domain` / `dev-api.school-domain`, and corresponding production hostnames. Final DNS/domain choices are an implementation input.
 - [ ] Give each environment its own PostgreSQL database/volume, Redis namespace or instance, object-storage bucket/prefix and credentials, Cloudinary credentials/folder, Arkesel sender/key, Paystack test/live keys and webhook, SES sender/configuration set, Django secret, and admin/bootstrap credentials.
 - [ ] Keep development integrations in provider test/sandbox mode where available. Use synthetic or anonymized test data only. Do not copy production student/guardian data into dev without a documented, approved sanitization process.
@@ -57,8 +57,8 @@ This is the working deployment checklist for the repository. The VPS layout is o
 - [x] Pin workflow actions to reviewed commit SHAs, set minimum `contents: read` permissions, and avoid deployment credentials in CI.
 - [ ] Add Compose/config validation, secret scanning, and dependency vulnerability scanning.
 - [ ] Add CodeQL or equivalent source analysis, Dependabot/Renovate updates, container scanning (e.g. Trivy), and secret scanning/push protection in repository settings.
-- [ ] Publish the backend image to a private GHCR package only from trusted branches. Tag it with the full commit SHA and deploy that exact tag after CI; do not build the backend image on the VPS. Build the two frontends in CI and upload their static releases for Caddy to serve.
-- [ ] Enable the `main` ruleset in GitHub: require PR, the four CI checks plus the source-branch policy check, block force pushes/deletion, and do not allow bypass. See [github-branch-protection.md](./github-branch-protection.md).
+- [ ] Publish the backend image to GHCR only after CI passes on `dev` or `main`, tag it with the full commit SHA, and deploy that exact tag. Build both frontends with the environment's API URL and upload static releases for Caddy to serve.
+- [x] `main` ruleset requires a PR, the four CI checks plus the source-branch policy check, blocks force pushes/deletion, and does not allow bypass. See [github-branch-protection.md](./github-branch-protection.md).
 - [ ] Protect `main`, require passing checks and review, and use concurrency locks so simultaneous deployments cannot race for the same environment.
 - [ ] Keep deployment credentials unavailable to fork PRs and general CI. Prefer a constrained SSH deploy key/user or a pull-only registry credential on the host; restrict it to the required repository and paths. Do not expose the Docker socket to untrusted jobs.
 
@@ -72,7 +72,7 @@ This is the working deployment checklist for the repository. The VPS layout is o
 
 ### 5. Secrets, providers, and credential rotation
 
-- [ ] Generate a unique high-entropy Django `SECRET_KEY` per environment. Store actual credentials in `.env.dev` and `.env.prod` inside the project directory on the VPS, with restrictive file permissions; keep deploy credentials in GitHub secrets.
+- [ ] Generate a unique high-entropy Django `SECRET_KEY` per environment. Store actual credentials in `~/school-management-system/dev/.env.dev` and `~/school-management-system/prod/.env.prod` on the VPS, with restrictive file permissions; keep deploy credentials in GitHub secrets.
 - [ ] Create distinct, least-privilege R2 credentials and private buckets for reports/receipts and migration files; set `MIGRATION_FILE_STORAGE=r2`. Decide the retention and cleanup policy for failed imports and locally staged bulk-import artifacts.
 - [ ] Configure Cloudinary credentials/folders separately; verify upload preset security, signed/unsigned behavior, and access controls.
 - [ ] Verify SES sending domain, production access, sender identity, configuration set and SNS event subscription. Test invite, OTP/email fallback, guardian message, bounce/complaint handling, and suppression behavior.
