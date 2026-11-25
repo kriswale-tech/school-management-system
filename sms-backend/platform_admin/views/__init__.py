@@ -1,3 +1,4 @@
+from platform_admin.views.audit import PlatformAuditListView
 from platform_admin.views.auth import (
     PlatformHelloView,
     PlatformLoginView,
@@ -33,6 +34,7 @@ __all__ = [
     'CurriculumDraftCreateView',
     'CurriculumDraftView',
     'CurriculumOverviewView',
+    'PlatformAuditListView',
     'PlatformHelloView',
     'PlatformLoginView',
     'PlatformLogoutView',

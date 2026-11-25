@@ -608,5 +608,10 @@ if 'test' in sys.argv:
     CELERY_TASK_EAGER_PROPAGATES = True
     EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
     EMAIL_ENABLED = True
+    # A developer .env often has live SES keys. Tests must not send through
+    # that account. A test that needs the SES path sets its own keys.
+    AWS_ACCESS_KEY_ID = ''
+    AWS_SECRET_ACCESS_KEY = ''
+    AWS_REGION = ''
     # A missing float must not block fixture SMS. Production leaves this unset.
     ARKESEL_FLOAT_ASSUME_UNITS = 100_000

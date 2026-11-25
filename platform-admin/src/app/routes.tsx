@@ -5,6 +5,7 @@ import DashboardPage from '@/features/dashboard/DashboardPage'
 import SchoolsPage from '@/features/schools/SchoolsPage'
 import SchoolDetailPage from '@/features/schools/SchoolDetailPage'
 import SettingsPage from '@/features/settings/SettingsPage'
+import AuditPage from '@/features/audit/AuditPage'
 import PlansPage from '@/features/billing/PlansPage'
 import DiscountsPage from '@/features/billing/DiscountsPage'
 import PaymentsPage from '@/features/billing/PaymentsPage'
@@ -77,6 +78,7 @@ export default function AppRoutes() {
             <Route path="profitability" element={<ProfitabilityPage />} />
             <Route path="transactions" element={<TransactionsPage />} />
           </Route>
+          <Route path="/audit" element={<AuditPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

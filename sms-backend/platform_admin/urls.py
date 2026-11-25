@@ -4,6 +4,7 @@ from platform_admin.views import (
     CurriculumDraftCreateView,
     CurriculumDraftView,
     CurriculumOverviewView,
+    PlatformAuditListView,
     PlatformHelloView,
     PlatformLoginView,
     PlatformLogoutView,
@@ -41,6 +42,7 @@ urlpatterns = [
     ),
     path('auth/mfa/disable/', PlatformMfaDisableView.as_view(), name='platform-mfa-disable'),
     path('settings/', PlatformSettingsView.as_view(), name='platform-settings'),
+    path('audit/', PlatformAuditListView.as_view(), name='platform-audit-list'),
     path('curriculum/', CurriculumOverviewView.as_view(), name='platform-curriculum'),
     path(
         'curriculum/draft/',
