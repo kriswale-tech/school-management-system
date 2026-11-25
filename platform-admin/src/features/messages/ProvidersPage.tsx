@@ -43,6 +43,7 @@ import {
   listProviders,
   listPurchases,
   listSesUsage,
+  sendArkeselTest,
   sendSesTest,
   syncArkeselBalance,
   syncSesUsage,
@@ -95,6 +96,8 @@ export default function ProvidersPage() {
   const [testTo, setTestTo] = useState('')
   const [testSubject, setTestSubject] = useState('')
   const [testMessage, setTestMessage] = useState('')
+  const [smsTestTo, setSmsTestTo] = useState('')
+  const [smsTestMessage, setSmsTestMessage] = useState('')
 
   const providersQuery = useQuery({
     queryKey: ['platform-messages-providers'],
@@ -144,6 +147,20 @@ export default function ProvidersPage() {
       toast.success(data?.placeholder ? 'SES placeholder usage recorded' : 'SES usage synced')
       void queryClient.invalidateQueries({ queryKey: ['platform-messages-ses-usage'] })
       void queryClient.invalidateQueries({ queryKey: ['platform-messages-providers'] })
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+
+  const smsTestMutation = useMutation({
+    mutationFn: sendArkeselTest,
+    onSuccess: (data) => {
+      toast.success(
+        data.sandbox
+          ? `Arkesel accepted the test for ${data.to} in sandbox. The phone will not receive it.`
+          : `Sent a test SMS to ${data.to}.`,
+      )
+      setSmsTestTo('')
+      setSmsTestMessage('')
     },
     onError: (error) => toast.error(errorMessage(error)),
   })
@@ -504,6 +521,56 @@ export default function ProvidersPage() {
           </Panel>
         </div>
       )}
+
+      <div className="mt-4">
+        <Panel
+          title="Send a test SMS"
+          description="One plain message through the same Arkesel credentials this app uses."
+          footnote="This uses the server's Arkesel key and sandbox setting. In sandbox Arkesel accepts the request and the phone does not get a message. A live send spends account credit and does not charge a school."
+        >
+          {canSync ? (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault()
+                smsTestMutation.mutate({
+                  to: smsTestTo.trim(),
+                  message: smsTestMessage.trim(),
+                })
+              }}
+              className="grid gap-3"
+            >
+              <Field label="Phone number">
+                <TextInput
+                  type="tel"
+                  required
+                  value={smsTestTo}
+                  placeholder="0240000000 or +233240000000"
+                  onChange={(event) => setSmsTestTo(event.target.value)}
+                />
+              </Field>
+              <Field label="Message">
+                <TextArea
+                  required
+                  rows={4}
+                  maxLength={480}
+                  value={smsTestMessage}
+                  placeholder="Write the test message."
+                  onChange={(event) => setSmsTestMessage(event.target.value)}
+                />
+              </Field>
+              <div>
+                <PrimaryButton type="submit" disabled={smsTestMutation.isPending}>
+                  {smsTestMutation.isPending ? 'Sending…' : 'Send test SMS'}
+                </PrimaryButton>
+              </div>
+            </form>
+          ) : (
+            <p className="text-sm text-[var(--color-ink)]/55">
+              Sending a test SMS is limited to Super Admin and Operations.
+            </p>
+          )}
+        </Panel>
+      </div>
       </>
       )}
 

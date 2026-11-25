@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, time
 
+import requests
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
@@ -72,12 +73,15 @@ from communications.services.reconciliation import reconcile_arkesel, reconcile_
 from communications.services.segments import analyze_sms
 from communications.services.transactions import transaction_feed
 from core.pagination import StandardResultsSetPagination
+from notifications.services.platform_outbound import arkesel_message_id
 from platform_admin.authentication import PlatformJWTCookieAuthentication
 from platform_admin.models import PlatformUser
 from platform_admin.permissions import HasPlatformRole, IsPlatformAuthenticated
 from platform_admin.services.audit import record_audit
 from platform_admin.utils import client_ip
 from schools.models import School
+from shared.helpers import format_phone_number
+from shared.services.arkesel_sms import send_sms
 
 # Role shortcuts
 SA = PlatformUser.Role.SUPER_ADMIN
@@ -379,6 +383,76 @@ class SesTestSendView(MessagesAPIView):
             'to': to_addr,
             'from_email': settings.DEFAULT_FROM_EMAIL,
             'provider_message_id': result.get('provider_message_id') or '',
+        })
+
+
+def _arkesel_rejection_message(exc: requests.RequestException) -> str:
+    response = getattr(exc, 'response', None)
+    if response is not None:
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        if isinstance(body, dict):
+            provider_message = str(body.get('message') or '').strip()
+            if provider_message:
+                return provider_message[:240]
+    return 'Arkesel rejected the message.'
+
+
+class ArkeselTestSendView(MessagesAPIView):
+    """Send one plain SMS through the app's Arkesel credentials."""
+
+    allowed_roles = OPS_SYNC
+
+    def post(self, request):
+        raw_phone = str(request.data.get('to') or '').strip()
+        message = str(request.data.get('message') or '').strip()
+        errors = {}
+        phone = ''
+        try:
+            phone = format_phone_number(raw_phone)
+        except ValueError as exc:
+            errors['to'] = str(exc)
+        if not message:
+            errors['message'] = 'Enter a message.'
+        elif len(message) > 480:
+            errors['message'] = 'Message must be 480 characters or fewer.'
+        if errors:
+            raise ValidationError(errors)
+        if not (settings.ARKESEL_API_KEY or '').strip():
+            raise ValidationError('Arkesel API key is not configured on the server.')
+
+        try:
+            payload = send_sms(phone, message)
+        except requests.RequestException as exc:
+            raise ValidationError(_arkesel_rejection_message(exc)) from exc
+
+        if isinstance(payload, dict):
+            status_value = str(payload.get('status') or '').strip().lower()
+            if status_value and status_value != 'success':
+                provider_message = str(payload.get('message') or '').strip()
+                raise ValidationError(provider_message[:240] or 'Arkesel rejected the message.')
+        else:
+            payload = {}
+
+        message_id = arkesel_message_id(payload)[:64]
+        record_audit(
+            actor=request.platform_user,
+            action='messages.arkesel_test.sent',
+            target_type='arkesel_test',
+            target_id=message_id,
+            detail={
+                'to': phone,
+                'sandbox': bool(settings.ARKESEL_SANDBOX),
+            },
+            ip_address=client_ip(request),
+        )
+        return Response({
+            'ok': True,
+            'to': phone,
+            'sandbox': bool(settings.ARKESEL_SANDBOX),
+            'provider_message_id': message_id,
         })
 
 
