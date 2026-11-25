@@ -387,7 +387,10 @@ PAYSTACK_SAAS_PUBLIC_KEY = os.getenv('PAYSTACK_SAAS_PUBLIC_KEY', '')
 PAYSTACK_SAAS_WEBHOOK_SECRET = os.getenv('PAYSTACK_SAAS_WEBHOOK_SECRET', '')
 
 # cloudinary settings
-PARENT_CLOUDINARY_FOLDER = 'school-management-system'
+PARENT_CLOUDINARY_FOLDER = (
+    os.getenv('CLOUDINARY_ROOT_FOLDER', 'school-management-system').strip()
+    or 'school-management-system'
+)
 CLOUDINARY_UPLOAD_PRESET = os.getenv('CLOUDINARY_UPLOAD_PRESET')
 
 _cloudinary_upload_options = {
