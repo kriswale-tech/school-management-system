@@ -380,6 +380,10 @@ AUTH_USER_MODEL = 'accounts.User'
 # Arkesel settings
 ARKESEL_API_KEY = os.getenv('ARKESEL_API_KEY')
 ARKESEL_SMS_SENDER = os.getenv('ARKESEL_SMS_SENDER')
+ARKESEL_SANDBOX = _env_bool(
+    'ARKESEL_SANDBOX',
+    'false' if APP_ENV == 'production' else 'true',
+)
 
 # Paystack — SaaS billing only (school-fee Paystack, if any, stays separate).
 PAYSTACK_SAAS_SECRET_KEY = os.getenv('PAYSTACK_SAAS_SECRET_KEY', '')
