@@ -15,6 +15,8 @@ The VPS already runs Caddy as a host service. Keep it as the only public web ser
 
 The hostnames in [`../deploy/Caddyfile.example`](../deploy/Caddyfile.example) are examples and must be replaced with the real domains. Merge the site blocks into the VPS's existing Caddyfile; preserve any other sites already hosted there.
 
+Production app, admin, and API responses start with an HSTS `max-age` of one hour. This lets browsers learn the HTTPS policy while keeping the first rollout easy to reverse. After confirming all production hosts serve HTTPS reliably, increase the value to `31536000` (one year). Keep `includeSubDomains` and `preload` disabled until every subdomain is known to support HTTPS.
+
 ## Frontend release model
 
 GitHub Actions will build each frontend with its environment's public `VITE_API_BASE_URL`. For a commit SHA, it will upload `dist/` into a new release directory, for example:

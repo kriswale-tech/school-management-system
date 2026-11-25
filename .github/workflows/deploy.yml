@@ -86,7 +86,7 @@ jobs:
           EOF
           chmod 600 "$RUNNER_TEMP/deploy-ssh/config"
 
-      - name: Upload frontend releases and Compose files
+      - name: Upload frontend releases, Compose files, and production backup script
         env:
           RSYNC_RSH: ssh -F ${{ runner.temp }}/deploy-ssh/config
         run: |
@@ -100,6 +100,10 @@ jobs:
             "deploy-host:$stage_root/platform-admin/releases/$GITHUB_SHA/"
           rsync -az compose.deploy.yml "compose.$DEPLOY_STAGE.yml" \
             "deploy-host:$stage_root/"
+          if [[ "$DEPLOY_STAGE" == "prod" ]]; then
+            rsync -az deploy/backup-prod-postgres-r2.sh \
+              "deploy-host:$stage_root/backup-prod-postgres-r2.sh"
+          fi
 
       - name: Deploy backend and switch frontend releases
         run: |
@@ -111,6 +115,13 @@ jobs:
           export IMAGE_TAG="$GITHUB_SHA"
           compose=(docker compose -f compose.deploy.yml -f "compose.$DEPLOY_STAGE.yml")
           "${compose[@]}" pull
+          if [[ "$DEPLOY_STAGE" == "prod" ]]; then
+            # Start only the database first so we can preserve its current
+            # state before the one-off migration job changes the schema.
+            "${compose[@]}" up -d db --wait --wait-timeout 120
+            chmod 700 "$stage_root/backup-prod-postgres-r2.sh"
+            "$stage_root/backup-prod-postgres-r2.sh"
+          fi
           # Keep the migration container from consuming the rest of this SSH script.
           "${compose[@]}" run --rm -T migrate </dev/null
           "${compose[@]}" up -d --remove-orphans --wait --wait-timeout 120

@@ -21,6 +21,7 @@ dev-api.schoolassistgh.com {
 }
 
 app.schoolassistgh.com {
+	header Strict-Transport-Security "max-age=3600"
 	root * /home/kris/school-management-system/prod/school/current
 	encode zstd gzip
 	try_files {path} /index.html
@@ -28,6 +29,7 @@ app.schoolassistgh.com {
 }
 
 admin.schoolassistgh.com {
+	header Strict-Transport-Security "max-age=3600"
 	root * /home/kris/school-management-system/prod/platform-admin/current
 	encode zstd gzip
 	try_files {path} /index.html
@@ -35,5 +37,6 @@ admin.schoolassistgh.com {
 }
 
 api.schoolassistgh.com {
+	header Strict-Transport-Security "max-age=3600"
 	reverse_proxy 127.0.0.1:18200
 }
