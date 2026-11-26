@@ -381,7 +381,7 @@ class SesTestSendView(MessagesAPIView):
         return Response({
             'ok': True,
             'to': to_addr,
-            'from_email': settings.DEFAULT_FROM_EMAIL,
+            'from_email': settings.GUARDIAN_FROM_EMAIL,
             'provider_message_id': result.get('provider_message_id') or '',
         })
 

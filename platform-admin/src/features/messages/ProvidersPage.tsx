@@ -860,7 +860,7 @@ export default function ProvidersPage() {
       <div className="mt-4">
         <Panel
           title="Send a test email"
-          description="One plain message through the same SES credentials this app uses."
+          description="One plain message from the parent sender (notify). Login codes and staff mail use the team sender."
           footnote="Sandbox delivery only reaches a verified address. pseudofaux25@gmail.com is verified, so a message to that inbox is delivered. Check spam if it is not in the inbox."
         >
           {canSync ? (

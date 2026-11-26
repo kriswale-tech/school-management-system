@@ -22,7 +22,9 @@ EMAIL_BATCH_SIZE = 100
 
 
 def _from_email() -> str:
-    return settings.DEFAULT_FROM_EMAIL
+    """Parent notifications. Staff and OTP mail use DEFAULT_FROM_EMAIL directly."""
+    guardian = (getattr(settings, 'GUARDIAN_FROM_EMAIL', '') or '').strip()
+    return guardian or settings.DEFAULT_FROM_EMAIL
 
 
 def _provider() -> str:

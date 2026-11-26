@@ -524,6 +524,8 @@ RESEND_WEBHOOK_SECRET = os.getenv('RESEND_WEBHOOK_SECRET', '').strip()
 
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@localhost')
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
+# Billed parent mail. Internal mail (OTP, staff, platform) stays on DEFAULT_FROM_EMAIL.
+GUARDIAN_FROM_EMAIL = os.getenv('GUARDIAN_FROM_EMAIL', '').strip() or DEFAULT_FROM_EMAIL
 
 # Messaging refund policy (v4.1 §2.14) — reverse school credits after provider
 # acceptance when the eventual DLR/webhook reports failure.
