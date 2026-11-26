@@ -368,7 +368,19 @@ class SesTestSendView(MessagesAPIView):
 
         result = send_ses_test_email(to=to_addr, subject=subject, body=message)
         if not result.get('ok'):
-            raise ValidationError(result.get('error') or 'SES rejected the message.')
+            error = (result.get('error') or 'SES rejected the message.')[:500]
+            record_audit(
+                actor=request.platform_user,
+                action='messages.ses_test.failed',
+                target_type='ses_test',
+                detail={
+                    'to': to_addr,
+                    'subject': subject[:200],
+                    'error': error,
+                },
+                ip_address=client_ip(request),
+            )
+            raise ValidationError(error)
 
         record_audit(
             actor=request.platform_user,

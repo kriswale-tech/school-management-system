@@ -1,6 +1,7 @@
 const ACTION_LABELS: Record<string, string> = {
   'messages.arkesel_test.sent': 'Test SMS sent',
   'messages.ses_test.sent': 'Test email sent',
+  'messages.ses_test.failed': 'Test email failed',
   'messages.provider_purchase.created': 'Provider purchase recorded',
   'messages.provider_expense.created': 'Provider expense recorded',
   'messages.allowance.created': 'Messaging allowance created',
@@ -90,6 +91,7 @@ export function auditSummary(detail: Record<string, unknown>) {
   if (detail.sandbox === false) parts.push('live')
   if (typeof detail.amount_ghs === 'string' && detail.amount_ghs) parts.push(`GHS ${detail.amount_ghs}`)
   if (typeof detail.subject === 'string' && detail.subject) parts.push(detail.subject)
+  if (typeof detail.error === 'string' && detail.error) parts.push(detail.error)
   if (reason) parts.push(reason)
   return parts.join(' · ')
 }
