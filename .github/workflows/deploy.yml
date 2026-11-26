@@ -170,7 +170,9 @@ jobs:
               docker image rm "$image_ref"
               printf 'Removed unused SchoolAssist backend image: %s\n' "$image_ref"
             fi
-          done < <(docker image ls "$image_repo" --format '{{.Repository}}:{{.Tag}} {{.ID}}')
+          # Use full image IDs here; `docker inspect` returns full IDs while
+          # `docker image ls` abbreviates them by default.
+          done < <(docker image ls --no-trunc "$image_repo" --format '{{.Repository}}:{{.Tag}} {{.ID}}')
           REMOTE
 
       - name: Tag successful image and retain four versions per environment in GHCR
