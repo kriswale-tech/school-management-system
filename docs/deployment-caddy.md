@@ -28,11 +28,17 @@ GitHub Actions will build each frontend with its environment's public `VITE_API_
 
 After upload completes, the deployment script will atomically switch each `current` symlink to that release. Caddy continues serving files from `current`; rollback means switching the symlink to a previous release. Keep the Caddy user able to traverse the release parent directories and read the static files, but do not make the directory writable by Caddy.
 
-The backend alone is packaged as a private GHCR image tagged with the commit SHA. The API is published to the host only on loopback; Postgres and Redis have no published host ports. Dev and production Compose project names keep their volumes separate.
+After a successful deployment, the workflow keeps the active release and the three most recent previous releases for each frontend and environment. Older frontend release directories are removed only after the backend is healthy and both frontend symlinks have switched.
+
+The backend alone is packaged as a private GHCR image with both an immutable commit-SHA tag (used by Compose) and an environment-prefixed tag (`dev-<sha>` or `prod-<sha>`) used for registry retention. The GHCR cleanup retains the four most recent versions for each environment. Pre-retention SHA-only versions are left untouched because their environment cannot be safely inferred. The VPS removes unused tags from this application's backend image repository only; it preserves image IDs used by any containers and does not prune other projects' images. GHCR remains the source for rolling back to earlier image versions.
+
+GHCR version deletion requires the repository's GitHub Actions workflow to have **Admin** access to the package. Configure that in the package's **Package settings → Manage Actions access**. The cleanup step is non-blocking, so a missing permission will be reported in the workflow without failing an otherwise successful deployment.
+
+The API is published to the host only on loopback; Postgres and Redis have no published host ports. Dev and production Compose project names keep their volumes separate.
 
 ## GitHub Actions setup required before the first deployment
 
-The reusable workflow in `.github/workflows/deploy.yml` is connected to `.github/workflows/ci.yml` on the local `dev` branch. It only runs on pushes to `dev` or `main`, after the backend, both frontend, and backend-image jobs pass. Once these changes are merged to `dev`, it will publish the backend image to GHCR, build the frontends with the environment's API URL, upload static releases, run migrations, and switch the Caddy `current` symlinks.
+The reusable workflow in `.github/workflows/deploy.yml` is called by `.github/workflows/ci.yml`. It only runs on pushes to `dev` or `main`, after backend, frontend, and backend-image checks pass. A shared concurrency lock serializes both stages on this one VPS. A successful dev deployment has been verified. The first production deployment has not been run yet. On deployment, the workflow publishes the backend image to GHCR, builds the frontends with the environment's API URL, uploads static releases, runs migrations, waits for service health, and switches the Caddy `current` symlinks.
 
 Create GitHub Environments named `development` and `production`, and restrict each to its matching branch (`dev` or `main`). Add these secrets to each environment:
 
@@ -45,4 +51,4 @@ Create GitHub Environments named `development` and `production`, and restrict ea
 
 Add the environment variable `VITE_API_BASE_URL` to both environments, set to that environment's public API URL ending in `/api/v1`.
 
-On the VPS, use `~/school-management-system/dev` and `~/school-management-system/prod`, put `.env.dev` and `.env.prod` in their matching directories, and ensure the SSH user can write those directories and run Docker Compose. Log that user into the private GHCR package with a read-only package token so it can pull the image. Merge the routes from [`../deploy/Caddyfile.example`](../deploy/Caddyfile.example) into the host's existing Caddyfile, preserving other sites. The workflow runs migrations automatically; finish and verify the production backup/restore setup before enabling production deployments.
+On the VPS, use `~/school-management-system/dev` and `~/school-management-system/prod`, put `.env.dev` and `.env.prod` in their matching directories, and ensure the SSH user can write those directories and run Docker Compose. Log that user into the private GHCR package with a read-only package token so it can pull the image. Merge the routes from [`../deploy/Caddyfile.example`](../deploy/Caddyfile.example) into the host's existing Caddyfile, preserving other sites. The workflow runs migrations automatically and takes a production database backup before migration. See [`deployment-operations.md`](deployment-operations.md) for the current setup and retention details.

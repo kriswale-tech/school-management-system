@@ -12,7 +12,8 @@ jobs:
     environment:
       name: ${{ github.ref_name == 'main' && 'production' || 'development' }}
     concurrency:
-      group: deploy-${{ github.ref_name }}
+      # Both environments share one VPS; serialize deploy and image cleanup.
+      group: deploy-school-management-system
       cancel-in-progress: false
     permissions:
       contents: read
@@ -130,6 +131,55 @@ jobs:
             test -f "$release/index.html"
             ln -sfn "$release" "$stage_root/$app/current.next"
             mv -Tf "$stage_root/$app/current.next" "$stage_root/$app/current"
+            touch "$release"
             printf 'Activated %s frontend: %s\n' "$app" "$(readlink "$stage_root/$app/current")"
           done
+
+          # Keep the active release and three previous releases for rollback.
+          # Cleanup runs only after the backend is healthy and both frontends
+          # have switched successfully, and is scoped to this app's releases.
+          for app in school platform-admin; do
+            releases_dir="$stage_root/$app/releases"
+            current_release="$(readlink -f "$stage_root/$app/current")"
+            previous_count=0
+            while IFS= read -r release; do
+              [[ "$release" == "$current_release" ]] && continue
+              if (( previous_count < 3 )); then
+                ((previous_count += 1))
+              else
+                rm -rf -- "$release"
+                printf 'Removed old %s frontend release: %s\n' "$app" "$release"
+              fi
+            done < <(find "$releases_dir" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -rn | cut -d' ' -f2-)
+          done
+
+          # Keep only backend images referenced by existing containers on this
+          # VPS. This preserves active dev/prod images and leaves GHCR rollback
+          # tags untouched. Scope removal to this application's image repository.
+          image_repo="ghcr.io/kriswale-tech/school-management-system-backend"
+          declare -A in_use_image_ids=()
+          while IFS= read -r container_id; do
+            [[ -n "$container_id" ]] || continue
+            image_id="$(docker inspect --format '{{.Image}}' "$container_id")"
+            in_use_image_ids["$image_id"]=1
+          done < <(docker ps -aq)
+          while IFS=' ' read -r image_ref image_id; do
+            [[ -n "$image_ref" && -n "$image_id" ]] || continue
+            [[ "$image_ref" == "$image_repo:"* ]] || continue
+            if [[ -z "${in_use_image_ids[$image_id]:-}" ]]; then
+              docker image rm "$image_ref"
+              printf 'Removed unused SchoolAssist backend image: %s\n' "$image_ref"
+            fi
+          done < <(docker image ls "$image_repo" --format '{{.Repository}}:{{.Tag}} {{.ID}}')
           REMOTE
+
+      - name: Tag successful image and retain four versions per environment in GHCR
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker buildx imagetools create \
+            --tag "$IMAGE:$DEPLOY_STAGE-$GITHUB_SHA" \
+            "$IMAGE:$GITHUB_SHA"
+          python3 deploy/cleanup-ghcr-versions.py
