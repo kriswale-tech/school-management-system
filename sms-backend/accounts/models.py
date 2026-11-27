@@ -6,6 +6,7 @@ from django.utils import timezone
 from django.conf import settings
 
 from shared.models import BaseModel
+from shared.uploads import profile_picture_upload_to
 
 
 class UserManager(BaseUserManager):
@@ -121,7 +122,7 @@ class SchoolMembership(BaseModel):
 
 class Profile(BaseModel):
     user = models.OneToOneField('accounts.User', on_delete=models.CASCADE)
-    profile_picture = models.ImageField(upload_to=f'{settings.PARENT_CLOUDINARY_FOLDER}/profile-pictures/', null=True, blank=True)
+    profile_picture = models.ImageField(upload_to=profile_picture_upload_to, null=True, blank=True)
     bio = models.TextField(null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
     gender = models.CharField(

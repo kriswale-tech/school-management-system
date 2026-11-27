@@ -8,6 +8,7 @@ This document records the deployment setup and the operational choices made for 
 - Production is prepared but has not had its first deployment. Its school, platform-admin, and API hosts are `app.schoolassistgh.com`, `admin.schoolassistgh.com`, and `api.schoolassistgh.com`.
 - Both stacks run on the existing Hetzner VPS under `/home/kris/school-management-system/{dev,prod}`. Host Caddy serves the static frontends and proxies API requests to loopback ports `18100` (dev) and `18200` (production).
 - The VPS keeps `.env.dev` and `.env.prod` in the matching stage directory. Production has `EMAIL_ENABLED=false` while the SES account remains in the sandbox.
+- `CLOUDINARY_ROOT_FOLDER` remains environment-specific. Profile-picture and school-logo upload paths read it at upload time through stable callables, so migration history does not capture the dev or production folder name.
 
 ## CI and deployment flow
 
