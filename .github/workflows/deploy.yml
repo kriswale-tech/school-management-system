@@ -1,0 +1,187 @@
+name: Deploy
+
+on:
+  workflow_call:
+
+jobs:
+  deploy:
+    name: Deploy ${{ github.ref_name }}
+    if: github.event_name == 'push' && (github.ref_name == 'dev' || github.ref_name == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+    concurrency:
+      # Both environments share one VPS; serialize deploy and image cleanup.
+      group: deploy-school-management-system
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    env:
+      DEPLOY_STAGE: ${{ github.ref_name == 'main' && 'prod' || 'dev' }}
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+      IMAGE: ghcr.io/kriswale-tech/school-management-system-backend
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check deployment environment settings
+        run: |
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS VITE_API_BASE_URL; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Set $name in the ${{ github.ref_name == 'main' && 'production' || 'development' }} GitHub Environment."
+              exit 1
+            fi
+          done
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: sms-frontend/package-lock.json
+
+      - name: Build school frontend for this environment
+        working-directory: sms-frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build platform admin for this environment
+        working-directory: platform-admin
+        run: |
+          npm ci
+          npm run build
+
+      - name: Publish immutable backend image to GHCR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker buildx build \
+            --file sms-backend/Dockerfile.prod \
+            --tag "$IMAGE:$GITHUB_SHA" \
+            --push \
+            sms-backend
+
+      - name: Configure SSH
+        run: |
+          install -d -m 700 "$RUNNER_TEMP/deploy-ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy-ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$RUNNER_TEMP/deploy-ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/deploy-ssh/id_ed25519" "$RUNNER_TEMP/deploy-ssh/known_hosts"
+          cat >> "$RUNNER_TEMP/deploy-ssh/config" <<EOF
+          Host deploy-host
+            HostName $DEPLOY_HOST
+            User $DEPLOY_USER
+            IdentityFile $RUNNER_TEMP/deploy-ssh/id_ed25519
+            UserKnownHostsFile $RUNNER_TEMP/deploy-ssh/known_hosts
+            StrictHostKeyChecking yes
+            IdentitiesOnly yes
+            BatchMode yes
+          EOF
+          chmod 600 "$RUNNER_TEMP/deploy-ssh/config"
+
+      - name: Upload frontend releases, Compose files, and production backup script
+        env:
+          RSYNC_RSH: ssh -F ${{ runner.temp }}/deploy-ssh/config
+        run: |
+          # SSH and rsync start in the deployment user's home directory.
+          stage_root="school-management-system/$DEPLOY_STAGE"
+          ssh -F "$RUNNER_TEMP/deploy-ssh/config" deploy-host \
+            "mkdir -p '$stage_root/school/releases/$GITHUB_SHA' '$stage_root/platform-admin/releases/$GITHUB_SHA'"
+          rsync -az --delete sms-frontend/dist/ \
+            "deploy-host:$stage_root/school/releases/$GITHUB_SHA/"
+          rsync -az --delete platform-admin/dist/ \
+            "deploy-host:$stage_root/platform-admin/releases/$GITHUB_SHA/"
+          rsync -az compose.deploy.yml "compose.$DEPLOY_STAGE.yml" \
+            "deploy-host:$stage_root/"
+          if [[ "$DEPLOY_STAGE" == "prod" ]]; then
+            rsync -az deploy/backup-prod-postgres-r2.sh \
+              "deploy-host:$stage_root/backup-prod-postgres-r2.sh"
+          fi
+
+      - name: Deploy backend and switch frontend releases
+        run: |
+          ssh -F "$RUNNER_TEMP/deploy-ssh/config" deploy-host \
+            "DEPLOY_STAGE='$DEPLOY_STAGE' GITHUB_SHA='$GITHUB_SHA' bash -s" <<'REMOTE'
+          set -euo pipefail
+          stage_root="$HOME/school-management-system/$DEPLOY_STAGE"
+          cd "$stage_root"
+          export IMAGE_TAG="$GITHUB_SHA"
+          compose=(docker compose -f compose.deploy.yml -f "compose.$DEPLOY_STAGE.yml")
+          "${compose[@]}" pull
+          if [[ "$DEPLOY_STAGE" == "prod" ]]; then
+            # Start only the database first so we can preserve its current
+            # state before the one-off migration job changes the schema.
+            "${compose[@]}" up -d db --wait --wait-timeout 120
+            chmod 700 "$stage_root/backup-prod-postgres-r2.sh"
+            "$stage_root/backup-prod-postgres-r2.sh"
+          fi
+          # Keep the migration container from consuming the rest of this SSH script.
+          "${compose[@]}" run --rm -T migrate </dev/null
+          "${compose[@]}" up -d --remove-orphans --wait --wait-timeout 120
+          for app in school platform-admin; do
+            release="$stage_root/$app/releases/$GITHUB_SHA"
+            test -f "$release/index.html"
+            ln -sfn "$release" "$stage_root/$app/current.next"
+            mv -Tf "$stage_root/$app/current.next" "$stage_root/$app/current"
+            touch "$release"
+            printf 'Activated %s frontend: %s\n' "$app" "$(readlink "$stage_root/$app/current")"
+          done
+
+          # Keep the active release and three previous releases for rollback.
+          # Cleanup runs only after the backend is healthy and both frontends
+          # have switched successfully, and is scoped to this app's releases.
+          for app in school platform-admin; do
+            releases_dir="$stage_root/$app/releases"
+            current_release="$(readlink -f "$stage_root/$app/current")"
+            previous_count=0
+            while IFS= read -r release; do
+              [[ "$release" == "$current_release" ]] && continue
+              if (( previous_count < 3 )); then
+                ((previous_count += 1))
+              else
+                rm -rf -- "$release"
+                printf 'Removed old %s frontend release: %s\n' "$app" "$release"
+              fi
+            done < <(find "$releases_dir" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -rn | cut -d' ' -f2-)
+          done
+
+          # Keep only backend images referenced by existing containers on this
+          # VPS. This preserves active dev/prod images and leaves GHCR rollback
+          # tags untouched. Scope removal to this application's image repository.
+          image_repo="ghcr.io/kriswale-tech/school-management-system-backend"
+          declare -A in_use_image_ids=()
+          while IFS= read -r container_id; do
+            [[ -n "$container_id" ]] || continue
+            image_id="$(docker inspect --format '{{.Image}}' "$container_id")"
+            in_use_image_ids["$image_id"]=1
+          done < <(docker ps -aq)
+          while IFS=' ' read -r image_ref image_id; do
+            [[ -n "$image_ref" && -n "$image_id" ]] || continue
+            [[ "$image_ref" == "$image_repo:"* ]] || continue
+            if [[ -z "${in_use_image_ids[$image_id]:-}" ]]; then
+              docker image rm "$image_ref"
+              printf 'Removed unused SchoolAssist backend image: %s\n' "$image_ref"
+            fi
+          # Use full image IDs here; `docker inspect` returns full IDs while
+          # `docker image ls` abbreviates them by default.
+          done < <(docker image ls --no-trunc "$image_repo" --format '{{.Repository}}:{{.Tag}} {{.ID}}')
+          REMOTE
+
+      - name: Tag successful image and retain four versions per environment in GHCR
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker buildx imagetools create \
+            --tag "$IMAGE:$DEPLOY_STAGE-$GITHUB_SHA" \
+            "$IMAGE:$GITHUB_SHA"
+          python3 deploy/cleanup-ghcr-versions.py

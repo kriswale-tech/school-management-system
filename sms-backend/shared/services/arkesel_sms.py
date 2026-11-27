@@ -39,7 +39,7 @@ def _headers() -> dict:
 
 
 def _sandbox_flag(sandbox: bool | None) -> bool:
-    return settings.DEBUG if sandbox is None else sandbox
+    return settings.ARKESEL_SANDBOX if sandbox is None else sandbox
 
 
 def arkesel_callback_url() -> str:

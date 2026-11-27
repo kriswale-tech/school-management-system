@@ -193,3 +193,17 @@ jobs:
       - name: Build production image without publishing
         run: docker build --file sms-backend/Dockerfile.prod --tag school-management-system-backend:ci sms-backend
 
+  deploy:
+    name: Deploy ${{ github.ref_name }}
+    needs:
+      - backend-tests
+      - school-frontend
+      - platform-admin
+      - backend-image
+    if: github.event_name == 'push' && (github.ref_name == 'dev' || github.ref_name == 'main')
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+

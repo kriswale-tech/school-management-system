@@ -103,6 +103,16 @@ export async function syncArkeselBalance() {
   return data
 }
 
+export async function sendArkeselTest(payload: { to: string; message: string }) {
+  const { data } = await api.post<{
+    ok: boolean
+    to: string
+    sandbox: boolean
+    provider_message_id: string
+  }>(`${BASE}/providers/arkesel/test-send/`, payload)
+  return data
+}
+
 export async function listArkeselSnapshots(params?: { page?: number }) {
   const { data } = await api.get<Paginated<ProviderBalanceSnapshot>>(
     `${BASE}/providers/arkesel/snapshots/`,

@@ -5,6 +5,7 @@ from communications.views.messages import (
     AllowanceListCreateView,
     ArkeselSnapshotListView,
     ArkeselSyncBalanceView,
+    ArkeselTestSendView,
     EmailPricingHistoryView,
     EmailPricingListCreateView,
     ExpenseListCreateView,
@@ -62,6 +63,11 @@ urlpatterns = [
         'providers/arkesel/snapshots/',
         ArkeselSnapshotListView.as_view(),
         name='platform-messages-arkesel-snapshots',
+    ),
+    path(
+        'providers/arkesel/test-send/',
+        ArkeselTestSendView.as_view(),
+        name='platform-messages-arkesel-test-send',
     ),
     path(
         'providers/ses/sync-usage/',

@@ -1,9 +1,9 @@
 from decimal import Decimal
 
-from django.conf import settings
 from django.db import models
 
 from shared.models import BaseModel
+from shared.uploads import school_logo_upload_to
 
 # Create your models here.
 class School(BaseModel):
@@ -30,7 +30,7 @@ class School(BaseModel):
     phone_number = models.CharField(max_length=15)
     phone_number_alt = models.CharField(max_length=15, null=True, blank=True)
     email = models.EmailField(null=True, blank=True)
-    logo = models.ImageField(upload_to=f'{settings.PARENT_CLOUDINARY_FOLDER}/school-logos/', null=True, blank=True)
+    logo = models.ImageField(upload_to=school_logo_upload_to, null=True, blank=True)
     motto = models.TextField(null=True, blank=True)
     student_id_prefix = models.CharField(
         max_length=12,

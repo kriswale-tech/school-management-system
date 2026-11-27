@@ -52,6 +52,9 @@ export default function AppShell() {
                   Messages
                 </NavLink>
               )}
+              <NavLink to="/audit" className={navClass}>
+                Audit
+              </NavLink>
               <NavLink to="/settings" className={navClass}>
                 Settings
               </NavLink>

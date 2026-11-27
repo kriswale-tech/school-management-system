@@ -380,6 +380,10 @@ AUTH_USER_MODEL = 'accounts.User'
 # Arkesel settings
 ARKESEL_API_KEY = os.getenv('ARKESEL_API_KEY')
 ARKESEL_SMS_SENDER = os.getenv('ARKESEL_SMS_SENDER')
+ARKESEL_SANDBOX = _env_bool(
+    'ARKESEL_SANDBOX',
+    'false' if APP_ENV == 'production' else 'true',
+)
 
 # Paystack — SaaS billing only (school-fee Paystack, if any, stays separate).
 PAYSTACK_SAAS_SECRET_KEY = os.getenv('PAYSTACK_SAAS_SECRET_KEY', '')
@@ -387,7 +391,10 @@ PAYSTACK_SAAS_PUBLIC_KEY = os.getenv('PAYSTACK_SAAS_PUBLIC_KEY', '')
 PAYSTACK_SAAS_WEBHOOK_SECRET = os.getenv('PAYSTACK_SAAS_WEBHOOK_SECRET', '')
 
 # cloudinary settings
-PARENT_CLOUDINARY_FOLDER = 'school-management-system'
+PARENT_CLOUDINARY_FOLDER = (
+    os.getenv('CLOUDINARY_ROOT_FOLDER', 'school-management-system').strip()
+    or 'school-management-system'
+)
 CLOUDINARY_UPLOAD_PRESET = os.getenv('CLOUDINARY_UPLOAD_PRESET')
 
 _cloudinary_upload_options = {
@@ -517,6 +524,8 @@ RESEND_WEBHOOK_SECRET = os.getenv('RESEND_WEBHOOK_SECRET', '').strip()
 
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@localhost')
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
+# Billed parent mail. Internal mail (OTP, staff, platform) stays on DEFAULT_FROM_EMAIL.
+GUARDIAN_FROM_EMAIL = os.getenv('GUARDIAN_FROM_EMAIL', '').strip() or DEFAULT_FROM_EMAIL
 
 # Messaging refund policy (v4.1 §2.14) — reverse school credits after provider
 # acceptance when the eventual DLR/webhook reports failure.
@@ -601,5 +610,10 @@ if 'test' in sys.argv:
     CELERY_TASK_EAGER_PROPAGATES = True
     EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
     EMAIL_ENABLED = True
+    # A developer .env often has live SES keys. Tests must not send through
+    # that account. A test that needs the SES path sets its own keys.
+    AWS_ACCESS_KEY_ID = ''
+    AWS_SECRET_ACCESS_KEY = ''
+    AWS_REGION = ''
     # A missing float must not block fixture SMS. Production leaves this unset.
     ARKESEL_FLOAT_ASSUME_UNITS = 100_000
